@@ -1,0 +1,7 @@
+(menhir
+ (modules sl_parser))
+
+(library
+ (name sl_to_acsl_lib)
+ (modules ast)
+ (wrapped false))
