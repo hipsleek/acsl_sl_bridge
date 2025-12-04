@@ -29,5 +29,21 @@ let test_translate_swap () =
   in
   test_framework test_name input expected
 
+let test_translate_no_swap () =
+  let test_name = "translate_swap" in
+  let input =
+    "req a->int*(u);\n" ^
+    "ens a->int*(u);"
+  in
+  let expected =
+"/*@
+  requires \\valid(a);
+  assigns  *a;
+  ensures  *a == \\old(*a);
+*/"
+  in
+  test_framework test_name input expected
+
 let () =
-  test_translate_swap ()
+  test_translate_swap ();
+  test_translate_no_swap ()
