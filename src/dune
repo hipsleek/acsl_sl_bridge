@@ -1,7 +1,15 @@
+(library
+ (name sl_to_acsl_lib)
+ (modules ast sl_parser sl_lexer)
+ (wrapped false))
+
 (menhir
  (modules sl_parser))
 
-(library
- (name sl_to_acsl_lib)
- (modules ast)
- (wrapped false))
+(ocamllex
+ (modules sl_lexer))
+
+(executable
+ (name main)
+ (modules main)
+ (libraries sl_to_acsl_lib))

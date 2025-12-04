@@ -8,14 +8,6 @@ let assert_string_equality name expected actual =
          name expected actual)
 
 (*Test cases*)
-let test_string_of_spec_empty () =
-  let empty = Emp in
-
-  let actual = string_of_heap empty in
-
-  let expected = "" in
-
-  assert_string_equality "string_of_spec_empty" actual expected
 
 let test_string_of_spec_atom () =
   let atom = Atom (PointTo ("a", "u")) in
@@ -63,7 +55,6 @@ let test_string_of_spec_swap () =
   assert_string_equality "string_of_spec_swap" actual expected
 
 let () =
-  test_string_of_spec_empty ();
   test_string_of_spec_atom ();
   test_string_of_spec_formula ();
   test_string_of_spec_swap ()
