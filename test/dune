@@ -3,3 +3,12 @@
  (modules test_ast)
  (libraries sl_to_acsl_lib))
 
+(test
+ (name test_lexer)
+ (modules test_lexer)
+ (libraries sl_to_acsl_lib))
+
+(test
+ (name test_parser)
+ (modules test_parser)
+ (libraries sl_to_acsl_lib))
