@@ -44,6 +44,22 @@ let test_translate_no_swap () =
   in
   test_framework test_name input expected
 
+let test_translate_triple_swap () =
+  let test_name = "translate_swap" in
+  let input =
+    "req a->int*(u) && b->int*(v) && c->int*(w);\n" ^
+    "ens a->int*(w) && b->int*(u) && c->int*(v);"
+  in
+  let expected =
+"/*@
+  requires \\valid(a) && \\valid(b) && \\valid(c);
+  assigns  *a, *b, *c;
+  ensures  *a == \\old(*c) && *b == \\old(*a) && *c == \\old(*b);
+*/"
+  in
+  test_framework test_name input expected
+
 let () =
   test_translate_swap ();
-  test_translate_no_swap ()
+  test_translate_no_swap ();
+  test_translate_triple_swap ()
