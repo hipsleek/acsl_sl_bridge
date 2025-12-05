@@ -1,0 +1,73 @@
+let parse_spec (input : string) : Ast.spec =
+  let lexbuf = Lexing.from_string input in
+  Sl_parser.main Sl_lexer.token lexbuf
+
+let assert_string_equality name expected actual =
+  if actual <> expected then
+    failwith
+      (Printf.sprintf "%s failed.\nExpected: %S\nGot:      %S\n"
+         name expected actual)
+
+let test_sl_to_core_swap () =
+  let test_name = "sl_to_core_swap" in
+  let input =
+    "req a->int*(u) && b->int*(v);\n" ^
+    "ens a->int*(v) && b->int*(u);"
+  in
+  let sl_spec = parse_spec input in
+  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let actual = Core.string_of_spec core_spec in
+  let expected =
+    "req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);"
+  in
+  assert_string_equality test_name expected actual
+
+let test_sl_to_core_no_swap () =
+  let test_name = "sl_to_core_no_swap" in
+  let input =
+    "req a->int*(u);\n" ^
+    "ens a->int*(u);"
+  in
+  let sl_spec = parse_spec input in
+  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let actual = Core.string_of_spec core_spec in
+  let expected =
+    "req a->int*(u); ens a->int*(u);"
+  in
+  assert_string_equality test_name expected actual
+
+let test_sl_to_core_triple_swap () =
+  let test_name = "sl_to_core_triple_swap" in
+  let input =
+    "req a->int*(u) && b->int*(v) && c->int*(w);\n" ^
+    "ens a->int*(w) && b->int*(u) && c->int*(v);"
+  in
+  let sl_spec = parse_spec input in
+  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let actual = Core.string_of_spec core_spec in
+  let expected =
+    "req a->int*(u) && b->int*(v) && c->int*(w); \
+     ens a->int*(w) && b->int*(u) && c->int*(v);"
+  in
+  assert_string_equality test_name expected actual
+
+let test_sl_to_core_swap_type_mismatch () =
+  let test_name = "sl_to_core_swap_type_mismatch" in
+  let input =
+    "req a->int*(u) && b->char*(v);\n" ^
+    "ens a->char*(v) && b->int*(u);"
+  in
+  let sl_spec = parse_spec input in
+  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let actual = Core.string_of_spec core_spec in
+  let expected =
+    "req a->int*(u) && b->char*(v); \
+     ens a->char*(v) && b->int*(u);"
+  in
+  assert_string_equality test_name expected actual
+
+let () =
+  test_sl_to_core_swap ();
+  test_sl_to_core_no_swap ();
+  test_sl_to_core_triple_swap ();
+  test_sl_to_core_swap_type_mismatch ();

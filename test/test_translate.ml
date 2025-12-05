@@ -10,9 +10,8 @@ let assert_string_equality name expected actual =
 
 let test_framework test_name input expected =
   let spec = parse_spec input in
-  let actual = Translate.sl_spec_to_acsl spec in
+  let actual = Translate.sl_to_acsl spec in
   assert_string_equality test_name expected actual
-
 
 let test_translate_swap () =
   let test_name = "translate_swap" in

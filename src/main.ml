@@ -14,7 +14,7 @@ let () =
   let text = read_all () in
   let lexbuf = Lexing.from_string text in
   try
-    let spec = Sl_parser.main Sl_lexer.token lexbuf in
+    let sl_spec = Sl_parser.main Sl_lexer.token lexbuf in
     let acsl = Translate.sl_spec_to_acsl spec in
     Printf.printf "%s\n" acsl
   with
