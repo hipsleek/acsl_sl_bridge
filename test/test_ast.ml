@@ -63,8 +63,22 @@ let test_string_of_spec_swap () =
 
   assert_string_equality "string_of_spec_swap" actual expected
 
+  open Ast
+
+let test_spec_of_pointer_pairs_swap () =
+  let test_name = "spec_of_pointer_pairs_swap" in
+  let pairs = [ ("a", "b"); ("b", "a") ] in
+  let spec = spec_of_pointer_pairs pairs in
+  let actual = string_of_spec spec in
+  let expected =
+    "req a->int*(v0) && b->int*(v1); ens a->int*(v1) && b->int*(v0);"
+  in
+  assert_string_equality test_name expected actual
+
+
 let () =
   test_string_of_spec_atom_int ();
   test_string_of_spec_atom_char ();
   test_string_of_spec_formula ();
-  test_string_of_spec_swap ()
+  test_string_of_spec_swap ();
+  test_spec_of_pointer_pairs_swap ()
