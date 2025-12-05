@@ -59,7 +59,24 @@ let test_translate_triple_swap () =
   in
   test_framework test_name input expected
 
+(*I let this be a postive test case because the translation only does syntatic translation*)
+let test_translate_swap_type_mismatch () =
+  let test_name = "translate_swap_type_mismatch" in
+  let input =
+    "req a->int*(u) && b->char*(v);\n" ^
+    "ens a->char*(v) && b->int*(u);"
+  in
+  let expected =
+"/*@
+  requires \\valid(a) && \\valid(b);
+  assigns  *a, *b;
+  ensures  *a == \\old(*b) && *b == \\old(*a);
+*/"
+  in
+  test_framework test_name input expected
+
 let () =
   test_translate_swap ();
   test_translate_no_swap ();
-  test_translate_triple_swap ()
+  test_translate_triple_swap ();
+  test_translate_swap_type_mismatch ()

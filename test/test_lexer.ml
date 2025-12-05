@@ -5,7 +5,9 @@ let string_of_token = function
   | REQ -> "REQ"
   | ENS -> "ENS"
   | ARROW -> "ARROW"
-  | INT -> "INT"
+  (* | INT -> "INT"
+  | CHAR -> "CHAR" *)
+  | TYPE s -> "TYPE(" ^ s ^ ")"
   | STAR -> "STAR"
   | AND -> "AND"
   | LPAREN -> "LPAREN"
@@ -51,13 +53,27 @@ let test_framework test_name input expected =
   assert_string_list_equal test_name expected token_strings
   
 (*unit test*)
-let test_lexer_atom () =
-  let test_name = "lexer_atom" in
+let test_lexer_atom_int () =
+  let test_name = "lexer_atom_int" in
   let input = "a->int*(u)" in
   let expected = [
       "ID(a)";
       "ARROW";
-      "INT";
+      "TYPE(int)";
+      "STAR";
+      "LPAREN";
+      "ID(u)";
+      "RPAREN";
+  ] in
+  test_framework test_name input expected
+
+let test_lexer_atom_char () =
+  let test_name = "lexer_atom_char" in
+  let input = "a->char*(u)" in
+  let expected = [
+      "ID(a)";
+      "ARROW";
+      "TYPE(char)";
       "STAR";
       "LPAREN";
       "ID(u)";
@@ -71,7 +87,7 @@ let test_lexer_formula () =
   let expected = [
       "ID(a)";
       "ARROW";
-      "INT";
+      "TYPE(int)";
       "STAR";
       "LPAREN";
       "ID(u)";
@@ -79,7 +95,7 @@ let test_lexer_formula () =
       "AND";
       "ID(b)";
       "ARROW";
-      "INT";
+      "TYPE(int)";
       "STAR";
       "LPAREN";
       "ID(v)";
@@ -95,7 +111,7 @@ let test_lexer_spec_swap () =
       "REQ";
       "ID(a)";
       "ARROW";
-      "INT";
+      "TYPE(int)";
       "STAR";
       "LPAREN";
       "ID(u)";
@@ -103,7 +119,7 @@ let test_lexer_spec_swap () =
       "AND";
       "ID(b)";
       "ARROW";
-      "INT";
+      "TYPE(int)";
       "STAR";
       "LPAREN";
       "ID(v)";
@@ -113,6 +129,7 @@ let test_lexer_spec_swap () =
   test_framework test_name input expected
 
 let () =
-  test_lexer_atom ();
+  test_lexer_atom_int ();
+  test_lexer_atom_char ();
   test_lexer_formula ();
   test_lexer_spec_swap ()

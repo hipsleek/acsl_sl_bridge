@@ -17,7 +17,7 @@ let test_framework test_name input expected =
 
 
 (*Unit Tests*)
-let test_parser_swap_spec () =
+let test_parser_swap_spec_int () =
   let test_name = "parser_swap_spec" in
   let input =
     "req a->int*(u) && b->int*(v);\n" ^
@@ -28,5 +28,17 @@ let test_parser_swap_spec () =
   in
   test_framework test_name input expected
 
+let test_parser_swap_spec_char () =
+  let test_name = "parser_swap_spec" in
+  let input =
+    "req a->char*(u) && b->char*(v);\n" ^
+    "ens a->char*(v) && b->char*(u);"
+  in
+  let expected =
+    "req a->char*(u) && b->char*(v); ens a->char*(v) && b->char*(u);"
+  in
+  test_framework test_name input expected
+
 let () =
-  test_parser_swap_spec ()
+  test_parser_swap_spec_int ();
+  test_parser_swap_spec_char ();

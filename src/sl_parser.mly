@@ -4,13 +4,15 @@
 
 %token REQ ENS /* req ens*/
 %token ARROW /* -> */
-%token INT /* int */
+// %token INT /* int */
+// %token CHAR /* char */ (*MORE WILL BE ADDED INCREMENTALLY IN FUTURE.*)
 %token STAR /* * */
 %token AND /* && */
 %token LPAREN RPAREN /* (    ) */
 %token SEMICOLON /* ; */
 %token EOF
 %token <string> ID /* a, u ,.. .*/
+%token <string> TYPE /* int, char ,.. .*/
 
 %start <Ast.spec> main
 
@@ -30,6 +32,6 @@ heap:
       { Sep ($1, $3) }
 
 atom:
-  | ID ARROW INT STAR LPAREN ID RPAREN
-      { PointTo ($1, $6) }
+  | ID ARROW TYPE STAR LPAREN ID RPAREN
+      { PointTo ($1, $3, $6) }
 

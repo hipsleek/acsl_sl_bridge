@@ -3,22 +3,22 @@ open Ast
 module StringMap = Map.Make (String)
 module StringSet = Set.Make (String)
 
-let rec atoms_of_heap (h : heap) : (ptr * car) list =
+let rec atoms_of_heap (h : heap) : (ptr * car_type * car) list =
   match h with
-  | Atom (PointTo (p, v)) -> [ (p, v) ]
+  | Atom (PointTo (p, t, v)) -> [ (p, t, v) ]
   | Sep (h1, h2) -> atoms_of_heap h1 @ atoms_of_heap h2
 
 
-(*Eg: a -> int*(u)   =>   [("a", "u")]*)
-let map_of_atoms (atoms : (ptr * car) list) : car StringMap.t =
+(*Eg: a -> int*(u)   =>   [("a", "int", "u")] *)
+let map_of_atoms (atoms : (ptr * car_type * car) list) : car StringMap.t =
   List.fold_left
-    (fun acc (p, v) -> StringMap.add p v acc)
+    (fun acc (p, _t, v) -> StringMap.add p v acc)
     StringMap.empty atoms
 
 (*Eg: a -> int*(u)   =>   {"a"}*)
-let ptrs_of_atoms (atoms : (ptr * car) list) : StringSet.t =
+let ptrs_of_atoms (atoms : (ptr * car_type * car) list) : StringSet.t =
   List.fold_left
-    (fun acc (p, _) -> StringSet.add p acc)
+    (fun acc (p, _t, _v) -> StringSet.add p acc)
     StringSet.empty atoms
 
 
@@ -62,12 +62,11 @@ let sl_spec_to_acsl (s : spec) : string =
       (fun p v_post ->
         let src_opt =
           try
-            Some (
-              fst
-                (List.find
-                   (fun (_q, v_pre) -> v_pre = v_post)
-                   pre_atoms)
-            )
+            let (q, _t_pre, _v_pre) =
+              (List.find
+                  (fun (_q, _t, v_pre) -> v_pre = v_post)
+                  pre_atoms) in
+            Some q
           with Not_found -> None
         in
         match src_opt with

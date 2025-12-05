@@ -1,8 +1,9 @@
 type ptr = string
+type car_type = string
 type car = string
 
 type heap_atom = 
-  | PointTo of ptr * car 
+  | PointTo of ptr * car_type * car 
 
 type heap = 
   | Atom of heap_atom
@@ -17,8 +18,8 @@ type spec = {
 
 (*Prints*)
 let rec string_of_heap = function
-  | Atom (PointTo (p, v)) ->
-      Printf.sprintf "%s->int*(%s)" p v
+  | Atom (PointTo (p, t, v)) ->
+      Printf.sprintf "%s->%s*(%s)" p t v
   | Sep (h1, h2) ->
       Printf.sprintf "%s && %s" (string_of_heap h1) (string_of_heap h2)
 
