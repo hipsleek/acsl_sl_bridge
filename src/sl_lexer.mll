@@ -11,6 +11,9 @@ rule token = parse
   | "ens" { ENS }
   | "->" { ARROW }
   | "&&" { AND }
+  | "==" { EQEQ }
+  | '\'' { PRIME }
+  | "\\old" { OLD }
   | '*' { STAR }
   | '(' { LPAREN }
   | ')' { RPAREN }

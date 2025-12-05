@@ -30,7 +30,7 @@ let test_translate_swap () =
   test_framework test_name input expected
 
 let test_translate_no_swap () =
-  let test_name = "translate_swap" in
+  let test_name = "translate_no_swap" in
   let input =
     "req a->int*(u);\n" ^
     "ens a->int*(u);"
@@ -45,7 +45,7 @@ let test_translate_no_swap () =
   test_framework test_name input expected
 
 let test_translate_triple_swap () =
-  let test_name = "translate_swap" in
+  let test_name = "translate_triple_swap" in
   let input =
     "req a->int*(u) && b->int*(v) && c->int*(w);\n" ^
     "ens a->int*(w) && b->int*(u) && c->int*(v);"

@@ -5,11 +5,12 @@ let string_of_token = function
   | REQ -> "REQ"
   | ENS -> "ENS"
   | ARROW -> "ARROW"
-  (* | INT -> "INT"
-  | CHAR -> "CHAR" *)
   | TYPE s -> "TYPE(" ^ s ^ ")"
   | STAR -> "STAR"
   | AND -> "AND"
+  | EQEQ -> "EQEQ"
+  | PRIME -> "PRIME"
+  | OLD -> "OLD"
   | LPAREN -> "LPAREN"
   | RPAREN -> "RPAREN"
   | SEMICOLON -> "SEMICOLON"
@@ -128,8 +129,72 @@ let test_lexer_spec_swap () =
     ] in
   test_framework test_name input expected
 
+let test_lexer_spec_prime_sugar () =
+  let test_name = "lexer_spec_prime_sugar" in
+  let input = "ens (*a)'==(*b) && (*b)'==(*a);" in
+  let expected =
+    [
+      "ENS";
+      "LPAREN";
+      "STAR";
+      "ID(a)";
+      "RPAREN";
+      "PRIME";
+      "EQEQ";
+      "LPAREN";
+      "STAR";
+      "ID(b)";
+      "RPAREN";
+      "AND";
+      "LPAREN";
+      "STAR";
+      "ID(b)";
+      "RPAREN";
+      "PRIME";
+      "EQEQ";
+      "LPAREN";
+      "STAR";
+      "ID(a)";
+      "RPAREN";
+      "SEMICOLON";
+    ] in
+  test_framework test_name input expected
+
+let test_lexer_spec_prime_old () =
+  let test_name = "lexer_spec_prime_old" in
+  let input = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
+  let expected =
+    [
+      "ENS";
+      "LPAREN";
+      "STAR";
+      "ID(a)";
+      "RPAREN";
+      "EQEQ";
+      "OLD";
+      "LPAREN";
+      "STAR";
+      "ID(b)";
+      "RPAREN";
+      "AND";
+      "LPAREN";
+      "STAR";
+      "ID(b)";
+      "RPAREN";
+      "EQEQ";
+      "OLD";
+      "LPAREN";
+      "STAR";
+      "ID(a)";
+      "RPAREN";
+      "SEMICOLON";
+    ] in
+  test_framework test_name input expected
+
 let () =
   test_lexer_atom_int ();
   test_lexer_atom_char ();
   test_lexer_formula ();
-  test_lexer_spec_swap ()
+  test_lexer_spec_swap ();
+  test_lexer_spec_prime_sugar ();
+  test_lexer_spec_prime_old ();

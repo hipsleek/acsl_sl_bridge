@@ -29,7 +29,7 @@ let test_parser_swap_spec_int () =
   test_framework test_name input expected
 
 let test_parser_swap_spec_char () =
-  let test_name = "parser_swap_spec" in
+  let test_name = "parser_swap_spec_char" in
   let input =
     "req a->char*(u) && b->char*(v);\n" ^
     "ens a->char*(v) && b->char*(u);"
@@ -39,6 +39,28 @@ let test_parser_swap_spec_char () =
   in
   test_framework test_name input expected
 
+let test_parser_swap_spec_prime_sugar () =
+  let test_name = "parser_swap_spec_prime_sugar" in
+  let input =
+    "ens (*a)'==(*b) && (*b)'==(*a);"
+  in
+  let expected =
+    "req a->int*(v0) && b->int*(v1); ens a->int*(v1) && b->int*(v0);"
+  in
+  test_framework test_name input expected
+
+let test_parser_swap_spec_prime_old () =
+  let test_name = "parser_swap_spec_old_sugar" in
+  let input =
+    "ens (*a)==\\old(*b) && (*b)==\\old(*a);"
+  in
+  let expected =
+    "req a->int*(v0) && b->int*(v1); ens a->int*(v1) && b->int*(v0);"
+  in
+  test_framework test_name input expected
+
 let () =
   test_parser_swap_spec_int ();
   test_parser_swap_spec_char ();
+  test_parser_swap_spec_prime_sugar ();
+  test_parser_swap_spec_prime_old ();
