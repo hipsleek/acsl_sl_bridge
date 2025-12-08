@@ -19,9 +19,15 @@ type term =
   | T_var of var
   | T_int of int
   | T_heap of heap * ptr
+  | T_ptr of ptr  
 
 type predicate =
   | P_eq of term * term
+  | P_neq of term * term
+  | P_lte of term * term
+  | P_lt of term * term
+  | P_gte of term * term
+  | P_gt of term * term
   | P_valid of ptr
 
 type param = {
@@ -30,11 +36,16 @@ type param = {
   mode : mode;
 }
 
-type spec = {
-  params : param list;
-  frame : ptr list;
+type behavior = {
+  assumes : predicate list; 
   requires : predicate list;
   ensures : predicate list;
+  frame : ptr list;
+}
+
+type spec = {
+  params : param list;
+  behaviors : behavior list;
 }
 
 
@@ -47,8 +58,17 @@ let heap_post (p : ptr) : term = T_heap (Post, p)
 
 let eq (t1 : term) (t2 : term) : predicate = P_eq (t1, t2)
 
-let valid (p : ptr) : predicate = P_valid p
+let neq (t1 : term) (t2 : term) : predicate = P_neq (t1, t2)
 
+let lte (t1 : term) (t2 : term) : predicate = P_lte (t1, t2)
+
+let lt (t1 : term) (t2 : term) : predicate = P_lt (t1, t2)
+
+let gte (t1 : term) (t2 : term) : predicate = P_gt (t1, t2)
+
+let gt (t1 : term) (t2 : term) : predicate = P_gt (t1, t2)
+
+let valid (p : ptr) : predicate = P_valid p
 
 (* Preety prints*)
 
@@ -60,37 +80,43 @@ let string_of_term = function
   | T_var x -> x
   | T_int n -> string_of_int n
   | T_heap (ph, p) -> Printf.sprintf "%s(%s)" (string_of_heap_phase ph) p
+  | T_ptr p -> p
 
 let string_of_predicate = function
   | P_eq (t1, t2) -> Printf.sprintf "%s == %s" (string_of_term t1) (string_of_term t2)
+  | P_neq (t1, t2) -> Printf.sprintf "%s != %s" (string_of_term t1) (string_of_term t2)
+  | P_lte (t1, t2) -> Printf.sprintf "%s <= %s" (string_of_term t1) (string_of_term t2)
+  | P_lt (t1, t2) -> Printf.sprintf "%s < %s" (string_of_term t1) (string_of_term t2)
+  | P_gte (t1, t2) -> Printf.sprintf "%s >= %s" (string_of_term t1) (string_of_term t2)
+  | P_gt (t1, t2) -> Printf.sprintf "%s > %s" (string_of_term t1) (string_of_term t2)
   | P_valid p -> Printf.sprintf "valid(%s)" p
 
-let string_of_spec (s : spec) : string =
-  let params_str =
-    s.params
-    |> List.map (fun p ->
-           let mode_str =
-             match p.mode with
-             | In -> "in"
-             | Out -> "out"
-             | InOut -> "inout"
-           in
-           Printf.sprintf "%s:%s" p.name mode_str)
-    |> String.concat ", "
-  in
-  let frame_str =
-    s.frame |> String.concat ", "
-  in
+let string_of_mode = function
+  | In    -> "in"
+  | Out   -> "out"
+  | InOut -> "inout"
+
+let string_of_param (p : param) : string =
+  Printf.sprintf "%s:%s" p.name (string_of_mode p.mode)
+
+let string_of_behavior (b : behavior) : string =
   let preds_to_str ps =
     match ps with
     | [] -> "true"
-    | _  ->
+    | _ ->
         ps
         |> List.map string_of_predicate
         |> String.concat " && "
   in
+  let frame_str = String.concat ", " b.frame in
   Printf.sprintf
-    "params (%s)\nframe {%s}\nrequires %s\nensures %s"
-    params_str frame_str
-    (preds_to_str s.requires)
-    (preds_to_str s.ensures)
+    "assumes %s\n  requires %s\n  ensures %s\n  frame {%s}"
+    (preds_to_str b.assumes)
+    (preds_to_str b.requires)
+    (preds_to_str b.ensures)
+    frame_str
+
+let string_of_spec (s : spec) : string =
+  let params_str = s.params |> List.map string_of_param |> String.concat ", " in
+  let behaviors_str = s.behaviors |> List.map string_of_behavior |> String.concat "\n" in
+  Printf.sprintf "params (%s)\n%s" params_str behaviors_str
