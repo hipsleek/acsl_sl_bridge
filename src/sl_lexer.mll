@@ -9,14 +9,23 @@ rule token = parse
   | whitespace { token lexbuf }
   | "req" { REQ }
   | "ens" { ENS }
+  | "case" {CASE}
   | "->" { ARROW }
   | "&&" { AND }
   | "==" { EQEQ }
+  | "!=" { NEQ }
+  | ">=" { GTE }
+  | ">" { GT }
+  | "<=" { LTE }
+  | "<" { LT }
   | '\'' { PRIME }
   | "\\old" { OLD }
   | '*' { STAR }
   | '(' { LPAREN }
   | ')' { RPAREN }
+  | '{' {LBRACE}
+  | '}' {RBRACE}
+  | "=>" {IMPLIES}
   | ';' { SEMICOLON }
   | "int" { TYPE "int" }
   | "char" { TYPE "char" } (*Is there better way to do this??*)
