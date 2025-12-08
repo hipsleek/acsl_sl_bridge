@@ -39,7 +39,7 @@ spec:
       { Ast.spec_of_pointer_pairs $2 }
   | ENS sugar_old SEMICOLON
       { Ast.spec_of_pointer_pairs $2 }
-  | CASE LBRACE case_list RBRACE
+  | CASE LBRACE case_list RBRACE SEMICOLON
       { Case $3 }
 
 heap:
@@ -51,6 +51,7 @@ heap:
 atom:
   | ID ARROW TYPE STAR LPAREN ID RPAREN
       { PointTo ($1, $3, $6) }
+
 
 sugar_prime:
   | sugar_atom_prime
@@ -72,14 +73,21 @@ sugar_atom_old:
   | LPAREN STAR ID RPAREN EQEQ OLD LPAREN STAR ID RPAREN
       { ($3, $9) }
 
+
 conditional_expr:
-  | ID
-      { E_ptr $1 }
   | ID EQEQ ID
       { E_eq (E_ptr $1, E_ptr $3) }
   | ID NEQ ID
       { E_neq (E_ptr $1, E_ptr $3) }
-      (*Add more to grammar here*)
+  | ID LTE ID
+      { E_lte (E_ptr $1, E_ptr $3) }
+  | ID LT ID
+      { E_lt (E_ptr $1, E_ptr $3) }
+  | ID GTE ID
+      { E_gte (E_ptr $1, E_ptr $3) }
+  | ID GT ID
+      { E_gt (E_ptr $1, E_ptr $3) }
+
 
 case:
   | conditional_expr IMPLIES REQ heap SEMICOLON ENS heap SEMICOLON

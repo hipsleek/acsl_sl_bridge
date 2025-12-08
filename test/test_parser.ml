@@ -59,8 +59,25 @@ let test_parser_swap_spec_prime_old () =
   in
   test_framework test_name input expected
 
+let test_parser_eq_neq () =
+  let test_name = "parser_case_spec" in
+  let input =
+    "case {\n" ^
+    "  a==b => req a->int*(u); ens a->int*(u);\n" ^
+    "  a!=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
+    "};"
+  in
+  let expected =
+    "case {a==b => req a->int*(u); ens a->int*(u); " ^
+    "a!=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
+  in
+  test_framework test_name input expected
+
+
 let () =
   test_parser_swap_spec_int ();
   test_parser_swap_spec_char ();
   test_parser_swap_spec_prime_sugar ();
   test_parser_swap_spec_prime_old ();
+
+  test_parser_eq_neq ();

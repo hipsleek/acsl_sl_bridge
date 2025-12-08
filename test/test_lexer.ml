@@ -200,6 +200,245 @@ let test_lexer_spec_prime_old () =
     ] in
   test_framework test_name input expected
 
+let test_lexer_case_spec () =
+  let test_name = "lexer_case_spec" in
+  let input =
+    "case {\n" ^
+    "  a==b => req a->int*(u); ens a->int*(u);\n" ^
+    "  a!=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
+    "  a<=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
+    "  a<b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
+    "  a>=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
+    "  a>b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
+    "};"
+  in
+  let expected = [
+    "CASE";
+    "LBRACE";
+
+    "ID(a)";
+    "EQEQ";
+    "ID(b)";
+    "IMPLIES";
+    "REQ";
+    "ID(a)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(u)";
+    "RPAREN";
+    "SEMICOLON";
+    "ENS";
+    "ID(a)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(u)";
+    "RPAREN";
+    "SEMICOLON";
+
+    "ID(a)";
+    "NEQ";
+    "ID(b)";
+    "IMPLIES";
+    "REQ";
+    "ID(a)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(u)";
+    "RPAREN";
+    "AND";
+    "ID(b)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(v)";
+    "RPAREN";
+    "SEMICOLON";
+    "ENS";
+    "ID(a)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(v)";
+    "RPAREN";
+    "AND";
+    "ID(b)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(u)";
+    "RPAREN";
+    "SEMICOLON";
+
+    "ID(a)";
+    "LTE";
+    "ID(b)";
+    "IMPLIES";
+    "REQ";
+    "ID(a)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(u)";
+    "RPAREN";
+    "AND";
+    "ID(b)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(v)";
+    "RPAREN";
+    "SEMICOLON";
+    "ENS";
+    "ID(a)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(v)";
+    "RPAREN";
+    "AND";
+    "ID(b)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(u)";
+    "RPAREN";
+    "SEMICOLON";
+
+    "ID(a)";
+    "LT";
+    "ID(b)";
+    "IMPLIES";
+    "REQ";
+    "ID(a)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(u)";
+    "RPAREN";
+    "AND";
+    "ID(b)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(v)";
+    "RPAREN";
+    "SEMICOLON";
+    "ENS";
+    "ID(a)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(v)";
+    "RPAREN";
+    "AND";
+    "ID(b)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(u)";
+    "RPAREN";
+    "SEMICOLON";
+
+    "ID(a)";
+    "GTE";
+    "ID(b)";
+    "IMPLIES";
+    "REQ";
+    "ID(a)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(u)";
+    "RPAREN";
+    "AND";
+    "ID(b)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(v)";
+    "RPAREN";
+    "SEMICOLON";
+    "ENS";
+    "ID(a)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(v)";
+    "RPAREN";
+    "AND";
+    "ID(b)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(u)";
+    "RPAREN";
+    "SEMICOLON";
+
+    "ID(a)";
+    "GT";
+    "ID(b)";
+    "IMPLIES";
+    "REQ";
+    "ID(a)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(u)";
+    "RPAREN";
+    "AND";
+    "ID(b)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(v)";
+    "RPAREN";
+    "SEMICOLON";
+    "ENS";
+    "ID(a)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(v)";
+    "RPAREN";
+    "AND";
+    "ID(b)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(u)";
+    "RPAREN";
+    "SEMICOLON";
+
+    "RBRACE";
+    "SEMICOLON";
+  ] in
+  test_framework test_name input expected
+
 let () =
   test_lexer_atom_int ();
   test_lexer_atom_char ();
@@ -207,3 +446,5 @@ let () =
   test_lexer_spec_swap ();
   test_lexer_spec_prime_sugar ();
   test_lexer_spec_prime_old ();
+
+  test_lexer_case_spec ();
