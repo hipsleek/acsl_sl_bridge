@@ -1,3 +1,7 @@
+(* the idea of this interface is generalise and distill the key information.
+so, it writes about the io variables, memory loc to be chanhged, the pre-state, the relation bw
+pre state and post state*)
+
 type ptr = string
 type ty = string
 type var = string

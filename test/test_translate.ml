@@ -74,8 +74,35 @@ let test_translate_swap_type_mismatch () =
   in
   test_framework test_name input expected
 
+let test_translate_swap_prime_notation_sugar () =
+  let test_name = "translate_swap_prime_notation_sugar" in
+  let input = "ens (*a)'==(*b) && (*b)'==(*a);"
+  in
+  let expected =
+"/*@
+  requires \\valid(a) && \\valid(b);
+  assigns  *a, *b;
+  ensures  *a == \\old(*b) && *b == \\old(*a);
+*/"
+  in
+  test_framework test_name input expected
+
+let test_translate_swap_old_notation_sugar () =
+  let test_name = "translate_swap_old_notation_sugar" in
+  let input = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
+  let expected =
+"/*@
+  requires \\valid(a) && \\valid(b);
+  assigns  *a, *b;
+  ensures  *a == \\old(*b) && *b == \\old(*a);
+*/"
+  in
+  test_framework test_name input expected
+
 let () =
   test_translate_swap ();
   test_translate_no_swap ();
   test_translate_triple_swap ();
-  test_translate_swap_type_mismatch ()
+  test_translate_swap_type_mismatch ();
+  test_translate_swap_prime_notation_sugar ();
+  test_translate_swap_old_notation_sugar ();
