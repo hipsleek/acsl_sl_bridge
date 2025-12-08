@@ -7,55 +7,99 @@ let assert_string_equality name expected actual =
       (Printf.sprintf "%s failed.\nExpected: %S\nGot:      %S\n"
          name expected actual)
 
-(* Helper: Build atom *)
-let mk_atom p t v =
-  { Core.loc = p; ty = t; value = v }
 
-let test_core_string_of_heap_atom_int () =
-  let heap = [ mk_atom "a" "int" "u" ] in
-  let actual = Core.string_of_heap heap in
-  let expected = "a->int*(u)" in
-  assert_string_equality "core_string_of_heap_atom_int" expected actual
+let test_core_string_of_term_heap_pre () =
+  let t = T_heap (Pre, "a") in
+  let actual = string_of_term t in
+  let expected = "H(a)" in
+  assert_string_equality "core_string_of_term_heap_pre" expected actual
 
-let test_core_string_of_heap_atom_char () =
-  let heap = [ mk_atom "a" "char" "u" ] in
-  let actual = Core.string_of_heap heap in
-  let expected = "a->char*(u)" in
-  assert_string_equality "core_string_of_heap_atom_char" expected actual
+let test_core_string_of_term_heap_post () =
+  let t = T_heap (Post, "a") in
+  let actual = string_of_term t in
+  let expected = "H'(a)" in
+  assert_string_equality "core_string_of_term_heap_post" expected actual
 
-let test_core_string_of_heap_formula () =
-  let heap =
-    [
-      mk_atom "a" "int" "u";
-      mk_atom "b" "int" "v";
-    ]
+let test_core_string_of_term_var () =
+  let t = T_var "u" in
+  let actual = string_of_term t in
+  let expected = "u" in
+  assert_string_equality "core_string_of_term_var" expected actual
+
+let test_core_string_of_term_int () =
+  let t = T_int 42 in
+  let actual = string_of_term t in
+  let expected = "42" in
+  assert_string_equality "core_string_of_term_int" expected actual
+
+
+let test_core_string_of_predicate_valid () =
+  let p = P_valid "a" in
+  let actual = string_of_predicate p in
+  let expected = "valid(a)" in
+  assert_string_equality "core_string_of_predicate_valid" expected actual
+
+let test_core_string_of_predicate_eq_heaps () =
+  let p =
+    P_eq (T_heap (Pre, "a"), T_heap (Post, "b"))
   in
-  let actual = Core.string_of_heap heap in
-  let expected = "a->int*(u) && b->int*(v)" in
-  assert_string_equality "core_string_of_heap_formula" expected actual
+  let actual = string_of_predicate p in
+  let expected = "H(a) == H'(b)" in
+  assert_string_equality "core_string_of_predicate_eq_heaps" expected actual
+
+
+let mk_inout_param name = mk_param Core.InOut name
 
 let test_core_string_of_spec_swap () =
-  let pre =
+  let params = [ mk_inout_param "a"; mk_inout_param "b" ] in
+  let frame  = [ "a"; "b" ] in
+  let requires =
+    [ valid "a"; valid "b" ]
+  in
+  let ensures =
     [
-      mk_atom "a" "int" "u";
-      mk_atom "b" "int" "v";
+      eq (heap_post "a") (heap_pre "b");
+      eq (heap_post "b") (heap_pre "a");
     ]
   in
-  let post =
-    [
-      mk_atom "a" "int" "v";
-      mk_atom "b" "int" "u";
-    ]
+  let spec_swap : Core.spec =
+    { params; frame; requires; ensures }
   in
-  let spec_swap : Core.spec = { pre; post } in
   let actual = Core.string_of_spec spec_swap in
   let expected =
-    "req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);"
+    "params (a:inout, b:inout)\n\
+     frame {a, b}\n\
+     requires valid(a) && valid(b)\n\
+     ensures H'(a) == H(b) && H'(b) == H(a)"
   in
   assert_string_equality "core_string_of_spec_swap" expected actual
 
+let test_core_string_of_spec_empty () =
+  let spec_empty : Core.spec =
+    {
+      params   = [];
+      frame    = [];
+      requires = [];
+      ensures  = [];
+    }
+  in
+  let actual = Core.string_of_spec spec_empty in
+  let expected =
+    "params ()\n\
+     frame {}\n\
+     requires true\n\
+     ensures true"
+  in
+  assert_string_equality "core_string_of_spec_empty" expected actual
+
 let () =
-  test_core_string_of_heap_atom_int ();
-  test_core_string_of_heap_atom_char ();
-  test_core_string_of_heap_formula ();
-  test_core_string_of_spec_swap ()
+  test_core_string_of_term_heap_pre ();
+  test_core_string_of_term_heap_post ();
+  test_core_string_of_term_var ();
+  test_core_string_of_term_int ();
+
+  test_core_string_of_predicate_valid ();
+  test_core_string_of_predicate_eq_heaps ();
+
+  test_core_string_of_spec_swap ();
+  test_core_string_of_spec_empty ();

@@ -17,8 +17,11 @@ let test_sl_to_core_swap () =
   let sl_spec = parse_spec input in
   let core_spec = Sl_to_core.spec_to_core sl_spec in
   let actual = Core.string_of_spec core_spec in
-  let expected =
-    "req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);"
+  let expected = 
+    "params (a:inout, b:inout)\n" ^
+    "frame {a, b}\n" ^
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(a) == H(b) && H'(b) == H(a)"
   in
   assert_string_equality test_name expected actual
 
@@ -32,7 +35,10 @@ let test_sl_to_core_no_swap () =
   let core_spec = Sl_to_core.spec_to_core sl_spec in
   let actual = Core.string_of_spec core_spec in
   let expected =
-    "req a->int*(u); ens a->int*(u);"
+    "params (a:inout)\n" ^
+    "frame {a}\n" ^
+    "requires valid(a)\n" ^
+    "ensures H'(a) == H(a)"
   in
   assert_string_equality test_name expected actual
 
@@ -46,8 +52,10 @@ let test_sl_to_core_triple_swap () =
   let core_spec = Sl_to_core.spec_to_core sl_spec in
   let actual = Core.string_of_spec core_spec in
   let expected =
-    "req a->int*(u) && b->int*(v) && c->int*(w); \
-     ens a->int*(w) && b->int*(u) && c->int*(v);"
+    "params (a:inout, b:inout, c:inout)\n" ^
+    "frame {a, b, c}\n" ^
+    "requires valid(a) && valid(b) && valid(c)\n" ^
+    "ensures H'(a) == H(c) && H'(b) == H(a) && H'(c) == H(b)"
   in
   assert_string_equality test_name expected actual
 
@@ -61,8 +69,10 @@ let test_sl_to_core_swap_type_mismatch () =
   let core_spec = Sl_to_core.spec_to_core sl_spec in
   let actual = Core.string_of_spec core_spec in
   let expected =
-    "req a->int*(u) && b->char*(v); \
-     ens a->char*(v) && b->int*(u);"
+    "params (a:inout, b:inout)\n" ^
+    "frame {a, b}\n" ^
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(a) == H(b) && H'(b) == H(a)"
   in
   assert_string_equality test_name expected actual
 
