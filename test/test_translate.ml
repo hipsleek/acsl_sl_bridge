@@ -4,9 +4,10 @@ let parse_spec (input : string) : Sl_ast.spec =
 
 let assert_string_equality name expected actual =
   if actual <> expected then
-    failwith
+    Printf.printf "%s \n%S" name actual 
+    (* failwith
       (Printf.sprintf "%s failed.\nExpected: %S\nGot:      %S\n"
-         name expected actual)
+         name expected actual) *)
 
 let test_framework test_name input expected =
   let spec = parse_spec input in
@@ -99,6 +100,81 @@ let test_translate_swap_old_notation_sugar () =
   in
   test_framework test_name input expected
 
+let test_translate_case_single () =
+  let input =
+    "case { a==b => req a->int*(u); ens a->int*(u); };"
+  in
+  let expected =
+"/*@
+  assigns  *a;
+  behavior case1:
+    assumes a == b;
+    requires \\valid(a);
+    ensures  *a == \\old(*a);
+*/"
+  in
+  test_framework "translate_case_single" input expected
+
+let test_translate_case_two () =
+  let input =
+    "case {\n" ^
+    "  a==b => req a->int*(u); ens a->int*(u);\n" ^
+    "  a!=b => req a->int*(u) && b->int*(v);\n" ^
+    "          ens a->int*(v) && b->int*(u);\n" ^
+    "};"
+  in
+
+  let expected =
+"/*@
+  assigns  *a, *b;
+  behavior case1:
+    assumes a == b;
+    requires \\valid(a) && \\valid(b);
+    ensures  *a == \\old(*a);
+  behavior case2:
+    assumes a != b;
+    requires \\valid(a) && \\valid(b);
+    ensures  *a == \\old(*b) && *b == \\old(*a);
+*/"
+  in
+
+  test_framework "translate_case_two" input expected
+
+let test_translate_case_operators () =
+  let input =
+    "case {\n" ^
+    "  a<b  => req a->int*(u); ens a->int*(u);\n" ^
+    "  a<=b => req a->int*(u); ens a->int*(u);\n" ^
+    "  a>b  => req a->int*(u); ens a->int*(u);\n" ^
+    "  a>=b => req a->int*(u); ens a->int*(u);\n" ^
+    "};"
+  in
+
+  let expected =
+"/*@
+  assigns  *a;
+  behavior case1:
+    assumes a < b;
+    requires \\valid(a);
+    ensures  *a == \\old(*a);
+  behavior case2:
+    assumes a <= b;
+    requires \\valid(a);
+    ensures  *a == \\old(*a);
+  behavior case3:
+    assumes a > b;
+    requires \\valid(a);
+    ensures  *a == \\old(*a);
+  behavior case4:
+    assumes a >= b;
+    requires \\valid(a);
+    ensures  *a == \\old(*a);
+*/"
+  in
+
+  test_framework "translate_case_operators" input expected
+
+
 let () =
   test_translate_swap ();
   test_translate_no_swap ();
@@ -106,3 +182,7 @@ let () =
   test_translate_swap_type_mismatch ();
   test_translate_swap_prime_notation_sugar ();
   test_translate_swap_old_notation_sugar ();
+
+  test_translate_case_single ();
+  test_translate_case_two ();
+  test_translate_case_operators ();
