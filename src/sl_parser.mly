@@ -2,26 +2,20 @@
   open Sl_ast
 %}
 
-%token REQ ENS /* req ens*/
+%token REQ ENS CASE TERM/* req ens case term*/
 %token ARROW /* -> */
-// %token INT /* int */
-// %token CHAR /* char */ (*MORE WILL BE ADDED INCREMENTALLY IN FUTURE.*)
 %token STAR /* * */
 %token AND /* && */
-%token EQEQ /* == */
-%token NEQ /* != */
-%token GTE /* >= */
-%token GT /* > */
-%token LTE /* <= */
-%token LT /* < */
+%token EQEQ NEQ GTE GT LTE LT /* == */
 %token PRIME /* ' */
 %token OLD /*  \old */
 %token LPAREN RPAREN /* (    ) */
-%token CASE /* case */
 %token LBRACE RBRACE /* {    } */
+%token LBRACK RBRACK /* [    ] */
 %token SEMICOLON /* ; */
 %token IMPLIES /* => */
 %token EOF
+%token <int> INT
 %token <string> ID /* a, u ,.. .*/
 %token <string> TYPE /* int, char ,.. .*/
 
@@ -41,6 +35,8 @@ spec:
       { Sl_ast.spec_of_pointer_pairs $2 }
   | CASE LBRACE case_list RBRACE SEMICOLON
       { Case $3 }
+  | CASE LBRACE loop_case_list RBRACE SEMICOLON
+      { Loop $3 }
 
 heap:
   | atom
@@ -88,7 +84,6 @@ conditional_expr:
   | ID GT ID
       { E_gt (E_ptr $1, E_ptr $3) }
 
-
 case:
   | conditional_expr IMPLIES REQ heap SEMICOLON ENS heap SEMICOLON
       { { test = $1; pre = $4; post = $7 } }
@@ -97,4 +92,41 @@ case_list:
   | case
       { [$1] }
   | case case_list
+      { $1 :: $2 }
+
+
+
+loop_int_expr:
+  | ID { Lvar $1 }
+  | INT { Lconst $1 }
+
+loop_conditional_expr:
+  | loop_int_expr EQEQ loop_int_expr
+      { L_eq ($1, $3) }
+  | loop_int_expr NEQ loop_int_expr
+      { L_neq ($1, $3) }
+  | loop_int_expr LTE loop_int_expr
+      { L_lte ($1, $3) }
+  | loop_int_expr LT loop_int_expr
+      { L_lt ($1, $3) }
+  | loop_int_expr GTE loop_int_expr
+      { L_gte ($1, $3) }
+  | loop_int_expr GT loop_int_expr
+      { L_gt ($1, $3) }
+
+term_expression:
+  | TERM LBRACK loop_int_expr RBRACK
+      { Terminate_expr $3 }
+  | TERM LBRACK RBRACK
+      { Terminate_empty }
+
+
+loop_case:
+  | loop_conditional_expr IMPLIES REQ term_expression SEMICOLON ENS loop_conditional_expr SEMICOLON
+      { { loop_test = $1; loop_requirement = $4; loop_gurantee = $7; } }
+
+loop_case_list:
+  | loop_case 
+      { [$1] }
+  | loop_case loop_case_list 
       { $1 :: $2 }

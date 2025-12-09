@@ -137,4 +137,5 @@ let spec_to_core (s : Sl_ast.spec) : C.spec =
     make_simple_core pre_atoms post_atoms
 
   | Case sl_cases -> make_case_core sl_cases
+  | Loop _sl_cases -> failwith "Loop case not implemented yet"
   

@@ -5,6 +5,7 @@ let string_of_token = function
   | REQ -> "REQ"
   | ENS -> "ENS"
   | CASE -> "CASE"
+  | TERM -> "TERM"
   | ARROW -> "ARROW"
   | TYPE s -> "TYPE(" ^ s ^ ")"
   | STAR -> "STAR"
@@ -21,10 +22,13 @@ let string_of_token = function
   | RPAREN -> "RPAREN"
   | LBRACE -> "LBRACE"
   | RBRACE -> "RBRACE"
+  | LBRACK -> "LBRACK"
+  | RBRACK -> "RBRACK"
   | IMPLIES -> "IMPLIES"
   | SEMICOLON -> "SEMICOLON"
   | EOF -> "EOF"
   | ID s -> "ID(" ^ s ^ ")"
+  | INT n -> "INT(" ^ string_of_int n ^ ")"
 
 let lex_all (input : string) : token list =
   let lexbuf = Lexing.from_string input in
