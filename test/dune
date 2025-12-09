@@ -23,10 +23,10 @@
  (modules test_core)
  (libraries sl_to_acsl_lib))
 
-; (test
-;  (name test_core_to_acsl)
-;  (modules test_core_to_acsl)
-;  (libraries sl_to_acsl_lib))
+(test
+ (name test_core_to_acsl)
+ (modules test_core_to_acsl)
+ (libraries sl_to_acsl_lib))
 
 (test
  (name test_sl_to_core)
