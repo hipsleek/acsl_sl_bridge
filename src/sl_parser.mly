@@ -1,5 +1,5 @@
 %{
-  open Ast
+  open Sl_ast
 %}
 
 %token REQ ENS /* req ens*/
@@ -25,7 +25,7 @@
 %token <string> ID /* a, u ,.. .*/
 %token <string> TYPE /* int, char ,.. .*/
 
-%start <Ast.spec> main
+%start <Sl_ast.spec> main
 
 %%
 
@@ -36,9 +36,9 @@ spec:
   | REQ heap SEMICOLON ENS heap SEMICOLON
       { Simple { pre = $2; post = $5 } }
   | ENS sugar_prime SEMICOLON
-      { Ast.spec_of_pointer_pairs $2 }
+      { Sl_ast.spec_of_pointer_pairs $2 }
   | ENS sugar_old SEMICOLON
-      { Ast.spec_of_pointer_pairs $2 }
+      { Sl_ast.spec_of_pointer_pairs $2 }
   | CASE LBRACE case_list RBRACE SEMICOLON
       { Case $3 }
 

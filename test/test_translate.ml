@@ -1,4 +1,4 @@
-let parse_spec (input : string) : Ast.spec =
+let parse_spec (input : string) : Sl_ast.spec =
   let lexbuf = Lexing.from_string input in
   Sl_parser.main Sl_lexer.token lexbuf
 

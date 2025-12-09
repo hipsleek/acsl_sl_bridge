@@ -1,4 +1,4 @@
-let parse_spec (input : string) : Ast.spec =
+let parse_spec (input : string) : Sl_ast.spec =
   let lexbuf = Lexing.from_string input in
   Sl_parser.main Sl_lexer.token lexbuf
 
@@ -101,7 +101,7 @@ let test_sl_to_core_case_swap () =
     "requires valid(a) && valid(b)\n" ^
     "ensures H'(a) == H(a)\n" ^
     "frame {a}\n" ^
-    
+
     "assumes a != b\n" ^
     "requires valid(a) && valid(b)\n" ^
     "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^

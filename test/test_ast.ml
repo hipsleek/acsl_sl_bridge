@@ -1,4 +1,4 @@
-open Ast
+open Sl_ast
 
 (*Helper Function to assert expected and actual equality*)
 let assert_string_equality name expected actual =
@@ -63,8 +63,6 @@ let test_string_of_spec_swap () =
 
   assert_string_equality "string_of_spec_swap" actual expected
 
-  open Ast
-
 let test_spec_of_pointer_pairs_swap () =
   let test_name = "spec_of_pointer_pairs_swap" in
   let pairs = [ ("a", "b"); ("b", "a") ] in
@@ -91,7 +89,7 @@ let test_spec_of_pointer_eq_eq () =
 
   let spec = Case [case_one] in
 
-  let actual = Ast.string_of_spec spec in
+  let actual = Sl_ast.string_of_spec spec in
   let expected = "case {a==b => req a->int*(u); ens a->int*(u);};" in
   assert_string_equality test_name expected actual
 
@@ -121,7 +119,7 @@ let test_spec_of_pointer_eq_neq () =
 
   let spec = Case [case_one; case_two] in
 
-  let actual = Ast.string_of_spec spec in
+  let actual = Sl_ast.string_of_spec spec in
   let expected = "case {a==b => req a->int*(u); ens a->int*(u); a!=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};" in
   assert_string_equality test_name expected actual
 
@@ -151,7 +149,7 @@ let test_spec_of_pointer_eq_lte () =
 
   let spec = Case [case_one; case_two] in
 
-  let actual = Ast.string_of_spec spec in
+  let actual = Sl_ast.string_of_spec spec in
   let expected = "case {a==b => req a->int*(u); ens a->int*(u); a<=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};" in
   assert_string_equality test_name expected actual
 
@@ -181,7 +179,7 @@ let test_spec_of_pointer_eq_lt () =
 
   let spec = Case [case_one; case_two] in
 
-  let actual = Ast.string_of_spec spec in
+  let actual = Sl_ast.string_of_spec spec in
   let expected = "case {a==b => req a->int*(u); ens a->int*(u); a<b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};" in
   assert_string_equality test_name expected actual
 
@@ -211,7 +209,7 @@ let test_spec_of_pointer_eq_gte () =
 
   let spec = Case [case_one; case_two] in
 
-  let actual = Ast.string_of_spec spec in
+  let actual = Sl_ast.string_of_spec spec in
   let expected = "case {a==b => req a->int*(u); ens a->int*(u); a>=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};" in
   assert_string_equality test_name expected actual
 
@@ -241,7 +239,7 @@ let test_spec_of_pointer_eq_gt () =
 
   let spec = Case [case_one; case_two] in
 
-  let actual = Ast.string_of_spec spec in
+  let actual = Sl_ast.string_of_spec spec in
   let expected = "case {a==b => req a->int*(u); ens a->int*(u); a>b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};" in
   assert_string_equality test_name expected actual
 

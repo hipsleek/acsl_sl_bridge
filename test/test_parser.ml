@@ -1,5 +1,5 @@
 
-let parse_spec (input : string) : Ast.spec =
+let parse_spec (input : string) : Sl_ast.spec =
   let lexbuf = Lexing.from_string input in
   Sl_parser.main Sl_lexer.token lexbuf
 
@@ -11,7 +11,7 @@ let assert_string_equality name expected actual =
 
 let test_framework test_name input expected =
   let spec = parse_spec input in
-  let actual = Ast.string_of_spec spec in
+  let actual = Sl_ast.string_of_spec spec in
   assert_string_equality test_name expected actual
 
 

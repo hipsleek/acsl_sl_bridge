@@ -1,4 +1,4 @@
-open Ast
+open Sl_ast
 
 module C = Core
 
@@ -6,24 +6,24 @@ module StringSet = Set.Make (String)
 module StringMap = Map.Make (String)
 
 (*Helper functions*)
-let rec atoms_of_heap (h : Ast.heap) : (Ast.ptr * Ast.car_type * Ast.car) list =
+let rec atoms_of_heap (h : Sl_ast.heap) : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list =
   match h with
   | Atom (PointTo (p, t, v)) -> [ (p, t, v) ]
   | Sep (h1, h2) -> atoms_of_heap h1 @ atoms_of_heap h2
 
-let ptrs_of_atoms (atoms : (Ast.ptr * Ast.car_type * Ast.car) list) : StringSet.t =
+let ptrs_of_atoms (atoms : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list) : StringSet.t =
   List.fold_left
     (fun acc (p, _, _) -> StringSet.add p acc)
     StringSet.empty atoms
 
-let map_of_atoms (atoms : (Ast.ptr * Ast.car_type * Ast.car) list) : string StringMap.t =
+let map_of_atoms (atoms : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list) : string StringMap.t =
   List.fold_left
     (fun acc (p, _t, v) -> StringMap.add p v acc)
     StringMap.empty atoms
 
 let make_ensures 
-  (pre_atoms : (Ast.ptr * Ast.car_type * Ast.car) list)
-  (post_atoms: (Ast.ptr * Ast.car_type * Ast.car) list) :C.predicate list =
+  (pre_atoms : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list)
+  (post_atoms: (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list) :C.predicate list =
 
   let buf = ref [] in
   let post_map = map_of_atoms post_atoms in
@@ -49,7 +49,7 @@ let make_ensures
     post_map;
   List.rev !buf
 
-let get_predicate (e : Ast.conditional_expr) : C.predicate =
+let get_predicate (e : Sl_ast.conditional_expr) : C.predicate =
   match e with
   | E_eq (E_ptr x, E_ptr y) -> C.P_eq (C.T_ptr x, C.T_ptr y)
   | E_neq (E_ptr x, E_ptr y) -> C.P_neq (C.T_ptr x, C.T_ptr y)
@@ -63,8 +63,8 @@ let get_predicate (e : Ast.conditional_expr) : C.predicate =
 
 (*branch functions*)
 let make_simple_core
-  (pre_atoms : (Ast.ptr * Ast.car_type * Ast.car) list)
-  (post_atoms: (Ast.ptr * Ast.car_type * Ast.car) list) :C.spec =
+  (pre_atoms : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list)
+  (post_atoms: (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list) :C.spec =
 
   let ptrs = StringSet.union (ptrs_of_atoms pre_atoms) (ptrs_of_atoms post_atoms) in
   let ptr_list = StringSet.elements ptrs in
@@ -129,7 +129,7 @@ let make_case_core sl_cases =
   }
 
 
-let spec_to_core (s : Ast.spec) : C.spec =
+let spec_to_core (s : Sl_ast.spec) : C.spec =
   match s with
   | Simple { pre; post } -> 
     let pre_atoms = atoms_of_heap pre in
