@@ -20,9 +20,9 @@ let map_of_atoms (atoms : (Ast.ptr * Ast.car_type * Ast.car) list) : string Stri
     (fun acc (p, _t, v) -> StringMap.add p v acc)
     StringMap.empty atoms
 
-let spec_to_core (s : Ast.spec) : C.spec =
-  let pre_atoms = atoms_of_heap s.pre in
-  let post_atoms = atoms_of_heap s.post in
+let make_core
+  (pre_atoms : (Ast.ptr * Ast.car_type * Ast.car) list)
+  (post_atoms: (Ast.ptr * Ast.car_type * Ast.car) list) :C.spec =
 
   let post_map = map_of_atoms post_atoms in
 
@@ -61,9 +61,35 @@ let spec_to_core (s : Ast.spec) : C.spec =
     List.rev !buf
   in
 
-  {
-    C.params;
-    frame;
+  let behaviors : C.behavior = {
+    assumes  = []; 
     requires;
     ensures;
+    frame;
+  } in
+
+  {
+    C.params;
+    behaviors = [behaviors];
   }
+
+let spec_to_core (s : Ast.spec) : C.spec =
+  match s with
+  | Simple { pre; post } -> 
+    let pre_atoms = atoms_of_heap pre in
+    let post_atoms = atoms_of_heap post in
+    make_core pre_atoms post_atoms
+
+  | Case sl_cases -> 
+    let pre_atoms_all =
+        sl_cases
+        |> List.map (fun c -> atoms_of_heap c.pre)
+        |> List.concat
+    in
+    let post_atoms_all =
+      sl_cases
+      |> List.map (fun c -> atoms_of_heap c.post)
+      |> List.concat
+    in
+    make_core pre_atoms_all post_atoms_all
+  

@@ -19,9 +19,10 @@ let test_sl_to_core_swap () =
   let actual = Core.string_of_spec core_spec in
   let expected = 
     "params (a:inout, b:inout)\n" ^
-    "frame {a, b}\n" ^
+    "assumes true\n" ^
     "requires valid(a) && valid(b)\n" ^
-    "ensures H'(a) == H(b) && H'(b) == H(a)"
+    "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "frame {a, b}"
   in
   assert_string_equality test_name expected actual
 
@@ -36,9 +37,10 @@ let test_sl_to_core_no_swap () =
   let actual = Core.string_of_spec core_spec in
   let expected =
     "params (a:inout)\n" ^
-    "frame {a}\n" ^
+    "assumes true\n" ^
     "requires valid(a)\n" ^
-    "ensures H'(a) == H(a)"
+    "ensures H'(a) == H(a)\n" ^
+    "frame {a}"
   in
   assert_string_equality test_name expected actual
 
@@ -53,9 +55,10 @@ let test_sl_to_core_triple_swap () =
   let actual = Core.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout, c:inout)\n" ^
-    "frame {a, b, c}\n" ^
+    "assumes true\n" ^
     "requires valid(a) && valid(b) && valid(c)\n" ^
-    "ensures H'(a) == H(c) && H'(b) == H(a) && H'(c) == H(b)"
+    "ensures H'(a) == H(c) && H'(b) == H(a) && H'(c) == H(b)\n" ^
+    "frame {a, b, c}"
   in
   assert_string_equality test_name expected actual
 
@@ -70,9 +73,10 @@ let test_sl_to_core_swap_type_mismatch () =
   let actual = Core.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
-    "frame {a, b}\n" ^
+    "assumes true\n" ^
     "requires valid(a) && valid(b)\n" ^
-    "ensures H'(a) == H(b) && H'(b) == H(a)"
+    "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "frame {a, b}"
   in
   assert_string_equality test_name expected actual
 

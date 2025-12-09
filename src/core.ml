@@ -110,7 +110,7 @@ let string_of_behavior (b : behavior) : string =
   in
   let frame_str = String.concat ", " b.frame in
   Printf.sprintf
-    "assumes %s\n  requires %s\n  ensures %s\n  frame {%s}"
+    "assumes %s\nrequires %s\nensures %s\nframe {%s}"
     (preds_to_str b.assumes)
     (preds_to_str b.requires)
     (preds_to_str b.ensures)

@@ -78,9 +78,9 @@ let test_core_string_of_spec_swap () =
   let expected =
     "params (a:inout, b:inout)\n" ^
     "assumes a != b\n" ^
-    "  requires valid(a) && valid(b)\n" ^
-    "  ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
-    "  frame {a, b}"
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "frame {a, b}"
   in
   assert_string_equality "core_string_of_spec_swap" expected actual
 
@@ -103,9 +103,9 @@ let test_core_string_of_spec_empty () =
   let expected =
     "params ()\n" ^
     "assumes true\n" ^
-    "  requires true\n" ^
-    "  ensures true\n" ^
-    "  frame {}"
+    "requires true\n" ^
+    "ensures true\n" ^
+    "frame {}"
   in
   assert_string_equality "core_string_of_spec_empty" expected actual
 
