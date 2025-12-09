@@ -1,7 +1,6 @@
 (library
  (name sl_to_acsl_lib)
- (modules ast sl_parser sl_lexer core sl_to_core core_to_acsl)
- ; core sl_to_core core_to_acsl translate)
+ (modules ast sl_parser sl_lexer core sl_to_core core_to_acsl translate)
  (wrapped false))
 
 (menhir

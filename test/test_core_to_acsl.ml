@@ -92,9 +92,9 @@ let test_core_to_acsl_case_behaviors () =
   let test_name = "core_to_acsl_case_behaviors" in
   let params = [ mk_inout_param "a"; mk_inout_param "b" ] in
 
-  (* Behavior 1: alias case a == b *)
+  (*case a == b *)
   let b1_requires = [ Core.valid "a"; Core.valid "b" ] in
-  let b1_ensures  =
+  let b1_ensures =
     [
       Core.eq (Core.heap_post "a") (Core.heap_pre "a");
     ]
@@ -102,14 +102,14 @@ let test_core_to_acsl_case_behaviors () =
   let b1_frame = [ "a" ] in
   let b1 : Core.behavior =
     {
-      Core.assumes  = [ Core.P_eq (Core.T_ptr "a", Core.T_ptr "b") ];
+      Core.assumes = [ Core.P_eq (Core.T_ptr "a", Core.T_ptr "b") ];
       Core.requires = b1_requires;
-      Core.ensures  = b1_ensures;
-      Core.frame    = b1_frame;
+      Core.ensures = b1_ensures;
+      Core.frame = b1_frame;
     }
   in
 
-  (* Behavior 2: no_alias case a != b *)
+  (*case a != b*)
   let b2_requires = [ Core.valid "a"; Core.valid "b" ] in
   let b2_ensures  =
     [
@@ -120,16 +120,16 @@ let test_core_to_acsl_case_behaviors () =
   let b2_frame = [ "a"; "b" ] in
   let b2 : Core.behavior =
     {
-      Core.assumes  = [ Core.P_neq (Core.T_ptr "a", Core.T_ptr "b") ];
+      Core.assumes = [ Core.P_neq (Core.T_ptr "a", Core.T_ptr "b") ];
       Core.requires = b2_requires;
-      Core.ensures  = b2_ensures;
-      Core.frame    = b2_frame;
+      Core.ensures = b2_ensures;
+      Core.frame = b2_frame;
     }
   in
 
   let core_spec : Core.spec =
     {
-      Core.params    = params;
+      Core.params = params;
       Core.behaviors = [ b1; b2 ];
     }
   in
