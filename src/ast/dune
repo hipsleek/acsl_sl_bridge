@@ -1,4 +1,4 @@
 (library
  (name ast)
- (modules sl_ast core)
+ (modules sl_ast core acsl_ast)
  (wrapped false))

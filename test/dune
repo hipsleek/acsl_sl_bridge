@@ -1,6 +1,6 @@
 (test
- (name test_ast)
- (modules test_ast)
+ (name test_sl_ast)
+ (modules test_sl_ast)
  (libraries sl_to_acsl_lib))
 
 (test
@@ -31,4 +31,9 @@
 (test
  (name test_sl_to_core)
  (modules test_sl_to_core)
+ (libraries sl_to_acsl_lib))
+
+(test
+ (name test_acsl_ast)
+ (modules test_acsl_ast)
  (libraries sl_to_acsl_lib))
