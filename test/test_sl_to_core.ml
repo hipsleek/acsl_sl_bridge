@@ -80,8 +80,58 @@ let test_sl_to_core_swap_type_mismatch () =
   in
   assert_string_equality test_name expected actual
 
+let test_sl_to_core_case_swap () =
+  let test_name = "sl_to_core_case_swap" in
+  let input =
+    "case {\n" ^
+    "  a==b => req a->int*(u); ens a->int*(u);\n" ^
+    "  a!=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
+    "  a<=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
+    "  a<b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
+    "  a>=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
+    "  a>b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
+    "};"
+  in
+  let sl_spec = parse_spec input in
+  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let actual = Core.string_of_spec core_spec in
+  let expected =
+    "params (a:inout, b:inout)\n" ^
+    "assumes a == b\n" ^
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(a) == H(a)\n" ^
+    "frame {a}\n" ^
+    
+    "assumes a != b\n" ^
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "frame {a, b}\n" ^
+
+    "assumes a <= b\n" ^
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "frame {a, b}\n" ^
+
+    "assumes a < b\n" ^
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "frame {a, b}\n" ^
+
+    "assumes a >= b\n" ^
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "frame {a, b}\n" ^
+
+    "assumes a > b\n" ^
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "frame {a, b}"
+  in
+  assert_string_equality test_name expected actual
+
 let () =
   test_sl_to_core_swap ();
   test_sl_to_core_no_swap ();
   test_sl_to_core_triple_swap ();
   test_sl_to_core_swap_type_mismatch ();
+  test_sl_to_core_case_swap ();
