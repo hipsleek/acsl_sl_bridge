@@ -129,9 +129,35 @@ let test_sl_to_core_case_swap () =
   in
   assert_string_equality test_name expected actual
 
+let test_sl_to_core_case_loop_term () =
+  let test_name = "sl_to_core_case_loop_term" in
+  let input =
+    "case {\n" ^
+    "  i<30  => req Term[30-i]; ens a->int*(u);\n" ^
+    "  i>=30 => req Term[];     ens b->int*(v);\n" ^
+    "};"
+  in
+  let sl_spec  = parse_spec input in
+  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let actual   = Core.string_of_spec core_spec in
+  let expected =
+    "params (a:inout, b:inout)\n" ^
+    "assumes i < 30\n" ^
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(a) == H(a)\n" ^
+    "frame {a}\n" ^
+    "assumes i >= 30\n" ^
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(b) == H(b)\n" ^
+    "frame {b}"
+  in
+  assert_string_equality test_name expected actual
+
+
 let () =
   test_sl_to_core_swap ();
   test_sl_to_core_no_swap ();
   test_sl_to_core_triple_swap ();
   test_sl_to_core_swap_type_mismatch ();
   test_sl_to_core_case_swap ();
+  test_sl_to_core_case_loop_term ();

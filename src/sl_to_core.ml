@@ -49,16 +49,31 @@ let make_ensures
     post_map;
   List.rev !buf
 
+let rec string_of_arith = function
+  | A_var x -> x
+  | A_int n -> string_of_int n
+  | A_add (e1, e2) -> Printf.sprintf "%s+%s" (string_of_arith e1) (string_of_arith e2)
+  | A_sub (e1, e2) -> Printf.sprintf "%s-%s" (string_of_arith e1) (string_of_arith e2)
+  | A_mul (e1, e2) -> Printf.sprintf "%s*%s" (string_of_arith e1) (string_of_arith e2)
+  | A_div (e1, e2) -> Printf.sprintf "%s/%s" (string_of_arith e1) (string_of_arith e2)
+
+let term_of_arith (e : Sl_ast.arith_expr) : C.term =
+  match e with
+  | A_var x -> C.T_var x
+  | A_int n -> C.T_int n
+  | A_add _
+  | A_sub _
+  | A_mul _
+  | A_div _ -> C.T_var (string_of_arith e)
+
 let get_predicate (e : Sl_ast.conditional_expr) : C.predicate =
   match e with
-  | E_eq (E_ptr x, E_ptr y) -> C.P_eq (C.T_ptr x, C.T_ptr y)
-  | E_neq (E_ptr x, E_ptr y) -> C.P_neq (C.T_ptr x, C.T_ptr y)
-  | E_gte (E_ptr x, E_ptr y) -> C.P_gte (C.T_ptr x, C.T_ptr y)
-  | E_gt (E_ptr x, E_ptr y) -> C.P_gt (C.T_ptr x, C.T_ptr y)
-  | E_lte (E_ptr x, E_ptr y) -> C.P_lte (C.T_ptr x, C.T_ptr y)
-  | E_lt (E_ptr x, E_ptr y) -> C.P_lt (C.T_ptr x, C.T_ptr y)
-  | _ ->
-      failwith "get_predicate: unsupported guard expression"
+  | E_eq (e1, e2) -> C.P_eq  (term_of_arith e1, term_of_arith e2)
+  | E_neq (e1, e2) -> C.P_neq (term_of_arith e1, term_of_arith e2)
+  | E_lte (e1, e2) -> C.P_lte (term_of_arith e1, term_of_arith e2)
+  | E_lt (e1, e2) -> C.P_lt  (term_of_arith e1, term_of_arith e2)
+  | E_gte (e1, e2) -> C.P_gte (term_of_arith e1, term_of_arith e2)
+  | E_gt (e1, e2) -> C.P_gt  (term_of_arith e1, term_of_arith e2)
 
 
 (*branch functions*)
@@ -71,11 +86,8 @@ let make_simple_core
 
   (* Default INOUT*)
   let params = List.map (fun p -> C.mk_param C.InOut p) ptr_list in
-
   let frame = ptr_list in
-
   let requires = List.map (fun p -> C.valid p) ptr_list in
-
   let ensures = make_ensures pre_atoms post_atoms in
 
   let behaviors : C.behavior = {
@@ -83,6 +95,7 @@ let make_simple_core
     requires;
     ensures;
     frame;
+    variant = None
   } in
 
   {
@@ -115,11 +128,18 @@ let make_case_core sl_cases =
             let assumes  = [ get_predicate c.test ] in
             let requires = List.map (fun p -> C.valid p) global_ptrs in
             let ensures  = make_ensures pre_atoms post_atoms in
+            let variant =
+              match c.term with
+              | None
+              | Some Term_none -> None
+              | Some (Term e)  -> Some (term_of_arith e)
+            in
             {
               C.assumes;
               requires;
               ensures;
               frame;
+              variant;
             })
   in
 
