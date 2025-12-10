@@ -31,6 +31,7 @@ rule token = parse
   | ']' { RBRACK }
   | "=>" {IMPLIES}
   | ';' { SEMICOLON }
+  | '-' {MINUS}
   | "int" { TYPE "int" }
   | "char" { TYPE "char" } (*Is there better way to do this??*)
   | digits as d { INT (int_of_string d) }

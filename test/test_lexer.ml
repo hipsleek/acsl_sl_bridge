@@ -27,6 +27,7 @@ let string_of_token = function
   | IMPLIES -> "IMPLIES"
   | SEMICOLON -> "SEMICOLON"
   | EOF -> "EOF"
+  | MINUS -> "MINUS"
   | ID s -> "ID(" ^ s ^ ")"
   | INT n -> "INT(" ^ string_of_int n ^ ")"
 
@@ -443,6 +444,127 @@ let test_lexer_case_spec () =
   ] in
   test_framework test_name input expected
 
+let test_lexer_arith_sub () =
+  let test_name = "lexer_arith_sub" in
+  let input = "30-i" in
+  let expected = [
+    "INT(30)";
+    "MINUS";
+    "ID(i)";
+  ] in
+  test_framework test_name input expected
+
+let test_lexer_conditional_lt () =
+  let test_name = "lexer_conditional_lt" in
+  let input = "i<30" in
+  let expected = [
+    "ID(i)";
+    "LT";
+    "INT(30)";
+  ] in
+  test_framework test_name input expected
+
+let test_lexer_all_comparators () =
+  let test_name = "lexer_all_comparators" in
+  let input = "a==b a!=b a<=b a<b a>=b a>b" in
+  let expected = [
+    "ID(a)"; "EQEQ"; "ID(b)";
+    "ID(a)"; "NEQ";  "ID(b)";
+    "ID(a)"; "LTE";  "ID(b)";
+    "ID(a)"; "LT";   "ID(b)";
+    "ID(a)"; "GTE";  "ID(b)";
+    "ID(a)"; "GT";   "ID(b)";
+  ] in
+  test_framework test_name input expected
+
+
+let test_lexer_case_loop_term () =
+  let test_name = "lexer_case_loop_term" in
+  let input =
+    "case { i<30 => req Term[30-i]; ens a->int*(u); \
+            i>=30 => req Term[]; ens b->int*(v);};"
+  in
+  let expected = [
+    "CASE";
+    "LBRACE";
+
+    "ID(i)";
+    "LT";
+    "INT(30)";
+    "IMPLIES";
+
+    "REQ";
+    "TERM";
+    "LBRACK";
+    "INT(30)";
+    "MINUS";
+    "ID(i)";
+    "RBRACK";
+    "SEMICOLON";
+
+    "ENS";
+    "ID(a)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(u)";
+    "RPAREN";
+    "SEMICOLON";
+
+    "ID(i)";
+    "GTE";
+    "INT(30)";
+    "IMPLIES";
+
+    "REQ";
+    "TERM";
+    "LBRACK";
+    "RBRACK";
+    "SEMICOLON";
+
+    "ENS";
+    "ID(b)";
+    "ARROW";
+    "TYPE(int)";
+    "STAR";
+    "LPAREN";
+    "ID(v)";
+    "RPAREN";
+    "SEMICOLON";
+
+    "RBRACE";
+    "SEMICOLON";
+  ] in
+  test_framework test_name input expected
+
+let test_lexer_prime_sugar () =
+  let test_name = "lexer_prime_sugar" in
+  let input = "ens (*a)'==(*b) && (*b)'==(*a);" in
+  let expected = [
+    "ENS";
+    "LPAREN"; "STAR"; "ID(a)"; "RPAREN"; "PRIME"; "EQEQ";
+    "LPAREN"; "STAR"; "ID(b)"; "RPAREN";
+    "AND";
+    "LPAREN"; "STAR"; "ID(b)"; "RPAREN"; "PRIME"; "EQEQ";
+    "LPAREN"; "STAR"; "ID(a)"; "RPAREN";
+    "SEMICOLON";
+  ] in
+  test_framework test_name input expected
+
+let test_lexer_old_sugar () =
+  let test_name = "lexer_old_sugar" in
+  let input = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
+  let expected = [
+    "ENS";
+    "LPAREN"; "STAR"; "ID(a)"; "RPAREN"; "EQEQ"; "OLD";
+    "LPAREN"; "STAR"; "ID(b)"; "RPAREN";
+    "AND";
+    "LPAREN"; "STAR"; "ID(b)"; "RPAREN"; "EQEQ"; "OLD";
+    "LPAREN"; "STAR"; "ID(a)"; "RPAREN";
+    "SEMICOLON";
+  ] in
+  test_framework test_name input expected
 let () =
   test_lexer_atom_int ();
   test_lexer_atom_char ();
@@ -452,3 +574,10 @@ let () =
   test_lexer_spec_prime_old ();
 
   test_lexer_case_spec ();
+
+  test_lexer_arith_sub ();
+  test_lexer_conditional_lt ();
+  test_lexer_all_comparators ();
+  test_lexer_case_loop_term ();
+  test_lexer_prime_sugar ();
+  test_lexer_old_sugar ();
