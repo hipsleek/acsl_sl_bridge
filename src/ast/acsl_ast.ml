@@ -30,6 +30,12 @@ type contract = {
   behaviors : behavior list;
 }
 
+type loop_contract = {
+  l_invariants : predicate list;
+  l_assigns    : term list;
+  l_variant    : term option;
+}
+
 
 (*Preety Print*)
 let string_of_binop = function
@@ -154,3 +160,26 @@ let acsl_contract (c : contract) : string =
         behaviors;
       Buffer.add_string buf "*/";
       Buffer.contents buf
+
+let acsl_loop_contract (lc : loop_contract) : string =
+  let buf = Buffer.create 128 in
+  Buffer.add_string buf "/*@\n";
+
+  (match acsl_pred_list lc.l_invariants with
+   | None -> ()
+   | Some s ->
+       Buffer.add_string buf
+         (Printf.sprintf "  loop invariant %s;\n" s));
+
+  let assigns_str = acsl_assigns lc.l_assigns in
+  Buffer.add_string buf
+    (Printf.sprintf "  loop assigns %s;\n" assigns_str);
+
+  (match lc.l_variant with
+   | None -> ()
+   | Some v ->
+       Buffer.add_string buf
+         (Printf.sprintf "  loop variant %s;\n" (acsl_term v)));
+
+  Buffer.add_string buf "*/";
+  Buffer.contents buf

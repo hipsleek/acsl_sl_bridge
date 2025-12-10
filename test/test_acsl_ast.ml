@@ -111,6 +111,24 @@ let test_acsl_contract_cases () =
 
   assert_string_equality "acsl_contract_cases" expected actual
 
+let test_acsl_loop_contract_simple () =
+  let lc : loop_contract =
+    {
+      l_invariants = [ TBinOp (Lte, TVar "i", TInt 30) ];
+      l_assigns    = [ TVar "i" ];
+      l_variant    = Some (TVar "30-i");
+    }
+  in
+  let actual = acsl_loop_contract lc in
+  let expected =
+"/*@\n" ^
+"  loop invariant i <= 30;\n" ^
+"  loop assigns i;\n" ^
+"  loop variant 30-i;\n" ^
+"*/"
+  in
+  assert_string_equality "acsl_loop_contract_simple" expected actual
+
 let () =
   test_acsl_term_var ();
   test_acsl_term_int ();
@@ -122,3 +140,5 @@ let () =
 
   test_acsl_contract_flat ();
   test_acsl_contract_cases ();
+
+  test_acsl_loop_contract_simple ();
