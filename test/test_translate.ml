@@ -174,6 +174,40 @@ let test_translate_case_operators () =
 
   test_framework "translate_case_operators" input expected
 
+let test_translate_loop_terminating () =
+  let test_name = "translate_loop_terminating" in
+  let input =
+    "case {\n" ^
+    "  i<=30 => req Term[30-i]; ens a->int*(u);\n" ^
+    "  i>30  => req Term[];     ens b->int*(v);\n" ^
+    "};"
+  in
+  let expected =
+"/*@
+  loop invariant i <= 30;
+  loop assigns i;
+  loop variant 30-i;
+*/"
+  in
+  test_framework test_name input expected
+
+let test_translate_loop_terminating_change_var () =
+  let test_name = "translate_loop_terminating" in
+  let input =
+    "case {\n" ^
+    "  j<=30 => req Term[30-j]; ens a->int*(u);\n" ^
+    "  j>30  => req Term[];     ens b->int*(v);\n" ^
+    "};"
+  in
+  let expected =
+"/*@
+  loop invariant j <= 30;
+  loop assigns j;
+  loop variant 30-j;
+*/"
+  in
+  test_framework test_name input expected
+
 
 let () =
   test_translate_swap ();
@@ -186,3 +220,6 @@ let () =
   test_translate_case_single ();
   test_translate_case_two ();
   test_translate_case_operators ();
+
+  test_translate_loop_terminating ();
+  test_translate_loop_terminating_change_var ();

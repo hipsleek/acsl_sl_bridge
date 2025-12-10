@@ -13,10 +13,10 @@
  (modules test_parser)
  (libraries sl_to_acsl_lib))
 
-; (test
-;  (name test_translate)
-;  (modules test_translate)
-;  (libraries sl_to_acsl_lib))
+(test
+ (name test_translate)
+ (modules test_translate)
+ (libraries sl_to_acsl_lib))
 
 (test
  (name test_core)
