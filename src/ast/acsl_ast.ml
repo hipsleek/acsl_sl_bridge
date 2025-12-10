@@ -163,23 +163,23 @@ let acsl_contract (c : contract) : string =
 
 let acsl_loop_contract (lc : loop_contract) : string =
   let buf = Buffer.create 128 in
-  Buffer.add_string buf "/*@\n";
+  Buffer.add_string buf "/*@\r\n";
 
   (match acsl_pred_list lc.l_invariants with
    | None -> ()
    | Some s ->
        Buffer.add_string buf
-         (Printf.sprintf "  loop invariant %s;\n" s));
+         (Printf.sprintf "  loop invariant %s;\r\n" s));
 
   let assigns_str = acsl_assigns lc.l_assigns in
   Buffer.add_string buf
-    (Printf.sprintf "  loop assigns %s;\n" assigns_str);
+    (Printf.sprintf "  loop assigns %s;\r\n" assigns_str);
 
   (match lc.l_variant with
    | None -> ()
    | Some v ->
        Buffer.add_string buf
-         (Printf.sprintf "  loop variant %s;\n" (acsl_term v)));
+         (Printf.sprintf "  loop variant %s;\r\n" (acsl_term v)));
 
   Buffer.add_string buf "*/";
   Buffer.contents buf

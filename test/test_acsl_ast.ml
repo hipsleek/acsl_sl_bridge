@@ -121,11 +121,11 @@ let test_acsl_loop_contract_simple () =
   in
   let actual = acsl_loop_contract lc in
   let expected =
-"/*@\n" ^
-"  loop invariant i <= 30;\n" ^
-"  loop assigns i;\n" ^
-"  loop variant 30-i;\n" ^
-"*/"
+"/*@
+  loop invariant i <= 30;
+  loop assigns i;
+  loop variant 30-i;
+*/"
   in
   assert_string_equality "acsl_loop_contract_simple" expected actual
 

@@ -14,12 +14,12 @@ let acsl_term_of_core (t : term) : A.term =
 let acsl_pred_of_core (p : predicate) : A.predicate =
   match p with
   | P_valid q -> A.TApp ("\\valid", [ A.TVar q ])
-  | P_eq (t1, t2) -> A.TBinOp (A.Eq,  acsl_term_of_core t1, acsl_term_of_core t2)
-  | P_neq (t1, t2) -> A.TBinOp (A.Neq, acsl_term_of_core t1, acsl_term_of_core t2)
+  | P_eq (t1, t2) -> A.TBinOp (A.Eq, acsl_term_of_core t1, acsl_term_of_core t2)
+  | P_neq (t1, t2) -> A.TBinOp (A.Neq,acsl_term_of_core t1, acsl_term_of_core t2)
   | P_lte (t1, t2) -> A.TBinOp (A.Lte, acsl_term_of_core t1, acsl_term_of_core t2)
-  | P_lt  (t1, t2) -> A.TBinOp (A.Lt,  acsl_term_of_core t1, acsl_term_of_core t2)
+  | P_lt  (t1, t2) -> A.TBinOp (A.Lt, acsl_term_of_core t1, acsl_term_of_core t2)
   | P_gte (t1, t2) -> A.TBinOp (A.Gte, acsl_term_of_core t1, acsl_term_of_core t2)
-  | P_gt  (t1, t2) -> A.TBinOp (A.Gt,  acsl_term_of_core t1, acsl_term_of_core t2)
+  | P_gt  (t1, t2) -> A.TBinOp (A.Gt, acsl_term_of_core t1, acsl_term_of_core t2)
 
 let acsl_preds_of_core (ps : predicate list) : A.predicate list =
   List.map acsl_pred_of_core ps
@@ -82,5 +82,49 @@ let contract_of_spec (s : spec) : A.contract =
       in { A.assigns; behaviors; }
 
 
+let rec vars_of_term (acc : StringSet.t) (t : A.term) : StringSet.t =
+  match t with
+  | A.TVar x -> StringSet.add x acc
+  | A.TInt _ -> acc
+  | A.TDeref t'
+  | A.TOld t' -> vars_of_term acc t'
+  | A.TApp (_, args) ->
+      List.fold_left vars_of_term acc args
+  | A.TBinOp (_, t1, t2) ->
+      let acc = vars_of_term acc t1 in
+      vars_of_term acc t2
+
+let vars_of_preds (ps : A.predicate list) : StringSet.t =
+  List.fold_left vars_of_term StringSet.empty ps
+
+(* if behavior has variant field, interpret as a loop contract *)
+let loop_contract_of_spec (s : spec) : A.loop_contract option =
+  match s.behaviors with
+  | [] -> None
+  | bs ->
+      let with_variant = List.filter (fun b -> b.variant <> None) bs in
+      match with_variant with
+      | [] -> None
+      | b :: _ ->
+          let invariants = acsl_preds_of_core b.assumes in
+          let vars       = vars_of_preds invariants in
+          let assigns =
+            vars
+            |> StringSet.elements
+            |> List.map (fun x -> A.TVar x)
+          in
+          let variant =
+            match b.variant with
+            | None     -> None
+            | Some t_c -> Some (acsl_term_of_core t_c)
+          in
+          Some {
+            A.l_invariants = invariants;
+            A.l_assigns    = assigns;
+            A.l_variant    = variant;
+          }
+
 let spec_to_acsl (s : spec) : string =
-  s |> contract_of_spec |> A.acsl_contract
+  match loop_contract_of_spec s with
+  | Some lc -> A.acsl_loop_contract lc
+  | None -> s |> contract_of_spec |> A.acsl_contract

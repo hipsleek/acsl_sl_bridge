@@ -17,6 +17,7 @@ let mk_basic_spec (ptrs : string list) (eqs : Core.predicate list) : Core.spec =
       Core.requires = requires;
       Core.ensures = eqs;
       Core.frame = frame;
+      Core.variant = None;
     }
   in
   {
@@ -106,6 +107,7 @@ let test_core_to_acsl_case_behaviors () =
       Core.requires = b1_requires;
       Core.ensures = b1_ensures;
       Core.frame = b1_frame;
+      Core.variant = None;
     }
   in
 
@@ -124,6 +126,7 @@ let test_core_to_acsl_case_behaviors () =
       Core.requires = b2_requires;
       Core.ensures = b2_ensures;
       Core.frame = b2_frame;
+      Core.variant = None;
     }
   in
 
@@ -150,8 +153,43 @@ let test_core_to_acsl_case_behaviors () =
   in
   assert_string_equality test_name expected actual
 
+let test_core_to_acsl_loop_variant () =
+  let test_name = "core_to_acsl_loop_variant" in
+
+  (* Core behaviour describing:
+       loop invariant i <= 30;
+       loop assigns i;
+       loop variant 30-i;
+  *)
+  let behavior : Core.behavior =
+    {
+      Core.assumes  = [ Core.lte (Core.T_var "i") (Core.T_int 30) ];
+      Core.requires = [];
+      Core.ensures  = [];
+      Core.frame    = [];
+      Core.variant  = Some (Core.T_var "30-i");
+    }
+  in
+  let core_spec : Core.spec =
+    {
+      Core.params    = [];
+      Core.behaviors = [ behavior ];
+    }
+  in
+
+  let actual = Core_to_acsl.spec_to_acsl core_spec in
+  let expected =
+"/*@
+  loop invariant i <= 30;
+  loop assigns i;
+  loop variant 30-i;
+*/"
+  in
+  assert_string_equality test_name expected actual
+
 let () =
   test_core_to_acsl_swap ();
   test_core_to_acsl_no_swap ();
   test_core_to_acsl_triple_swap ();
   test_core_to_acsl_case_behaviors ();
+  test_core_to_acsl_loop_variant ();
