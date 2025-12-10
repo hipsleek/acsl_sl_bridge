@@ -1,7 +1,6 @@
 type ptr = string
 type car_type = string
 type car = string
-type int_var = string
 
 type heap_atom = 
   | PointTo of ptr * car_type * car 
@@ -31,35 +30,9 @@ type case_spec = {
   post : heap;
 }
 
-
-type loop_expr = 
-  | Lvar of int_var
-  | Lconst of int
-  | Lsub of loop_expr * loop_expr
-
-type relation =
-  | L_eq of loop_expr * loop_expr
-  | L_neq of loop_expr * loop_expr
-  | L_lte of loop_expr * loop_expr
-  | L_lt of loop_expr * loop_expr
-  | L_gte of loop_expr * loop_expr
-  | L_gt of loop_expr * loop_expr
-
-type terminate_expression = 
-  | Terminate_empty
-  | Terminate_expr of loop_expr
-
-
-type loop_case_spec = {
-  loop_test : relation;
-  loop_requirement : terminate_expression;
-  loop_gurantee : relation;
-}
-
 type spec =
   | Simple of base_spec
   | Case of case_spec list
-  | Loop of loop_case_spec list
 
 
 (*Prints*)
@@ -78,25 +51,6 @@ let rec string_of_expr = function
   | E_gt (e1, e2) -> Printf.sprintf "%s>%s" (string_of_expr e1) (string_of_expr e2)
   | E_gte (e1, e2) -> Printf.sprintf "%s>=%s" (string_of_expr e1) (string_of_expr e2)
 
-let rec string_of_int_expr = function
-  | Lvar x -> x
-  | Lconst n -> string_of_int n
-  | Lsub (e1, e2) -> Printf.sprintf "%s-%s" (string_of_int_expr e1) (string_of_int_expr e2)
-
-let string_of_int_rel = function
-  | L_eq  (e1, e2) -> Printf.sprintf "%s==%s" (string_of_int_expr e1) (string_of_int_expr e2)
-  | L_neq (e1, e2) -> Printf.sprintf "%s!=%s" (string_of_int_expr e1) (string_of_int_expr e2)
-  | L_lt  (e1, e2) -> Printf.sprintf "%s<%s"  (string_of_int_expr e1) (string_of_int_expr e2)
-  | L_lte (e1, e2) -> Printf.sprintf "%s<=%s" (string_of_int_expr e1) (string_of_int_expr e2)
-  | L_gt  (e1, e2) -> Printf.sprintf "%s>%s"  (string_of_int_expr e1) (string_of_int_expr e2)
-  | L_gte (e1, e2) -> Printf.sprintf "%s>=%s" (string_of_int_expr e1) (string_of_int_expr e2)
-
-let string_of_term_expression = function
-  | Terminate_empty -> "Term[]"
-  | Terminate_expr e -> Printf.sprintf "Term[%s]" (string_of_int_expr e)
-
-
-
 let string_of_base_spec (s : base_spec) : string =
   Printf.sprintf "req %s; ens %s;"
     (string_of_heap s.pre)
@@ -105,26 +59,14 @@ let string_of_base_spec (s : base_spec) : string =
 let string_of_sl_case (c : case_spec) : string =
   Printf.sprintf "%s => %s" (string_of_expr c.test) (string_of_base_spec { pre = c.pre; post = c.post })
 
-let string_of_loop_case (c : loop_case_spec) : string =
-  Printf.sprintf "%s => req %s; ens %s;"
-    (string_of_int_rel c.loop_test)
-    (string_of_term_expression c.loop_requirement)
-    (string_of_int_rel c.loop_gurantee)
-
 let string_of_spec = function
   | Simple bs -> string_of_base_spec bs
-  | Case cases -> (*Refactor*)
+  | Case cases ->
       let body =
         cases
         |> List.map string_of_sl_case
         |> String.concat " "
       in
-      Printf.sprintf "case {%s};" body
-  | Loop loop_cases ->
-      let body = 
-        loop_cases
-        |> List.map string_of_loop_case
-        |> String.concat " " in
       Printf.sprintf "case {%s};" body
 
 

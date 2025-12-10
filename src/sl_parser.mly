@@ -35,8 +35,6 @@ spec:
       { Sl_ast.spec_of_pointer_pairs $2 }
   | CASE LBRACE case_list RBRACE SEMICOLON
       { Case $3 }
-  | CASE LBRACE loop_case_list RBRACE SEMICOLON
-      { Loop $3 }
 
 heap:
   | atom
@@ -96,37 +94,3 @@ case_list:
 
 
 
-loop_int_expr:
-  | ID { Lvar $1 }
-  | INT { Lconst $1 }
-
-loop_conditional_expr:
-  | loop_int_expr EQEQ loop_int_expr
-      { L_eq ($1, $3) }
-  | loop_int_expr NEQ loop_int_expr
-      { L_neq ($1, $3) }
-  | loop_int_expr LTE loop_int_expr
-      { L_lte ($1, $3) }
-  | loop_int_expr LT loop_int_expr
-      { L_lt ($1, $3) }
-  | loop_int_expr GTE loop_int_expr
-      { L_gte ($1, $3) }
-  | loop_int_expr GT loop_int_expr
-      { L_gt ($1, $3) }
-
-term_expression:
-  | TERM LBRACK loop_int_expr RBRACK
-      { Terminate_expr $3 }
-  | TERM LBRACK RBRACK
-      { Terminate_empty }
-
-
-loop_case:
-  | loop_conditional_expr IMPLIES REQ term_expression SEMICOLON ENS loop_conditional_expr SEMICOLON
-      { { loop_test = $1; loop_requirement = $4; loop_gurantee = $7; } }
-
-loop_case_list:
-  | loop_case 
-      { [$1] }
-  | loop_case loop_case_list 
-      { $1 :: $2 }
