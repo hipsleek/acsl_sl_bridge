@@ -73,6 +73,19 @@ let test_parser_eq_neq () =
   in
   test_framework test_name input expected
 
+let test_parser_case_loop_term () =
+  let test_name = "parser_case_loop_term" in
+  let input =
+    "case {\n" ^
+    "  i<30 => req Term[30-i]; ens a->int*(u);\n" ^
+    "  i>=30 => req Term[];    ens b->int*(v);\n" ^
+    "};"
+  in
+  let expected =
+    "case {i<30 => req Term[30-i]; ens a->int*(u); " ^
+    "i>=30 => req Term[]; ens b->int*(v);};"
+  in
+  test_framework test_name input expected
 
 let () =
   test_parser_swap_spec_int ();
@@ -81,3 +94,5 @@ let () =
   test_parser_swap_spec_prime_old ();
 
   test_parser_eq_neq ();
+
+  test_parser_case_loop_term ();
