@@ -60,6 +60,7 @@ let test_core_string_of_spec_swap () =
     ]
   in
   let frame = [ "a"; "b" ] in
+  let variant = None in
 
   let behavior_swap : behavior =
     {
@@ -67,6 +68,7 @@ let test_core_string_of_spec_swap () =
       requires;
       ensures;
       frame;
+      variant;
     }
   in
 
@@ -91,6 +93,7 @@ let test_core_string_of_spec_empty () =
       requires = [];
       ensures = [];
       frame = [];
+      variant = None;
     }
   in
   let spec_empty : Core.spec =
@@ -109,6 +112,32 @@ let test_core_string_of_spec_empty () =
   in
   assert_string_equality "core_string_of_spec_empty" expected actual
 
+let test_core_string_of_spec_with_variant () =
+  let b : behavior =
+    {
+      assumes  = [];
+      requires = [];
+      ensures  = [];
+      frame    = [];
+      variant  = Some (T_int 42);
+    }
+  in
+  let spec : Core.spec =
+    {
+      params    = [];
+      behaviors = [ b ];
+    }
+  in
+  let actual = Core.string_of_spec spec in
+  let expected =
+    "params ()\n" ^
+    "assumes true\n" ^
+    "requires true\n" ^
+    "ensures true\n" ^
+    "frame {}"
+  in
+  assert_string_equality "core_string_of_spec_with_variant" expected actual
+
 let () =
   test_core_string_of_term_heap_pre ();
   test_core_string_of_term_heap_post ();
@@ -120,3 +149,5 @@ let () =
 
   test_core_string_of_spec_swap ();
   test_core_string_of_spec_empty ();
+
+  test_core_string_of_spec_with_variant ();
