@@ -9,15 +9,25 @@ type heap =
   | Atom of heap_atom
   | Sep of heap * heap
 
-type conditional_expr =
-  | E_ptr of ptr
-  | E_eq of conditional_expr * conditional_expr
-  | E_neq of conditional_expr * conditional_expr
-  | E_lte of conditional_expr * conditional_expr
-  | E_lt of conditional_expr * conditional_expr
-  | E_gte of conditional_expr * conditional_expr
-  | E_gt of conditional_expr * conditional_expr
+type arith_expr =
+  | A_var of string
+  | A_int of int
+  | A_add of arith_expr * arith_expr
+  | A_sub of arith_expr * arith_expr
+  | A_mul of arith_expr * arith_expr
+  | A_div of arith_expr * arith_expr
 
+type conditional_expr =
+  | E_eq of arith_expr * arith_expr
+  | E_neq of arith_expr * arith_expr
+  | E_lte of arith_expr * arith_expr
+  | E_lt of arith_expr * arith_expr
+  | E_gte of arith_expr * arith_expr
+  | E_gt of arith_expr * arith_expr
+
+type terminate_expr =
+  | Term_none
+  | Term of arith_expr
 
 type base_spec = {
   pre : heap;
@@ -26,6 +36,7 @@ type base_spec = {
 
 type case_spec = {
   test : conditional_expr;
+  term : terminate_expr option;
   pre : heap;
   post : heap;
 }
@@ -42,14 +53,21 @@ let rec string_of_heap = function
   | Sep (h1, h2) ->
       Printf.sprintf "%s && %s" (string_of_heap h1) (string_of_heap h2)    
 
-let rec string_of_expr = function
-  | E_ptr p -> p
-  | E_eq (e1, e2) -> Printf.sprintf "%s==%s" (string_of_expr e1) (string_of_expr e2)
-  | E_neq (e1, e2) -> Printf.sprintf "%s!=%s" (string_of_expr e1) (string_of_expr e2)
-  | E_lt (e1, e2) -> Printf.sprintf "%s<%s" (string_of_expr e1) (string_of_expr e2)
-  | E_lte (e1, e2) -> Printf.sprintf "%s<=%s" (string_of_expr e1) (string_of_expr e2)
-  | E_gt (e1, e2) -> Printf.sprintf "%s>%s" (string_of_expr e1) (string_of_expr e2)
-  | E_gte (e1, e2) -> Printf.sprintf "%s>=%s" (string_of_expr e1) (string_of_expr e2)
+let rec string_of_arith = function
+  | A_var x -> x
+  | A_int n -> string_of_int n
+  | A_add (e1, e2) -> Printf.sprintf "%s+%s" (string_of_arith e1) (string_of_arith e2)
+  | A_sub (e1, e2) -> Printf.sprintf "%s-%s" (string_of_arith e1) (string_of_arith e2)
+  | A_mul (e1, e2) -> Printf.sprintf "%s*%s" (string_of_arith e1) (string_of_arith e2)
+  | A_div (e1, e2) -> Printf.sprintf "%s/%s" (string_of_arith e1) (string_of_arith e2)
+
+let string_of_expr = function
+  | E_eq (e1, e2) -> Printf.sprintf "%s==%s" (string_of_arith e1) (string_of_arith e2)
+  | E_neq (e1, e2) -> Printf.sprintf "%s!=%s" (string_of_arith e1) (string_of_arith e2)
+  | E_lt (e1, e2) -> Printf.sprintf "%s<%s" (string_of_arith e1) (string_of_arith e2)
+  | E_lte (e1, e2) -> Printf.sprintf "%s<=%s" (string_of_arith e1) (string_of_arith e2)
+  | E_gt (e1, e2) -> Printf.sprintf "%s>%s" (string_of_arith e1) (string_of_arith e2)
+  | E_gte (e1, e2) -> Printf.sprintf "%s>=%s" (string_of_arith e1) (string_of_arith e2)
 
 let string_of_base_spec (s : base_spec) : string =
   Printf.sprintf "req %s; ens %s;"
@@ -57,7 +75,20 @@ let string_of_base_spec (s : base_spec) : string =
     (string_of_heap s.post)
 
 let string_of_sl_case (c : case_spec) : string =
-  Printf.sprintf "%s => %s" (string_of_expr c.test) (string_of_base_spec { pre = c.pre; post = c.post })
+  let guard = string_of_expr c.test in
+  match c.term with
+  | None ->
+      let bs = { pre = c.pre; post = c.post } in
+      Printf.sprintf "%s => %s" guard (string_of_base_spec bs)
+  | Some (Term e) ->
+      Printf.sprintf "%s => req Term[%s]; ens %s;"
+        guard
+        (string_of_arith e)
+        (string_of_heap c.post)
+  | Some Term_none ->
+      Printf.sprintf "%s => req Term[]; ens %s;"
+        guard
+        (string_of_heap c.post)
 
 let string_of_spec = function
   | Simple bs -> string_of_base_spec bs
