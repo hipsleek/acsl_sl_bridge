@@ -4,10 +4,10 @@ let parse_spec (input : string) : Sl_ast.spec =
 
 let assert_string_equality name expected actual =
   if actual <> expected then
-    Printf.printf "%s \n%S" name actual 
-    (* failwith
+    (* Printf.printf "%s \n%S" name actual  *)
+    failwith
       (Printf.sprintf "%s failed.\nExpected: %S\nGot:      %S\n"
-         name expected actual) *)
+         name expected actual)
 
 let test_framework test_name input expected =
   let spec = parse_spec input in
