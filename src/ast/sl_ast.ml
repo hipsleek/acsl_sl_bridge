@@ -11,6 +11,8 @@ type heap =
 
 type arith_expr =
   | A_var of string
+  | A_post_var of string
+  | A_old of arith_expr
   | A_int of int
   | A_add of arith_expr * arith_expr
   | A_sub of arith_expr * arith_expr
@@ -29,6 +31,10 @@ type terminate_expr =
   | Term_none
   | Term of arith_expr
 
+type post_kind =
+  | Post_heap of heap
+  | Post_expr of conditional_expr
+
 type base_spec = {
   pre : heap;
   post : heap;
@@ -38,11 +44,13 @@ type case_spec = {
   test : conditional_expr;
   term : terminate_expr option;
   pre : heap;
-  post : heap;
+  post : post_kind;
 }
 
 type spec =
   | Simple of base_spec
+  | Sugar_prime of (ptr * ptr) list
+  | Sugar_old of (ptr * ptr) list
   | Case of case_spec list
 
 
@@ -55,6 +63,8 @@ let rec string_of_heap = function
 
 let rec string_of_arith = function
   | A_var x -> x
+  | A_post_var x  -> x ^ "'"
+  | A_old e -> "\\old(" ^ string_of_arith e ^ ")"
   | A_int n -> string_of_int n
   | A_add (e1, e2) -> Printf.sprintf "%s+%s" (string_of_arith e1) (string_of_arith e2)
   | A_sub (e1, e2) -> Printf.sprintf "%s-%s" (string_of_arith e1) (string_of_arith e2)
@@ -69,6 +79,11 @@ let string_of_expr = function
   | E_gt (e1, e2) -> Printf.sprintf "%s>%s" (string_of_arith e1) (string_of_arith e2)
   | E_gte (e1, e2) -> Printf.sprintf "%s>=%s" (string_of_arith e1) (string_of_arith e2)
 
+
+let string_of_post_kind = function
+  | Post_heap h -> string_of_heap h
+  | Post_expr e -> string_of_expr e
+
 let string_of_base_spec (s : base_spec) : string =
   Printf.sprintf "req %s; ens %s;"
     (string_of_heap s.pre)
@@ -76,22 +91,59 @@ let string_of_base_spec (s : base_spec) : string =
 
 let string_of_sl_case (c : case_spec) : string =
   let guard = string_of_expr c.test in
-  match c.term with
-  | None ->
-      let bs = { pre = c.pre; post = c.post } in
+  match c.term, c.post with
+  | None, Post_heap h_post ->
+      let bs = { pre = c.pre; post = h_post } in
       Printf.sprintf "%s => %s" guard (string_of_base_spec bs)
-  | Some (Term e) ->
+
+  | None, Post_expr ce ->
+      Printf.sprintf "%s => req %s; ens %s;"
+        guard
+        (string_of_heap c.pre)
+        (string_of_expr ce)
+
+  | Some (Term e), Post_heap h_post ->
       Printf.sprintf "%s => req Term[%s]; ens %s;"
         guard
         (string_of_arith e)
-        (string_of_heap c.post)
-  | Some Term_none ->
+        (string_of_heap h_post)
+
+  | Some (Term e), Post_expr ce ->
+      Printf.sprintf "%s => req Term[%s]; ens %s;"
+        guard
+        (string_of_arith e)
+        (string_of_expr ce)
+
+  | Some Term_none, Post_heap h_post ->
       Printf.sprintf "%s => req Term[]; ens %s;"
         guard
-        (string_of_heap c.post)
+        (string_of_heap h_post)
+
+  | Some Term_none, Post_expr ce ->
+      Printf.sprintf "%s => req Term[]; ens %s;"
+        guard
+        (string_of_expr ce)
+
+
+let string_of_sugar_prime (pairs : (ptr * ptr) list) : string =
+  let string_of_pair (p, q) =
+    Printf.sprintf "(*%s)'==(*%s)" p q
+  in
+  pairs
+  |> List.map string_of_pair
+  |> String.concat " && "
+
+let string_of_sugar_old (pairs : (ptr * ptr) list) : string =
+  let string_of_pair (p, q) =
+    Printf.sprintf "(*%s)==\\old(*%s)" p q
+  in
+  pairs
+  |> List.map string_of_pair
+  |> String.concat " && "
 
 let string_of_spec = function
-  | Simple bs -> string_of_base_spec bs
+  | Simple bs ->
+      string_of_base_spec bs
   | Case cases ->
       let body =
         cases
@@ -99,52 +151,7 @@ let string_of_spec = function
         |> String.concat " "
       in
       Printf.sprintf "case {%s};" body
-
-
-(* **** Desugar functions ***** *)
-module StringSet = Set.Make (String)
-module SMap = Map.Make(String)
-
-(*Helper Functions*)
-let heap_of_atoms atoms =
-  match atoms with
-  | [] -> failwith "heap_of_atoms: empty"
-  | (p,t,v) :: rest ->
-        List.fold_left
-          (fun acc (p,t,v) -> Sep (acc, Atom (PointTo (p,t,v))))
-          (Atom (PointTo (p,t,v)))
-          rest
-
-(*Eg: a -> int*(u)   =>   {"a"}*)
-let ptrs_of_pairs pairs =
-  List.fold_left
-    (fun acc (_p, q) -> StringSet.add q acc)
-    StringSet.empty pairs
-
-(*Desugaring functions*)
-let spec_of_pointer_pairs (pairs : (ptr * ptr) list) : spec =
-  let srcs = ptrs_of_pairs pairs |> StringSet.elements in
-
-  let var_map =
-    List.mapi (fun i q -> (q, Printf.sprintf "v%d" i)) srcs
-    |> List.fold_left (fun m (q,v) -> SMap.add q v m) SMap.empty
-  in
-
-  let dummy_type = "int" in
-
-  let pre_atoms =
-    List.map
-      (fun q -> (q, dummy_type, SMap.find q var_map))
-      srcs
-  in
-
-  let post_atoms =
-    List.map
-      (fun (p,q) -> (p, dummy_type, SMap.find q var_map))
-      pairs
-  in
-
-  Simple {
-    pre  = heap_of_atoms pre_atoms;
-    post = heap_of_atoms post_atoms;
-  }
+  | Sugar_prime pairs ->
+      Printf.sprintf "ens %s;" (string_of_sugar_prime pairs)
+  | Sugar_old pairs ->
+      Printf.sprintf "ens %s;" (string_of_sugar_old pairs)

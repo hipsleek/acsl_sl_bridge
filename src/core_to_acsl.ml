@@ -5,11 +5,12 @@ module StringSet = Set.Make (String)
 
 let acsl_term_of_core (t : term) : A.term =
   match t with
-  | T_var x -> A.TVar x
+  | T_var (Pre, x) -> A.TOld (A.TVar x)
+  | T_var (Post, x) -> A.TVar x
+  | T_heap (Pre, p)  -> A.TOld (A.TDeref (A.TVar p))
+  | T_heap (Post, p) -> A.TDeref (A.TVar p)
   | T_int n -> A.TInt n
   | T_ptr p -> A.TVar p
-  | T_heap (Pre, p) -> A.TOld (A.TDeref (A.TVar p))
-  | T_heap (Post, p) -> A.TDeref (A.TVar p)
 
 let acsl_pred_of_core (p : predicate) : A.predicate =
   match p with

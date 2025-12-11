@@ -155,21 +155,17 @@ let test_core_to_acsl_case_behaviors () =
 
 let test_core_to_acsl_loop_variant () =
   let test_name = "core_to_acsl_loop_variant" in
-
-  (* Core behaviour describing:
-       loop invariant i <= 30;
-       loop assigns i;
-       loop variant 30-i;
-  *)
   let behavior : Core.behavior =
     {
-      Core.assumes  = [ Core.lte (Core.T_var "i") (Core.T_int 30) ];
+      Core.assumes =
+        [ Core.lte (Core.var_post "i") (Core.T_int 30) ];
       Core.requires = [];
       Core.ensures  = [];
       Core.frame    = [];
-      Core.variant  = Some (Core.T_var "30-i");
+      Core.variant  = Some (Core.var_post "30-i");
     }
   in
+
   let core_spec : Core.spec =
     {
       Core.params    = [];
@@ -177,7 +173,7 @@ let test_core_to_acsl_loop_variant () =
     }
   in
 
-  let actual = Core_to_acsl.spec_to_acsl core_spec in
+  let actual   = Core_to_acsl.spec_to_acsl core_spec in
   let expected =
 "/*@
   loop invariant i <= 30;
@@ -186,6 +182,7 @@ let test_core_to_acsl_loop_variant () =
 */"
   in
   assert_string_equality test_name expected actual
+
 
 let () =
   test_core_to_acsl_swap ();

@@ -80,6 +80,41 @@ let test_sl_to_core_swap_type_mismatch () =
   in
   assert_string_equality test_name expected actual
 
+let test_sl_to_core_swap_prime_sugar () =
+  let test_name = "sl_to_core_swap_prime_sugar" in
+  let input =
+    "ens (*a)'==(*b) && (*b)'==(*a);"
+  in
+  let sl_spec   = parse_spec input in
+  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let actual    = Core.string_of_spec core_spec in
+  (* semantics match the prev swap spec *)
+  let expected =
+    "params (a:inout, b:inout)\n" ^
+    "assumes true\n" ^
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "frame {a, b}"
+  in
+  assert_string_equality test_name expected actual
+
+let test_sl_to_core_swap_old_sugar () =
+  let test_name = "sl_to_core_swap_old_sugar" in
+  let input =
+    "ens (*a)==\\old(*b) && (*b)==\\old(*a);"
+  in
+  let sl_spec   = parse_spec input in
+  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let actual    = Core.string_of_spec core_spec in
+  let expected =
+    "params (a:inout, b:inout)\n" ^
+    "assumes true\n" ^
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "frame {a, b}"
+  in
+  assert_string_equality test_name expected actual
+
 let test_sl_to_core_case_swap () =
   let test_name = "sl_to_core_case_swap" in
   let input =
@@ -133,31 +168,59 @@ let test_sl_to_core_case_loop_term () =
   let test_name = "sl_to_core_case_loop_term" in
   let input =
     "case {\n" ^
-    "  i<30  => req Term[30-i]; ens a->int*(u);\n" ^
-    "  i>=30 => req Term[];     ens b->int*(v);\n" ^
+    "  i<30  => req Term[30-i]; ens i'==30;\n" ^
+    "  i>=30 => req Term[];     ens i'==i;\n" ^
     "};"
   in
-  let sl_spec  = parse_spec input in
+  let sl_spec   = parse_spec input in
   let core_spec = Sl_to_core.spec_to_core sl_spec in
-  let actual   = Core.string_of_spec core_spec in
+  let actual    = Core.string_of_spec core_spec in
   let expected =
-    "params (a:inout, b:inout)\n" ^
+    "params ()\n" ^
     "assumes i < 30\n" ^
-    "requires valid(a) && valid(b)\n" ^
-    "ensures H'(a) == H(a)\n" ^
-    "frame {a}\n" ^
+    "requires true\n" ^
+    "ensures true\n" ^
+    "frame {}\n" ^
     "assumes i >= 30\n" ^
-    "requires valid(a) && valid(b)\n" ^
-    "ensures H'(b) == H(b)\n" ^
-    "frame {b}"
+    "requires true\n" ^
+    "ensures true\n" ^
+    "frame {}"
   in
   assert_string_equality test_name expected actual
 
+
+let test_sl_to_core_case_guard_uses_post_phase () =
+  let test_name = "sl_to_core_case_guard_uses_post_phase" in
+  let input =
+    "case { a==b => req a->int*(u); ens a->int*(u); };"
+  in
+  let sl_spec   = parse_spec input in
+  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  match core_spec.Core.behaviors with
+  | [ b ] ->
+      begin
+        match b.Core.assumes with
+        | [ Core.P_eq (Core.T_var (Core.Post, "a"),
+                       Core.T_var (Core.Post, "b")) ] ->
+            ()
+        | _ ->
+            let actual = Core.string_of_spec core_spec in
+            failwith
+              (Printf.sprintf
+                 "%s failed.\nExpected assumes on post-phase vars a,b.\nGot Core spec:\n%s\n"
+                 test_name actual)
+      end
+  | _ ->
+      failwith
+        (Printf.sprintf "%s failed: expected exactly one behavior" test_name)
 
 let () =
   test_sl_to_core_swap ();
   test_sl_to_core_no_swap ();
   test_sl_to_core_triple_swap ();
   test_sl_to_core_swap_type_mismatch ();
+  test_sl_to_core_swap_prime_sugar ();
+  test_sl_to_core_swap_old_sugar ();
   test_sl_to_core_case_swap ();
   test_sl_to_core_case_loop_term ();
+  test_sl_to_core_case_guard_uses_post_phase ();

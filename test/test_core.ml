@@ -21,11 +21,18 @@ let test_core_string_of_term_heap_post () =
   let expected = "H'(a)" in
   assert_string_equality "core_string_of_term_heap_post" expected actual
 
-let test_core_string_of_term_var () =
-  let t = T_var "u" in
+let test_core_string_of_term_var_pre () =
+  let t = T_var (Pre, "u") in
   let actual = string_of_term t in
   let expected = "u" in
-  assert_string_equality "core_string_of_term_var" expected actual
+  assert_string_equality "core_string_of_term_var_pre" expected actual
+
+let test_core_string_of_term_var_post () =
+  let t = T_var (Post, "u") in
+  let actual = string_of_term t in
+  let expected = "u" in
+  assert_string_equality "core_string_of_term_var_post" expected actual
+
 
 let test_core_string_of_term_int () =
   let t = T_int 42 in
@@ -141,7 +148,8 @@ let test_core_string_of_spec_with_variant () =
 let () =
   test_core_string_of_term_heap_pre ();
   test_core_string_of_term_heap_post ();
-  test_core_string_of_term_var ();
+  test_core_string_of_term_var_pre ();
+  test_core_string_of_term_var_post ();
   test_core_string_of_term_int ();
 
   test_core_string_of_predicate_valid ();

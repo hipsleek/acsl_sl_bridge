@@ -11,14 +11,14 @@ type mode =
   | Out
   | InOut
 
-type heap =
+type phase =
   | Pre
   | Post
 
 type term =
-  | T_var of var
+  | T_var of phase * var
   | T_int of int
-  | T_heap of heap * ptr
+  | T_heap of phase * ptr
   | T_ptr of ptr  
 
 type predicate =
@@ -53,6 +53,9 @@ type spec = {
 (* operator helpers*)
 let mk_param mode name : param = { name; mode; }
 
+let var_pre x = T_var (Pre, x)
+let var_post x = T_var (Post, x)
+
 let heap_pre (p : ptr) : term = T_heap (Pre, p)
 let heap_post (p : ptr) : term = T_heap (Post, p)
 
@@ -81,7 +84,7 @@ let string_of_heap_phase = function
   | Post -> "H'"
 
 let string_of_term = function
-  | T_var x -> x
+  | T_var (_,x) -> x
   | T_int n -> string_of_int n
   | T_heap (ph, p) -> Printf.sprintf "%s(%s)" (string_of_heap_phase ph) p
   | T_ptr p -> p

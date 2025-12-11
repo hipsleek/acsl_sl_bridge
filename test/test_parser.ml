@@ -45,7 +45,7 @@ let test_parser_swap_spec_prime_sugar () =
     "ens (*a)'==(*b) && (*b)'==(*a);"
   in
   let expected =
-    "req a->int*(v0) && b->int*(v1); ens a->int*(v1) && b->int*(v0);"
+    "ens (*a)'==(*b) && (*b)'==(*a);"
   in
   test_framework test_name input expected
 
@@ -55,9 +55,34 @@ let test_parser_swap_spec_prime_old () =
     "ens (*a)==\\old(*b) && (*b)==\\old(*a);"
   in
   let expected =
-    "req a->int*(v0) && b->int*(v1); ens a->int*(v1) && b->int*(v0);"
+    "ens (*a)==\\old(*b) && (*b)==\\old(*a);"
   in
   test_framework test_name input expected
+
+let test_parser_case_post_var () =
+  let test_name = "parser_case_post_var" in
+  let input =
+    "case {\n" ^
+    "  i'==30 => req a->int*(u); ens a->int*(u);\n" ^
+    "};"
+  in
+  let expected =
+    "case {i'==30 => req a->int*(u); ens a->int*(u);};"
+  in
+  test_framework test_name input expected
+
+let test_parser_case_old_var () =
+  let test_name = "parser_case_old_var" in
+  let input =
+    "case {\n" ^
+    "  i==\\old(i) => req a->int*(u); ens a->int*(u);\n" ^
+    "};"
+  in
+  let expected =
+    "case {i==\\old(i) => req a->int*(u); ens a->int*(u);};"
+  in
+  test_framework test_name input expected
+
 
 let test_parser_eq_neq () =
   let test_name = "parser_case_spec" in
@@ -77,13 +102,13 @@ let test_parser_case_loop_term () =
   let test_name = "parser_case_loop_term" in
   let input =
     "case {\n" ^
-    "  i<30 => req Term[30-i]; ens a->int*(u);\n" ^
-    "  i>=30 => req Term[];    ens b->int*(v);\n" ^
+    "  i<30 => req Term[30-i]; ens i'==30;\n" ^
+    "  i>=30 => req Term[];    ens i'==i;\n" ^
     "};"
   in
   let expected =
-    "case {i<30 => req Term[30-i]; ens a->int*(u); " ^
-    "i>=30 => req Term[]; ens b->int*(v);};"
+    "case {i<30 => req Term[30-i]; ens i'==30; " ^
+    "i>=30 => req Term[]; ens i'==i;};"
   in
   test_framework test_name input expected
 
@@ -92,6 +117,8 @@ let () =
   test_parser_swap_spec_char ();
   test_parser_swap_spec_prime_sugar ();
   test_parser_swap_spec_prime_old ();
+  test_parser_case_post_var ();
+  test_parser_case_old_var ();
 
   test_parser_eq_neq ();
 

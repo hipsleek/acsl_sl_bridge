@@ -3,22 +3,22 @@
 %}
 
 %token REQ ENS CASE TERM /* req ens case Term */
-%token ARROW  /* -> */
-%token STAR /* *  */
-%token AND  /* && */
-%token EQEQ NEQ GTE GT LTE LT  /* == != >= > <= <   */
-%token PRIME  /* '  */
-%token OLD /* \old */
-%token LPAREN RPAREN /* ( ) */
+%token ARROW /* -> */
+%token STAR/* * */
+%token AND   /* && */
+%token EQEQ NEQ GTE GT LTE LT /* == != >= > <= <   */
+%token PRIME   /* '  */
+%token OLD  /* \old */
+%token LPAREN RPAREN  /* ( ) */
 %token LBRACE RBRACE /* { } */
-%token LBRACK RBRACK /* [ ] */
-%token SEMICOLON /* ; */
+%token LBRACK RBRACK  /* [ ] */
+%token SEMICOLON   /* ; */
 %token IMPLIES /* => */
 %token EOF
-%token <int> INT
-%token <string> ID /* a, u, i, ... */
-%token <string> TYPE /* int, char, ... */
-%token MINUS /* -  */
+%token <int>    INT
+%token <string> ID  /* a, u, i, ... */
+%token <string> TYPE  /* int, char, ... */
+%token MINUS   /* -  */
 
 %start <Sl_ast.spec> main
 
@@ -34,9 +34,9 @@ spec:
   | REQ heap SEMICOLON ENS heap SEMICOLON
       { Simple { pre = $2; post = $5 } }
   | ENS sugar_prime SEMICOLON
-      { Sl_ast.spec_of_pointer_pairs $2 }
+      { Sugar_prime $2 }
   | ENS sugar_old SEMICOLON
-      { Sl_ast.spec_of_pointer_pairs $2 }
+      { Sugar_old $2 }
   | CASE LBRACE case_list RBRACE SEMICOLON
       { Case $3 }
 
@@ -76,6 +76,10 @@ sugar_atom_old:
 arith_expr:
   | ID
       { A_var $1 }
+  | ID PRIME
+      { A_post_var $1 }
+  | OLD LPAREN arith_expr RPAREN
+      { A_old $3 }
   | INT
       { A_int $1 }
   | arith_expr MINUS arith_expr
@@ -98,17 +102,49 @@ conditional_expr:
       { E_gt ($1, $3) }
 
 
+post_kind:
+  | heap
+      { Post_heap $1 }
+  | conditional_expr
+      { Post_expr $1 }
+
+
 case:
-  | conditional_expr IMPLIES REQ heap SEMICOLON ENS heap SEMICOLON
-      { { test = $1; term = None; pre = $4; post = $7 } }
+  | conditional_expr IMPLIES
+      REQ heap SEMICOLON
+      ENS post_kind SEMICOLON
+      {
+        {
+          test = $1;
+          term = None;
+          pre  = $4;
+          post = $7;
+        }
+      }
+
   | conditional_expr IMPLIES
       REQ TERM LBRACK arith_expr RBRACK SEMICOLON
-      ENS heap SEMICOLON
-      { { test = $1; term = Some (Term $6); pre = $10; post = $10 } }
+      ENS post_kind SEMICOLON
+      {
+        {
+          test = $1;
+          term = Some (Term $6);
+          pre  = Atom (PointTo ("_", "int", "_"));
+          post = $10;
+        }
+      }
+
   | conditional_expr IMPLIES
       REQ TERM LBRACK RBRACK SEMICOLON
-      ENS heap SEMICOLON
-      { { test = $1; term = Some Term_none; pre = $9; post = $9 } }
+      ENS post_kind SEMICOLON
+      {
+        {
+          test = $1;
+          term = Some Term_none;
+          pre  = Atom (PointTo ("_", "int", "_"));
+          post = $9;
+        }
+      }
 
 case_list:
   | case
