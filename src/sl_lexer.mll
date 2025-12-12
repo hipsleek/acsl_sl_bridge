@@ -14,6 +14,7 @@ rule token = parse
   | "Term" {TERM}
   | "->" { ARROW }
   | "&&" { AND }
+  | "/\\" { SL_CONJ }
   | "==" { EQEQ }
   | "!=" { NEQ }
   | ">=" { GTE }

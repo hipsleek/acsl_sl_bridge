@@ -5,7 +5,7 @@
 %token REQ ENS CASE TERM /* req ens case Term */
 %token ARROW /* -> */
 %token STAR/* * */
-%token AND   /* && */
+%token AND SL_CONJ   /* &&      /\ */
 %token EQEQ NEQ GTE GT LTE LT /* == != >= > <= <   */
 %token PRIME   /* '  */
 %token OLD  /* \old */
@@ -39,6 +39,8 @@ spec:
       { Sugar_old $2 }
   | CASE LBRACE case_list RBRACE SEMICOLON
       { Case $3 }
+  | loop_clause SL_CONJ loop_clause_list
+      { Case ($1 :: $3) }
 
 
 heap:
@@ -151,3 +153,27 @@ case_list:
       { [$1] }
   | case case_list
       { $1 :: $2 }
+
+loop_req:
+  | conditional_expr AND TERM LBRACK arith_expr RBRACK
+      { ($1, Some (Term $5)) }
+  | conditional_expr AND TERM LBRACK RBRACK
+      { ($1, Some Term_none) }
+
+loop_clause:
+  | REQ loop_req SEMICOLON ENS conditional_expr SEMICOLON
+      {
+        let (cond, term_opt) = $2 in
+        {
+          test = cond;
+          term = term_opt;
+          pre  = Atom (PointTo ("_", "int", "_"));
+          post = Post_expr $5;
+        }
+      }
+
+loop_clause_list:
+  | loop_clause
+      { [$1] }
+  | loop_clause SL_CONJ loop_clause_list
+      { $1 :: $3 }

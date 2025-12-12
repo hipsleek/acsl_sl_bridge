@@ -10,6 +10,7 @@ let string_of_token = function
   | TYPE s -> "TYPE(" ^ s ^ ")"
   | STAR -> "STAR"
   | AND -> "AND"
+  | SL_CONJ -> "SL_CONJ"
   | EQEQ -> "EQEQ"
   | NEQ -> "NEQ"
   | GTE -> "GTE"

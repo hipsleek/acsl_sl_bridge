@@ -207,6 +207,21 @@ let test_translate_loop_terminating_case_expr_change_var () =
   in
   test_framework test_name input expected
 
+let test_translate_loop_terminating_conj_expr () =
+  let test_name = "translate_loop_terminating_conj_expr" in
+  let input =
+    "req i<30 && Term[30-i]; ens i'==30;\n" ^
+    "/\\ req i>=30 && Term[]; ens i'==i;"
+  in
+  let expected =
+"/*@
+  loop invariant i < 30;
+  loop assigns i;
+  loop variant 30-i;
+*/"
+  in
+  test_framework test_name input expected
+
 let () =
   test_translate_swap ();
   test_translate_no_swap ();
@@ -221,3 +236,4 @@ let () =
 
   test_translate_loop_terminating_case_expr ();
   test_translate_loop_terminating_case_expr_change_var ();
+  test_translate_loop_terminating_conj_expr ();
