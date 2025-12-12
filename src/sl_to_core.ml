@@ -48,9 +48,9 @@ let make_ensures
        in
        match src_opt with
        | Some q ->
-           let lhs = C.heap_post p in
-           let rhs = C.heap_pre q in
-           buf := C.eq lhs rhs :: !buf
+           let lhs = Core_builder.heap_post p in
+           let rhs = Core_builder.heap_pre q in
+           buf := Core_builder.eq lhs rhs :: !buf
        | None -> ())
     post_map;
   List.rev !buf
@@ -58,11 +58,11 @@ let make_ensures
 
 let term_of_arith (e : Sl_ast.arith_expr) : C.term =
   match e with
-  | A_var x      -> C.var_post x
-  | A_post_var x -> C.var_post x
+  | A_var x      -> Core_builder.var_post x
+  | A_post_var x -> Core_builder.var_post x
   | A_old inner ->
       begin match inner with
-      | A_var x -> C.var_pre x
+      | A_var x -> Core_builder.var_pre x
       | _       -> C.T_var (C.Pre, Sl_ast_printer.string_of_arith inner)
       end
   | A_int n      -> C.T_int n
@@ -91,9 +91,9 @@ let make_simple_core
   in
   let ptr_list = StringSet.elements ptrs in
 
-  let params   = List.map (fun p -> C.mk_param C.InOut p) ptr_list in
+  let params   = List.map (fun p -> Core_builder.mk_param C.InOut p) ptr_list in
   let frame    = ptr_list in
-  let requires = List.map C.valid ptr_list in
+  let requires = List.map Core_builder.valid ptr_list in
   let ensures  = make_ensures pre_atoms post_atoms in
 
   let behavior : C.behavior =
@@ -153,7 +153,7 @@ let make_case_core (sl_cases : Sl_ast.case_spec list) : C.spec =
         sl_cases
     in
     let global_ptrs = StringSet.elements global_ptrs_set in
-    let params      = List.map (fun p -> C.mk_param C.InOut p) global_ptrs in
+    let params      = List.map (fun p -> Core_builder.mk_param C.InOut p) global_ptrs in
 
     let behaviors =
       sl_cases
@@ -171,7 +171,7 @@ let make_case_core (sl_cases : Sl_ast.case_spec list) : C.spec =
            in
            let frame    = StringSet.elements frame_set in
            let assumes  = [ get_predicate c.test ] in
-           let requires = List.map C.valid global_ptrs in
+           let requires = List.map Core_builder.valid global_ptrs in
            let ensures  = make_ensures pre_atoms post_atoms in
            let variant =
              match c.term with
@@ -199,15 +199,15 @@ let make_sugar_core (pairs : (Sl_ast.ptr * Sl_ast.ptr) list) : C.spec =
       pairs
   in
   let ptrs    = StringSet.elements ptrs_set in
-  let params  = List.map (fun p -> C.mk_param C.InOut p) ptrs in
+  let params  = List.map (fun p -> Core_builder.mk_param C.InOut p) ptrs in
   let frame   = ptrs in
-  let requires = List.map C.valid ptrs in
+  let requires = List.map Core_builder.valid ptrs in
   let ensures =
     List.map
       (fun (p, q) ->
-         let lhs = C.heap_post p in
-         let rhs = C.heap_pre  q in
-         C.eq lhs rhs)
+         let lhs = Core_builder.heap_post p in
+         let rhs = Core_builder.heap_pre  q in
+         Core_builder.eq lhs rhs)
       pairs
   in
   let behavior : C.behavior =

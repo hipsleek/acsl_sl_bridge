@@ -1,4 +1,5 @@
 open Core
+open Core_builder
 
 (* helper *)
 let assert_string_equality name expected actual =
