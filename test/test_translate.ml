@@ -1,21 +1,19 @@
+(* test_translate_ounit.ml *)
+
+open OUnit2
+
 let parse_spec (input : string) : Sl_ast.spec =
   let lexbuf = Lexing.from_string input in
   Sl_parser.main Sl_lexer.token lexbuf
 
-let assert_string_equality name expected actual =
-  if actual <> expected then
-    (* Printf.printf "%s \n%S" name actual  *)
-    failwith
-      (Printf.sprintf "%s failed.\nExpected: %S\nGot:      %S\n"
-         name expected actual)
-
-let test_framework test_name input expected =
+let test_framework (input : string) (expected : string) : unit =
   let spec = parse_spec input in
   let actual = Translate.sl_to_acsl spec in
-  assert_string_equality test_name expected actual
+  assert_equal
+    expected
+    actual
 
-let test_translate_swap () =
-  let test_name = "translate_swap" in
+let test_translate_swap _ctx =
   let input =
     "req a->int*(u) && b->int*(v);\n" ^
     "ens a->int*(v) && b->int*(u);"
@@ -27,10 +25,9 @@ let test_translate_swap () =
   ensures  *a == \\old(*b) && *b == \\old(*a);
 */"
   in
-  test_framework test_name input expected
+  test_framework input expected
 
-let test_translate_no_swap () =
-  let test_name = "translate_no_swap" in
+let test_translate_no_swap _ctx =
   let input =
     "req a->int*(u);\n" ^
     "ens a->int*(u);"
@@ -42,10 +39,9 @@ let test_translate_no_swap () =
   ensures  *a == \\old(*a);
 */"
   in
-  test_framework test_name input expected
+  test_framework input expected
 
-let test_translate_triple_swap () =
-  let test_name = "translate_triple_swap" in
+let test_translate_triple_swap _ctx =
   let input =
     "req a->int*(u) && b->int*(v) && c->int*(w);\n" ^
     "ens a->int*(w) && b->int*(u) && c->int*(v);"
@@ -57,11 +53,9 @@ let test_translate_triple_swap () =
   ensures  *a == \\old(*c) && *b == \\old(*a) && *c == \\old(*b);
 */"
   in
-  test_framework test_name input expected
+  test_framework input expected
 
-(* I let this be a positive test case because the translation only does syntactic translation *)
-let test_translate_swap_type_mismatch () =
-  let test_name = "translate_swap_type_mismatch" in
+let test_translate_swap_type_mismatch _ctx =
   let input =
     "req a->int*(u) && b->char*(v);\n" ^
     "ens a->char*(v) && b->int*(u);"
@@ -73,10 +67,9 @@ let test_translate_swap_type_mismatch () =
   ensures  *a == \\old(*b) && *b == \\old(*a);
 */"
   in
-  test_framework test_name input expected
+  test_framework input expected
 
-let test_translate_swap_prime_notation_sugar () =
-  let test_name = "translate_swap_prime_notation_sugar" in
+let test_translate_swap_prime_notation_sugar _ctx =
   let input = "ens (*a)'==(*b) && (*b)'==(*a);" in
   let expected =
 "/*@
@@ -85,10 +78,9 @@ let test_translate_swap_prime_notation_sugar () =
   ensures  *a == \\old(*b) && *b == \\old(*a);
 */"
   in
-  test_framework test_name input expected
+  test_framework input expected
 
-let test_translate_swap_old_notation_sugar () =
-  let test_name = "translate_swap_old_notation_sugar" in
+let test_translate_swap_old_notation_sugar _ctx =
   let input = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
   let expected =
 "/*@
@@ -97,9 +89,9 @@ let test_translate_swap_old_notation_sugar () =
   ensures  *a == \\old(*b) && *b == \\old(*a);
 */"
   in
-  test_framework test_name input expected
+  test_framework input expected
 
-let test_translate_case_single () =
+let test_translate_case_single _ctx =
   let input =
     "case { a==b => req a->int*(u); ens a->int*(u); };"
   in
@@ -112,9 +104,9 @@ let test_translate_case_single () =
     ensures  *a == \\old(*a);
 */"
   in
-  test_framework "translate_case_single" input expected
+  test_framework input expected
 
-let test_translate_case_two () =
+let test_translate_case_two _ctx =
   let input =
     "case {\n" ^
     "  a==b => req a->int*(u); ens a->int*(u);\n" ^
@@ -122,7 +114,6 @@ let test_translate_case_two () =
     "          ens a->int*(v) && b->int*(u);\n" ^
     "};"
   in
-
   let expected =
 "/*@
   assigns  *a, *b;
@@ -136,10 +127,9 @@ let test_translate_case_two () =
     ensures  *a == \\old(*b) && *b == \\old(*a);
 */"
   in
+  test_framework input expected
 
-  test_framework "translate_case_two" input expected
-
-let test_translate_case_operators () =
+let test_translate_case_operators _ctx =
   let input =
     "case {\n" ^
     "  a<b  => req a->int*(u); ens a->int*(u);\n" ^
@@ -148,7 +138,6 @@ let test_translate_case_operators () =
     "  a>=b => req a->int*(u); ens a->int*(u);\n" ^
     "};"
   in
-
   let expected =
 "/*@
   assigns  *a;
@@ -170,11 +159,9 @@ let test_translate_case_operators () =
     ensures  *a == \\old(*a);
 */"
   in
+  test_framework input expected
 
-  test_framework "translate_case_operators" input expected
-
-let test_translate_loop_terminating_case_expr () =
-  let test_name = "translate_loop_terminating_case_expr" in
+let test_translate_loop_terminating_case_expr _ctx =
   let input =
     "case {\n" ^
     "  i<30 => req Term[30-i]; ens i'==30;\n" ^
@@ -188,10 +175,9 @@ let test_translate_loop_terminating_case_expr () =
   loop variant 30-i;
 */"
   in
-  test_framework test_name input expected
+  test_framework input expected
 
-let test_translate_loop_terminating_case_expr_change_var () =
-  let test_name = "translate_loop_terminating_case_expr_change_var" in
+let test_translate_loop_terminating_case_expr_change_var _ctx =
   let input =
     "case {\n" ^
     "  j<40 => req Term[40-j];ens j'==40;\n" ^
@@ -205,10 +191,9 @@ let test_translate_loop_terminating_case_expr_change_var () =
   loop variant 40-j;
 */"
   in
-  test_framework test_name input expected
+  test_framework input expected
 
-let test_translate_loop_terminating_conj_expr () =
-  let test_name = "translate_loop_terminating_conj_expr" in
+let test_translate_loop_terminating_conj_expr _ctx =
   let input =
     "req i<30 && Term[30-i]; ens i'==30;\n" ^
     "/\\ req i>=30 && Term[]; ens i'==i;"
@@ -220,20 +205,22 @@ let test_translate_loop_terminating_conj_expr () =
   loop variant 30-i;
 */"
   in
-  test_framework test_name input expected
+  test_framework input expected
 
-let () =
-  test_translate_swap ();
-  test_translate_no_swap ();
-  test_translate_triple_swap ();
-  test_translate_swap_type_mismatch ();
-  test_translate_swap_prime_notation_sugar ();
-  test_translate_swap_old_notation_sugar ();
+let suite =
+  "translate" >::: [
+    "swap"                               >:: test_translate_swap;
+    "no_swap"                            >:: test_translate_no_swap;
+    "triple_swap"                        >:: test_translate_triple_swap;
+    "swap_type_mismatch"                 >:: test_translate_swap_type_mismatch;
+    "swap_prime_notation_sugar"          >:: test_translate_swap_prime_notation_sugar;
+    "swap_old_notation_sugar"            >:: test_translate_swap_old_notation_sugar;
+    "case_single"                        >:: test_translate_case_single;
+    "case_two"                           >:: test_translate_case_two;
+    "case_operators"                     >:: test_translate_case_operators;
+    "loop_terminating_case_expr"          >:: test_translate_loop_terminating_case_expr;
+    "loop_case_expr_change_var"          >:: test_translate_loop_terminating_case_expr_change_var;
+    "loop_terminating_conj_expr"         >:: test_translate_loop_terminating_conj_expr;
+  ]
 
-  test_translate_case_single ();
-  test_translate_case_two ();
-  test_translate_case_operators ();
-
-  test_translate_loop_terminating_case_expr ();
-  test_translate_loop_terminating_case_expr_change_var ();
-  test_translate_loop_terminating_conj_expr ();
+let () = run_test_tt_main suite
