@@ -1,7 +1,7 @@
 (test
  (name test_sl_ast)
  (modules test_sl_ast)
- (libraries sl_to_acsl_lib))
+ (libraries ast ast_printer ounit2))
 
 (test
  (name test_lexer)

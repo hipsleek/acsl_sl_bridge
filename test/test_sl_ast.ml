@@ -1,33 +1,28 @@
+open OUnit2
 open Sl_ast
 open Sl_ast_printer
 
-let assert_string_equality name expected actual =
-  if actual <> expected then
-    failwith
-      (Printf.sprintf "%s failed.\nExpected: %S\nGot:      %S\n"
-         name expected actual)
-
-let test_string_of_spec_atom_int () =
+let test_string_of_spec_atom_int _ =
   let atom = Atom (PointTo ("a", "int", "u")) in
   let actual = string_of_heap atom in
   let expected = "a->int*(u)" in
-  assert_string_equality "string_of_spec_atom_int" actual expected
+  assert_equal expected actual
 
-let test_string_of_spec_atom_char () =
+let test_string_of_spec_atom_char _ =
   let atom = Atom (PointTo ("a", "char", "u")) in
   let actual = string_of_heap atom in
   let expected = "a->char*(u)" in
-  assert_string_equality "string_of_spec_atom_char" actual expected
+  assert_equal  expected actual
 
-let test_string_of_spec_formula () =
+let test_string_of_spec_formula _ =
   let atom1 = Atom (PointTo ("a", "int", "u")) in
   let atom2 = Atom (PointTo ("b", "int", "v")) in
   let h_pre = Sep (atom1, atom2) in
   let actual = string_of_heap h_pre in
   let expected = "a->int*(u) && b->int*(v)" in
-  assert_string_equality "string_of_spec_formula" actual expected
+  assert_equal expected actual
 
-let test_string_of_spec_swap () =
+let test_string_of_spec_swap _ =
   let h_pre =
     Sep (
       Atom (PointTo ("a", "int", "u")),
@@ -45,52 +40,51 @@ let test_string_of_spec_swap () =
   let expected =
     "req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);"
   in
-  assert_string_equality "string_of_spec_swap" actual expected
+  assert_equal expected actual
 
-let test_string_of_spec_sugar_prime_swap () =
+let test_string_of_spec_sugar_prime_swap _ =
   let spec = Sugar_prime [ ("a", "b"); ("b", "a") ] in
   let actual = string_of_spec spec in
   let expected = "ens (*a)'==(*b) && (*b)'==(*a);" in
-  assert_string_equality "string_of_spec_sugar_prime_swap" expected actual
+  assert_equal expected actual
 
-let test_string_of_spec_sugar_old_swap () =
+let test_string_of_spec_sugar_old_swap _ =
   let spec = Sugar_old [ ("a", "b"); ("b", "a") ] in
   let actual = string_of_spec spec in
   let expected = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
-  assert_string_equality "string_of_spec_sugar_old_swap" expected actual
+  assert_equal expected actual
 
-let test_string_of_conditional_eq_ptrs () =
+let test_string_of_conditional_eq_ptrs _ =
   let c = E_eq (A_var "a", A_var "b") in
   let actual = string_of_expr c in
   let expected = "a==b" in
-  assert_string_equality "string_of_conditional_eq_ptrs" expected actual
+  assert_equal expected actual
 
-let test_string_of_conditional_lt_int () =
+let test_string_of_conditional_lt_int _ =
   let c = E_lt (A_var "i", A_int 30) in
   let actual = string_of_expr c in
   let expected = "i<30" in
-  assert_string_equality "string_of_conditional_lt_int" expected actual
+  assert_equal expected actual
 
-let test_string_of_arith_sub_in_conditional () =
+let test_string_of_arith_sub_in_conditional _ =
   let c = E_eq (A_sub (A_int 30, A_var "i"), A_int 0) in
   let actual = string_of_expr c in
   let expected = "30-i==0" in
-  assert_string_equality "string_of_arith_sub_in_conditional" expected actual
+  assert_equal expected actual
 
-let test_string_of_arith_post_var () =
+let test_string_of_arith_post_var _ =
   let e = A_post_var "i" in
   let actual = string_of_arith e in
   let expected = "i'" in
-  assert_string_equality "string_of_arith_post_var" expected actual
+  assert_equal expected actual
 
-let test_string_of_arith_old_var () =
+let test_string_of_arith_old_var _ =
   let e = A_old (A_var "i") in
   let actual = string_of_arith e in
   let expected = "\\old(i)" in
-  assert_string_equality "string_of_arith_old_var" expected actual
+  assert_equal expected actual
 
-let test_spec_of_pointer_eq_eq () =
-  let test_name = "spec_of_pointer_eq_eq" in
+let test_spec_of_pointer_eq_eq _ =
   let heap_a_u = Atom (PointTo ("a", "int", "u")) in
 
   let case_one : case_spec =
@@ -98,17 +92,16 @@ let test_spec_of_pointer_eq_eq () =
       test = E_eq (A_var "a", A_var "b");
       term = None;
       pre = heap_a_u;
-      post = Post_heap(heap_a_u);
+      post = Post_heap heap_a_u;
     }
   in
 
   let spec = Case [case_one] in
   let actual = string_of_spec spec in
   let expected = "case {a==b => req a->int*(u); ens a->int*(u);};" in
-  assert_string_equality test_name expected actual
+  assert_equal expected actual
 
-let test_spec_of_pointer_eq_neq () =
-  let test_name = "spec_of_pointer_eq_neq" in
+let test_spec_of_pointer_eq_neq _ =
   let heap_a_u = Atom (PointTo ("a", "int", "u")) in
 
   let heap_a_u_b_v =
@@ -123,7 +116,7 @@ let test_spec_of_pointer_eq_neq () =
       test = E_eq (A_var "a", A_var "b");
       term = None;
       pre = heap_a_u;
-      post = Post_heap(heap_a_u);
+      post = Post_heap heap_a_u;
     }
   in
   let case_two : case_spec =
@@ -131,7 +124,7 @@ let test_spec_of_pointer_eq_neq () =
       test = E_neq (A_var "a", A_var "b");
       term = None;
       pre = heap_a_u_b_v;
-      post = Post_heap(heap_a_v_b_u);
+      post = Post_heap heap_a_v_b_u;
     }
   in
 
@@ -141,10 +134,9 @@ let test_spec_of_pointer_eq_neq () =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a!=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
   in
-  assert_string_equality test_name expected actual
+  assert_equal expected actual
 
-let test_spec_of_pointer_eq_lte () =
-  let test_name = "spec_of_pointer_eq_lte" in
+let test_spec_of_pointer_eq_lte _ =
   let heap_a_u = Atom (PointTo ("a", "int", "u")) in
 
   let heap_a_u_b_v =
@@ -159,7 +151,7 @@ let test_spec_of_pointer_eq_lte () =
       test = E_eq (A_var "a", A_var "b");
       term = None;
       pre = heap_a_u;
-      post = Post_heap(heap_a_u);
+      post = Post_heap heap_a_u;
     }
   in
   let case_two : case_spec =
@@ -167,7 +159,7 @@ let test_spec_of_pointer_eq_lte () =
       test = E_lte (A_var "a", A_var "b");
       term = None;
       pre = heap_a_u_b_v;
-      post = Post_heap(heap_a_v_b_u);
+      post = Post_heap heap_a_v_b_u;
     }
   in
 
@@ -177,10 +169,9 @@ let test_spec_of_pointer_eq_lte () =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a<=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
   in
-  assert_string_equality test_name expected actual
+  assert_equal expected actual
 
-let test_spec_of_pointer_eq_lt () =
-  let test_name = "spec_of_pointer_eq_lt" in
+let test_spec_of_pointer_eq_lt _ =
   let heap_a_u = Atom (PointTo ("a", "int", "u")) in
 
   let heap_a_u_b_v =
@@ -195,7 +186,7 @@ let test_spec_of_pointer_eq_lt () =
       test = E_eq (A_var "a", A_var "b");
       term = None;
       pre = heap_a_u;
-      post = Post_heap(heap_a_u);
+      post = Post_heap heap_a_u;
     }
   in
   let case_two : case_spec =
@@ -203,7 +194,7 @@ let test_spec_of_pointer_eq_lt () =
       test = E_lt (A_var "a", A_var "b");
       term = None;
       pre = heap_a_u_b_v;
-      post = Post_heap(heap_a_v_b_u);
+      post = Post_heap heap_a_v_b_u;
     }
   in
 
@@ -213,10 +204,9 @@ let test_spec_of_pointer_eq_lt () =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a<b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
   in
-  assert_string_equality test_name expected actual
+  assert_equal expected actual
 
-let test_spec_of_pointer_eq_gte () =
-  let test_name = "spec_of_pointer_eq_gte" in
+let test_spec_of_pointer_eq_gte _ =
   let heap_a_u = Atom (PointTo ("a", "int", "u")) in
 
   let heap_a_u_b_v =
@@ -231,7 +221,7 @@ let test_spec_of_pointer_eq_gte () =
       test = E_eq (A_var "a", A_var "b");
       term = None;
       pre = heap_a_u;
-      post = Post_heap(heap_a_u);
+      post = Post_heap heap_a_u;
     }
   in
   let case_two : case_spec =
@@ -239,7 +229,7 @@ let test_spec_of_pointer_eq_gte () =
       test = E_gte (A_var "a", A_var "b");
       term = None;
       pre = heap_a_u_b_v;
-      post = Post_heap(heap_a_v_b_u);
+      post = Post_heap heap_a_v_b_u;
     }
   in
 
@@ -249,10 +239,9 @@ let test_spec_of_pointer_eq_gte () =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a>=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
   in
-  assert_string_equality test_name expected actual
+  assert_equal expected actual
 
-let test_spec_of_pointer_eq_gt () =
-  let test_name = "spec_of_pointer_eq_gt" in
+let test_spec_of_pointer_eq_gt _ =
   let heap_a_u = Atom (PointTo ("a", "int", "u")) in
 
   let heap_a_u_b_v =
@@ -267,7 +256,7 @@ let test_spec_of_pointer_eq_gt () =
       test = E_eq (A_var "a", A_var "b");
       term = None;
       pre = heap_a_u;
-      post = Post_heap(heap_a_u);
+      post = Post_heap heap_a_u;
     }
   in
   let case_two : case_spec =
@@ -275,7 +264,7 @@ let test_spec_of_pointer_eq_gt () =
       test = E_gt (A_var "a", A_var "b");
       term = None;
       pre = heap_a_u_b_v;
-      post = Post_heap(heap_a_v_b_u);
+      post = Post_heap heap_a_v_b_u;
     }
   in
 
@@ -285,10 +274,10 @@ let test_spec_of_pointer_eq_gt () =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a>b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
   in
-  assert_string_equality test_name expected actual
+  assert_equal expected actual
 
 
-let test_loop_case_with_variant () =
+let test_loop_case_with_variant _ =
   let heap_i_u = Atom (PointTo ("i", "int", "u")) in
 
   let case_loop : case_spec =
@@ -304,9 +293,9 @@ let test_loop_case_with_variant () =
   let expected =
     "case {i<30 => req Term[30-i]; ens i'==30;};"
   in
-  assert_string_equality "loop_case_with_variant" expected actual
+  assert_equal expected actual
 
-let test_loop_case_with_variant_prime () =
+let test_loop_case_with_variant_prime _ =
   let heap_i_u = Atom (PointTo ("i", "int", "u")) in
 
   let case_loop : case_spec =
@@ -322,9 +311,9 @@ let test_loop_case_with_variant_prime () =
   let expected =
     "case {i<30 => req Term[30-i]; ens i'==i;};"
   in
-  assert_string_equality "loop_case_with_variant" expected actual
+  assert_equal expected actual
 
-let test_loop_case_with_variant_old () =
+let test_loop_case_with_variant_old _ =
   let heap_i_u = Atom (PointTo ("i", "int", "u")) in
 
   let case_loop : case_spec =
@@ -340,9 +329,9 @@ let test_loop_case_with_variant_old () =
   let expected =
     "case {i<30 => req Term[30-i]; ens i==\\old(i);};"
   in
-  assert_string_equality "loop_case_with_variant_old" expected actual
+  assert_equal  expected actual
 
-let test_loop_case_with_variant_and_exit () =
+let test_loop_case_with_variant_and_exit _ =
   let heap_i_u = Atom (PointTo ("i", "int", "u")) in
 
   let case1 : case_spec =
@@ -368,30 +357,31 @@ let test_loop_case_with_variant_and_exit () =
     "case {i<30 => req Term[30-i]; ens i'==30; \
      i>=30 => req Term[]; ens i'==i;};"
   in
-  assert_string_equality "loop_case_with_variant_and_exit" expected actual
+  assert_equal expected actual
 
-let () =
-  test_string_of_spec_atom_int ();
-  test_string_of_spec_atom_char ();
-  test_string_of_spec_formula ();
-  test_string_of_spec_swap ();
-  test_string_of_spec_sugar_prime_swap ();
-  test_string_of_spec_sugar_old_swap ();
+let suite =
+  "sl_ast_printer tests" >::: [
+    "string_of_spec_atom_int"            >:: test_string_of_spec_atom_int;
+    "string_of_spec_atom_char"           >:: test_string_of_spec_atom_char;
+    "string_of_spec_formula"             >:: test_string_of_spec_formula;
+    "string_of_spec_swap"                >:: test_string_of_spec_swap;
+    "string_of_spec_sugar_prime_swap"    >:: test_string_of_spec_sugar_prime_swap;
+    "string_of_spec_sugar_old_swap"      >:: test_string_of_spec_sugar_old_swap;
+    "string_of_conditional_eq_ptrs"      >:: test_string_of_conditional_eq_ptrs;
+    "string_of_conditional_lt_int"       >:: test_string_of_conditional_lt_int;
+    "string_of_arith_sub_in_conditional" >:: test_string_of_arith_sub_in_conditional;
+    "string_of_arith_post_var"           >:: test_string_of_arith_post_var;
+    "string_of_arith_old_var"            >:: test_string_of_arith_old_var;
+    "spec_of_pointer_eq_eq"              >:: test_spec_of_pointer_eq_eq;
+    "spec_of_pointer_eq_neq"             >:: test_spec_of_pointer_eq_neq;
+    "spec_of_pointer_eq_gte"             >:: test_spec_of_pointer_eq_gte;
+    "spec_of_pointer_eq_gt"              >:: test_spec_of_pointer_eq_gt;
+    "spec_of_pointer_eq_lte"             >:: test_spec_of_pointer_eq_lte;
+    "spec_of_pointer_eq_lt"              >:: test_spec_of_pointer_eq_lt;
+    "loop_case_with_variant"             >:: test_loop_case_with_variant;
+    "loop_case_with_variant_prime"       >:: test_loop_case_with_variant_prime;
+    "loop_case_with_variant_old"         >:: test_loop_case_with_variant_old;
+    "loop_case_with_variant_and_exit"    >:: test_loop_case_with_variant_and_exit;
+  ]
 
-  test_string_of_conditional_eq_ptrs ();
-  test_string_of_conditional_lt_int ();
-  test_string_of_arith_sub_in_conditional ();
-  test_string_of_arith_post_var ();
-  test_string_of_arith_old_var ();
-
-  test_spec_of_pointer_eq_eq ();
-  test_spec_of_pointer_eq_neq ();
-  test_spec_of_pointer_eq_gte ();
-  test_spec_of_pointer_eq_gt ();
-  test_spec_of_pointer_eq_lte ();
-  test_spec_of_pointer_eq_lt ();
-
-  test_loop_case_with_variant ();
-  test_loop_case_with_variant_prime ();
-  test_loop_case_with_variant_old ();
-  test_loop_case_with_variant_and_exit ();
+let () = run_test_tt_main suite
