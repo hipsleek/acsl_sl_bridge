@@ -1,6 +1,7 @@
 open Core
 
 module A = Acsl_ast
+module AP = Acsl_ast_printer
 module StringSet = Set.Make (String)
 
 let acsl_term_of_core (t : term) : A.term =
@@ -127,5 +128,5 @@ let loop_contract_of_spec (s : spec) : A.loop_contract option =
 
 let spec_to_acsl (s : spec) : string =
   match loop_contract_of_spec s with
-  | Some lc -> A.acsl_loop_contract lc
-  | None -> s |> contract_of_spec |> A.acsl_contract
+  | Some lc -> AP.acsl_loop_contract lc
+  | None -> s |> contract_of_spec |> AP.acsl_contract

@@ -1,5 +1,6 @@
 open OUnit2
 open Acsl_ast
+open Acsl_ast_printer
 
 let test_acsl_term_var _ctx =
   let actual = acsl_term (TVar "a") in
