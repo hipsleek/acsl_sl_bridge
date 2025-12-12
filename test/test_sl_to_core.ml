@@ -188,6 +188,28 @@ let test_sl_to_core_case_loop_term () =
   in
   assert_string_equality test_name expected actual
 
+let test_sl_to_core_conj_loop_term () =
+  let test_name = "sl_to_core_conj_loop_term" in
+  let input =
+    "req i<30 && Term[30-i]; ens i'==30;\n" ^
+    "/\\ req i>=30 && Term[]; ens i'==i;"
+  in
+  let sl_spec   = parse_spec input in
+  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let actual    = Core.string_of_spec core_spec in
+  let expected =
+    "params ()\n" ^
+    "assumes i < 30\n" ^
+    "requires true\n" ^
+    "ensures true\n" ^
+    "frame {}\n" ^
+    "assumes i >= 30\n" ^
+    "requires true\n" ^
+    "ensures true\n" ^
+    "frame {}"
+  in
+  assert_string_equality test_name expected actual
+
 
 let test_sl_to_core_case_guard_uses_post_phase () =
   let test_name = "sl_to_core_case_guard_uses_post_phase" in
@@ -224,3 +246,4 @@ let () =
   test_sl_to_core_case_swap ();
   test_sl_to_core_case_loop_term ();
   test_sl_to_core_case_guard_uses_post_phase ();
+  test_sl_to_core_conj_loop_term ();
