@@ -15,13 +15,3 @@ let lt (t1 : term) (t2 : term) : predicate = P_lt (t1, t2)
 let gte (t1 : term) (t2 : term) : predicate = P_gte (t1, t2)
 let gt (t1 : term) (t2 : term) : predicate = P_gt (t1, t2)
 let valid (p : ptr) : predicate = P_valid p
-
-let mk_behavior
-    ?(assumes = [])
-    ?(requires = [])
-    ?(ensures = [])
-    ?(frame = [])
-    ?variant
-    ()
-  : behavior =
-  { assumes; requires; ensures; frame; variant }

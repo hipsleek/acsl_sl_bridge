@@ -5,8 +5,6 @@ open Core_printer
 
 let mk_inout_param name = mk_param InOut name
 
-(* ---------------------- TERM TESTS ---------------------- *)
-
 let test_core_string_of_term_heap_pre _ =
   let t = T_heap (Pre, "a") in
   assert_equal
@@ -37,8 +35,6 @@ let test_core_string_of_term_int _ =
     "42"
     (string_of_term t)
 
-(* ---------------------- PREDICATE TESTS ---------------------- *)
-
 let test_core_string_of_predicate_valid _ =
   let p = P_valid "a" in
   assert_equal
@@ -50,8 +46,6 @@ let test_core_string_of_predicate_eq_heaps _ =
   assert_equal
     "H(a) == H'(b)"
     (string_of_predicate p)
-
-(* ---------------------- SPEC TESTS ---------------------- *)
 
 let test_core_string_of_spec_swap _ =
   let params = [ mk_inout_param "a"; mk_inout_param "b" ] in
@@ -126,7 +120,6 @@ let test_core_string_of_spec_with_variant _ =
   let spec   = { params = []; behaviors = [b] } in
   let actual = string_of_spec spec in
 
-  (* Note: variant is currently NOT printed in output (consistent with your previous tests) *)
   let expected =
     "params ()\n" ^
     "assumes true\n" ^
@@ -137,8 +130,6 @@ let test_core_string_of_spec_with_variant _ =
   in
 
   assert_equal expected actual
-
-(* ---------------------- SUITE ---------------------- *)
 
 let suite =
   "core printer tests" >::: [

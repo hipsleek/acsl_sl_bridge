@@ -48,8 +48,3 @@ type spec = {
   params : param list;
   behaviors : behavior list;
 }
-
-
-
-
-(* Preety prints*)

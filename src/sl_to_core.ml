@@ -5,6 +5,7 @@ module C = Core
 module StringSet = Set.Make (String)
 module StringMap = Map.Make (String)
 
+(*Relation makers*)
 let rec atoms_of_heap
     (h : Sl_ast.heap)
   : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list =
@@ -55,22 +56,21 @@ let make_ensures
     post_map;
   List.rev !buf
 
-
+(*1:1 translation*)
 let term_of_arith (e : Sl_ast.arith_expr) : C.term =
   match e with
-  | A_var x      -> Core_builder.var_post x
+  | A_var x  -> Core_builder.var_post x
   | A_post_var x -> Core_builder.var_post x
   | A_old inner ->
       begin match inner with
       | A_var x -> Core_builder.var_pre x
-      | _       -> C.T_var (C.Pre, Sl_ast_printer.string_of_arith inner)
+      | _  -> C.T_var (C.Pre, Sl_ast_printer.string_of_arith inner)
       end
-  | A_int n      -> C.T_int n
+  | A_int n -> C.T_int n
   | A_add _
   | A_sub _
   | A_mul _
-  | A_div _      ->
-      C.T_var (C.Post, Sl_ast_printer.string_of_arith e)
+  | A_div _  -> C.T_var (C.Post, Sl_ast_printer.string_of_arith e)
 
 let get_predicate (e : Sl_ast.conditional_expr) : C.predicate =
   match e with
@@ -82,19 +82,20 @@ let get_predicate (e : Sl_ast.conditional_expr) : C.predicate =
   | E_gt  (e1, e2) -> C.P_gt  (term_of_arith e1, term_of_arith e2)
 
 
+(*Composed translation*)
 let make_simple_core
     (pre_atoms  : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list)
     (post_atoms : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list)
   : C.spec =
-  let ptrs =
-    StringSet.union (ptrs_of_atoms pre_atoms) (ptrs_of_atoms post_atoms)
-  in
+  (*Get all pointers*)
+  let ptrs = StringSet.union (ptrs_of_atoms pre_atoms) (ptrs_of_atoms post_atoms) in
   let ptr_list = StringSet.elements ptrs in
 
-  let params   = List.map (fun p -> Core_builder.mk_param C.InOut p) ptr_list in
-  let frame    = ptr_list in
-  let requires = List.map Core_builder.valid ptr_list in
-  let ensures  = make_ensures pre_atoms post_atoms in
+  (*Make all variables inout*)
+  let params = List.map (fun p -> Core_builder.mk_param C.InOut p) ptr_list in
+  let frame = ptr_list in
+  let requires = List.map Core_builder.valid ptr_list in (*get valid pointers*)
+  let ensures = make_ensures pre_atoms post_atoms in
 
   let behavior : C.behavior =
     {
@@ -102,7 +103,7 @@ let make_simple_core
       requires;
       ensures;
       frame;
-      variant   = None;
+      variant = None;
     }
   in
   { C.params = params; behaviors = [ behavior ] }
@@ -119,6 +120,7 @@ let make_case_core (sl_cases : Sl_ast.case_spec list) : C.spec =
   in
   if has_post_expr then
     let behaviors =
+      (*Pattern match the behaviours to extract the test/condtional and their corresponding terminating consequent*)
       sl_cases
       |> List.map (fun c ->
            let assumes = [ get_predicate c.test ] in
@@ -131,12 +133,11 @@ let make_case_core (sl_cases : Sl_ast.case_spec list) : C.spec =
            {
              C.assumes;
              C.requires = [];
-             C.ensures  = [];
-             C.frame    = [];
-             C.variant  = variant;
+             C.ensures = [];
+             C.frame = [];
+             C.variant = variant;
            })
-    in
-    { C.params = []; behaviors }
+    in { C.params = []; behaviors }
   else
     let global_ptrs_set =
       List.fold_left
@@ -148,7 +149,7 @@ let make_case_core (sl_cases : Sl_ast.case_spec list) : C.spec =
            let acc = add_heap acc c.pre in
            match c.post with
            | Post_heap h_post -> add_heap acc h_post
-           | Post_expr _      -> acc )
+           | Post_expr _ -> acc ) (*ignore*)
         StringSet.empty
         sl_cases
     in
@@ -158,18 +159,14 @@ let make_case_core (sl_cases : Sl_ast.case_spec list) : C.spec =
     let behaviors =
       sl_cases
       |> List.map (fun c ->
-           let pre_atoms =
-             atoms_of_heap c.pre
-           in
+           let pre_atoms = atoms_of_heap c.pre in
            let post_atoms =
              match c.post with
              | Post_heap h_post -> atoms_of_heap h_post
-             | Post_expr _      -> [] 
+             | Post_expr _ -> [] (*ignore*)
            in
-           let frame_set =
-             StringSet.union (ptrs_of_atoms pre_atoms) (ptrs_of_atoms post_atoms)
-           in
-           let frame    = StringSet.elements frame_set in
+           let frame_set = StringSet.union (ptrs_of_atoms pre_atoms) (ptrs_of_atoms post_atoms) in
+           let frame  = StringSet.elements frame_set in
            let assumes  = [ get_predicate c.test ] in
            let requires = List.map Core_builder.valid global_ptrs in
            let ensures  = make_ensures pre_atoms post_atoms in
@@ -182,9 +179,9 @@ let make_case_core (sl_cases : Sl_ast.case_spec list) : C.spec =
            {
              C.assumes;
              C.requires = requires;
-             C.ensures  = ensures;
-             C.frame    = frame;
-             C.variant  = variant;
+             C.ensures = ensures;
+             C.frame = frame;
+             C.variant = variant;
            })
     in
     { C.params = params; behaviors }
@@ -212,7 +209,7 @@ let make_sugar_core (pairs : (Sl_ast.ptr * Sl_ast.ptr) list) : C.spec =
   in
   let behavior : C.behavior =
     {
-      C.assumes  = [];
+      C.assumes = [];
       requires;
       ensures;
       frame;
