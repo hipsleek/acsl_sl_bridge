@@ -1,7 +1,17 @@
 (test
  (name test_sl_ast)
- (modules test_sl_ast test_core_to_acsl)
- (libraries ast ast_printer ounit2))
+ (modules test_sl_ast)
+ (libraries sl_to_acsl_lib ounit2))
+
+(test
+ (name test_core)
+ (modules test_core)
+ (libraries sl_to_acsl_lib ounit2))
+
+(test
+ (name test_core_to_acsl)
+ (modules test_core_to_acsl)
+ (libraries sl_to_acsl_lib ounit2))
 
 (test
  (name test_lexer)
@@ -16,11 +26,6 @@
 (test
  (name test_translate)
  (modules test_translate)
- (libraries sl_to_acsl_lib))
-
-(test
- (name test_core)
- (modules test_core)
  (libraries sl_to_acsl_lib))
 
 

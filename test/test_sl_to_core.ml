@@ -16,7 +16,7 @@ let test_sl_to_core_swap () =
   in
   let sl_spec = parse_spec input in
   let core_spec = Sl_to_core.spec_to_core sl_spec in
-  let actual = Core.string_of_spec core_spec in
+  let actual = Core_printer.string_of_spec core_spec in
   let expected = 
     "params (a:inout, b:inout)\n" ^
     "assumes true\n" ^
@@ -34,7 +34,7 @@ let test_sl_to_core_no_swap () =
   in
   let sl_spec = parse_spec input in
   let core_spec = Sl_to_core.spec_to_core sl_spec in
-  let actual = Core.string_of_spec core_spec in
+  let actual = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout)\n" ^
     "assumes true\n" ^
@@ -52,7 +52,7 @@ let test_sl_to_core_triple_swap () =
   in
   let sl_spec = parse_spec input in
   let core_spec = Sl_to_core.spec_to_core sl_spec in
-  let actual = Core.string_of_spec core_spec in
+  let actual = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout, c:inout)\n" ^
     "assumes true\n" ^
@@ -70,7 +70,7 @@ let test_sl_to_core_swap_type_mismatch () =
   in
   let sl_spec = parse_spec input in
   let core_spec = Sl_to_core.spec_to_core sl_spec in
-  let actual = Core.string_of_spec core_spec in
+  let actual = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
     "assumes true\n" ^
@@ -87,7 +87,7 @@ let test_sl_to_core_swap_prime_sugar () =
   in
   let sl_spec   = parse_spec input in
   let core_spec = Sl_to_core.spec_to_core sl_spec in
-  let actual    = Core.string_of_spec core_spec in
+  let actual    = Core_printer.string_of_spec core_spec in
   (* semantics match the prev swap spec *)
   let expected =
     "params (a:inout, b:inout)\n" ^
@@ -105,7 +105,7 @@ let test_sl_to_core_swap_old_sugar () =
   in
   let sl_spec   = parse_spec input in
   let core_spec = Sl_to_core.spec_to_core sl_spec in
-  let actual    = Core.string_of_spec core_spec in
+  let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
     "assumes true\n" ^
@@ -129,7 +129,7 @@ let test_sl_to_core_case_swap () =
   in
   let sl_spec = parse_spec input in
   let core_spec = Sl_to_core.spec_to_core sl_spec in
-  let actual = Core.string_of_spec core_spec in
+  let actual = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
     "assumes a == b\n" ^
@@ -174,13 +174,14 @@ let test_sl_to_core_case_loop_term () =
   in
   let sl_spec   = parse_spec input in
   let core_spec = Sl_to_core.spec_to_core sl_spec in
-  let actual    = Core.string_of_spec core_spec in
+  let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params ()\n" ^
     "assumes i < 30\n" ^
     "requires true\n" ^
     "ensures true\n" ^
     "frame {}\n" ^
+    "variant 30-i\n" ^
     "assumes i >= 30\n" ^
     "requires true\n" ^
     "ensures true\n" ^
@@ -196,13 +197,14 @@ let test_sl_to_core_conj_loop_term () =
   in
   let sl_spec   = parse_spec input in
   let core_spec = Sl_to_core.spec_to_core sl_spec in
-  let actual    = Core.string_of_spec core_spec in
+  let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params ()\n" ^
     "assumes i < 30\n" ^
     "requires true\n" ^
     "ensures true\n" ^
     "frame {}\n" ^
+    "variant 30-i\n" ^
     "assumes i >= 30\n" ^
     "requires true\n" ^
     "ensures true\n" ^
@@ -226,7 +228,7 @@ let test_sl_to_core_case_guard_uses_post_phase () =
                        Core.T_var (Core.Post, "b")) ] ->
             ()
         | _ ->
-            let actual = Core.string_of_spec core_spec in
+            let actual = Core_printer.string_of_spec core_spec in
             failwith
               (Printf.sprintf
                  "%s failed.\nExpected assumes on post-phase vars a,b.\nGot Core spec:\n%s\n"

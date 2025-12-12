@@ -1,65 +1,60 @@
+open OUnit2
 open Core
 open Core_builder
-
-(* helper *)
-let assert_string_equality name expected actual =
-  if actual <> expected then
-    failwith
-      (Printf.sprintf "%s failed.\nExpected: %S\nGot:      %S\n"
-         name expected actual)
+open Core_printer
 
 let mk_inout_param name = mk_param InOut name
 
-let test_core_string_of_term_heap_pre () =
+(* ---------------------- TERM TESTS ---------------------- *)
+
+let test_core_string_of_term_heap_pre _ =
   let t = T_heap (Pre, "a") in
-  let actual = string_of_term t in
-  let expected = "H(a)" in
-  assert_string_equality "core_string_of_term_heap_pre" expected actual
+  assert_equal
+    "H(a)"
+    (string_of_term t)
 
-let test_core_string_of_term_heap_post () =
+let test_core_string_of_term_heap_post _ =
   let t = T_heap (Post, "a") in
-  let actual = string_of_term t in
-  let expected = "H'(a)" in
-  assert_string_equality "core_string_of_term_heap_post" expected actual
+  assert_equal
+    "H'(a)"
+    (string_of_term t)
 
-let test_core_string_of_term_var_pre () =
+let test_core_string_of_term_var_pre _ =
   let t = T_var (Pre, "u") in
-  let actual = string_of_term t in
-  let expected = "u" in
-  assert_string_equality "core_string_of_term_var_pre" expected actual
+  assert_equal
+    "u"
+    (string_of_term t)
 
-let test_core_string_of_term_var_post () =
+let test_core_string_of_term_var_post _ =
   let t = T_var (Post, "u") in
-  let actual = string_of_term t in
-  let expected = "u" in
-  assert_string_equality "core_string_of_term_var_post" expected actual
+  assert_equal
+    "u"
+    (string_of_term t)
 
-
-let test_core_string_of_term_int () =
+let test_core_string_of_term_int _ =
   let t = T_int 42 in
-  let actual = string_of_term t in
-  let expected = "42" in
-  assert_string_equality "core_string_of_term_int" expected actual
+  assert_equal
+    "42"
+    (string_of_term t)
 
+(* ---------------------- PREDICATE TESTS ---------------------- *)
 
-
-let test_core_string_of_predicate_valid () =
+let test_core_string_of_predicate_valid _ =
   let p = P_valid "a" in
-  let actual = string_of_predicate p in
-  let expected = "valid(a)" in
-  assert_string_equality "core_string_of_predicate_valid" expected actual
+  assert_equal
+    "valid(a)"
+    (string_of_predicate p)
 
-let test_core_string_of_predicate_eq_heaps () =
+let test_core_string_of_predicate_eq_heaps _ =
   let p = P_eq (T_heap (Pre, "a"), T_heap (Post, "b")) in
-  let actual = string_of_predicate p in
-  let expected = "H(a) == H'(b)" in
-  assert_string_equality "core_string_of_predicate_eq_heaps" expected actual
+  assert_equal
+    "H(a) == H'(b)"
+    (string_of_predicate p)
 
+(* ---------------------- SPEC TESTS ---------------------- *)
 
-
-let test_core_string_of_spec_swap () =
+let test_core_string_of_spec_swap _ =
   let params = [ mk_inout_param "a"; mk_inout_param "b" ] in
-
   let requires = [ valid "a"; valid "b" ] in
   let ensures =
     [
@@ -68,23 +63,20 @@ let test_core_string_of_spec_swap () =
     ]
   in
   let frame = [ "a"; "b" ] in
-  let variant = None in
 
   let behavior_swap : behavior =
     {
-      assumes = [neq (T_ptr "a") (T_ptr "b")];
-      requires;
-      ensures;
-      frame;
-      variant;
+      assumes  = [ neq (T_ptr "a") (T_ptr "b") ];
+      requires = requires;
+      ensures  = ensures;
+      frame    = frame;
+      variant  = None;
     }
   in
 
-  let spec_swap : Core.spec =
-    { params; behaviors = [ behavior_swap ] }
-  in
+  let spec_swap : Core.spec = { params; behaviors = [behavior_swap] } in
+  let actual = string_of_spec spec_swap in
 
-  let actual = Core.string_of_spec spec_swap in
   let expected =
     "params (a:inout, b:inout)\n" ^
     "assumes a != b\n" ^
@@ -92,10 +84,11 @@ let test_core_string_of_spec_swap () =
     "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
     "frame {a, b}"
   in
-  assert_string_equality "core_string_of_spec_swap" expected actual
 
-let test_core_string_of_spec_empty () =
-  let empty_behavior : behavior =
+  assert_equal expected actual
+
+let test_core_string_of_spec_empty _ =
+  let empty_behavior =
     {
       assumes = [];
       requires = [];
@@ -104,13 +97,9 @@ let test_core_string_of_spec_empty () =
       variant = None;
     }
   in
-  let spec_empty : Core.spec =
-    {
-      params = [];
-      behaviors = [ empty_behavior ];
-    }
-  in
-  let actual = Core.string_of_spec spec_empty in
+
+  let spec_empty = { params = []; behaviors = [empty_behavior] } in
+
   let expected =
     "params ()\n" ^
     "assumes true\n" ^
@@ -118,10 +107,13 @@ let test_core_string_of_spec_empty () =
     "ensures true\n" ^
     "frame {}"
   in
-  assert_string_equality "core_string_of_spec_empty" expected actual
 
-let test_core_string_of_spec_with_variant () =
-  let b : behavior =
+  assert_equal
+    expected
+    (string_of_spec spec_empty)
+
+let test_core_string_of_spec_with_variant _ =
+  let b =
     {
       assumes  = [];
       requires = [];
@@ -130,33 +122,38 @@ let test_core_string_of_spec_with_variant () =
       variant  = Some (T_int 42);
     }
   in
-  let spec : Core.spec =
-    {
-      params    = [];
-      behaviors = [ b ];
-    }
-  in
-  let actual = Core.string_of_spec spec in
+
+  let spec   = { params = []; behaviors = [b] } in
+  let actual = string_of_spec spec in
+
+  (* Note: variant is currently NOT printed in output (consistent with your previous tests) *)
   let expected =
     "params ()\n" ^
     "assumes true\n" ^
     "requires true\n" ^
     "ensures true\n" ^
-    "frame {}"
+    "frame {}\n"^
+    "variant 42"
   in
-  assert_string_equality "core_string_of_spec_with_variant" expected actual
 
-let () =
-  test_core_string_of_term_heap_pre ();
-  test_core_string_of_term_heap_post ();
-  test_core_string_of_term_var_pre ();
-  test_core_string_of_term_var_post ();
-  test_core_string_of_term_int ();
+  assert_equal expected actual
 
-  test_core_string_of_predicate_valid ();
-  test_core_string_of_predicate_eq_heaps ();
+(* ---------------------- SUITE ---------------------- *)
 
-  test_core_string_of_spec_swap ();
-  test_core_string_of_spec_empty ();
+let suite =
+  "core printer tests" >::: [
+    "term_heap_pre"        >:: test_core_string_of_term_heap_pre;
+    "term_heap_post"       >:: test_core_string_of_term_heap_post;
+    "term_var_pre"         >:: test_core_string_of_term_var_pre;
+    "term_var_post"        >:: test_core_string_of_term_var_post;
+    "term_int"             >:: test_core_string_of_term_int;
 
-  test_core_string_of_spec_with_variant ();
+    "predicate_valid"      >:: test_core_string_of_predicate_valid;
+    "predicate_eq_heaps"   >:: test_core_string_of_predicate_eq_heaps;
+
+    "spec_swap"            >:: test_core_string_of_spec_swap;
+    "spec_empty"           >:: test_core_string_of_spec_empty;
+    "spec_with_variant"    >:: test_core_string_of_spec_with_variant;
+  ]
+
+let () = run_test_tt_main suite

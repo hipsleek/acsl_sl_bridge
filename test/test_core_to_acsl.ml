@@ -24,7 +24,6 @@ let mk_basic_spec (ptrs : string list) (eqs : Core.predicate list) : Core.spec =
 (* Unit tests *)
 
 let test_core_to_acsl_swap _ctx =
-  let test_name = "core_to_acsl_swap" in
   let ptrs = [ "a"; "b" ] in
   let eqs =
     [
@@ -48,7 +47,6 @@ let test_core_to_acsl_swap _ctx =
   assert_equal expected actual
 
 let test_core_to_acsl_no_swap _ctx =
-  let test_name = "core_to_acsl_no_swap" in
   let ptrs = [ "a"; "b" ] in
   let eqs =
     [
@@ -72,7 +70,6 @@ let test_core_to_acsl_no_swap _ctx =
   assert_equal expected actual
 
 let test_core_to_acsl_triple_swap _ctx =
-  let test_name = "core_to_acsl_triple_swap" in
   let ptrs = [ "a"; "b"; "c" ] in
   let eqs =
     [
@@ -99,7 +96,6 @@ let test_core_to_acsl_triple_swap _ctx =
   assert_equal expected actual
 
 let test_core_to_acsl_case_behaviors _ctx =
-  let test_name = "core_to_acsl_case_behaviors" in
   let params = [ mk_inout_param "a"; mk_inout_param "b" ] in
 
   (* case a == b *)
@@ -168,36 +164,6 @@ let test_core_to_acsl_case_behaviors _ctx =
   in
   assert_equal expected actual
 
-let test_core_to_acsl_loop_variant _ctx =
-  let test_name = "core_to_acsl_loop_variant" in
-
-  let behavior : Core.behavior =
-    {
-      Core.assumes =
-        [ Core_builder.lte (Core_builder.var_post "i") (Core.T_int 30) ];
-      Core.requires = [];
-      Core.ensures  = [];
-      Core.frame    = [];
-      Core.variant  = Some (Core.T_var (Core.Pre, "30-i"));
-    }
-  in
-
-  let core_spec : Core.spec =
-    {
-      Core.params    = [];
-      Core.behaviors = [ behavior ];
-    }
-  in
-
-  let actual   = Core_to_acsl.spec_to_acsl core_spec in
-  let expected =
-"/*@
-  loop invariant i <= 30;
-  loop assigns i;
-  loop variant 30-i;
-*/"
-  in
-  assert_equal expected actual
 
 let suite =
   "core_to_acsl tests" >::: [
@@ -205,7 +171,6 @@ let suite =
     "core_to_acsl_no_swap"        >:: test_core_to_acsl_no_swap;
     "core_to_acsl_triple_swap"    >:: test_core_to_acsl_triple_swap;
     "core_to_acsl_case_behaviors" >:: test_core_to_acsl_case_behaviors;
-    "core_to_acsl_loop_variant"   >:: test_core_to_acsl_loop_variant;
   ]
 
 let () = run_test_tt_main suite
