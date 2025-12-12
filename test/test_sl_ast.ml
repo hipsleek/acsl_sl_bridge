@@ -1,4 +1,5 @@
 open Sl_ast
+open Sl_ast_printer
 
 let assert_string_equality name expected actual =
   if actual <> expected then
@@ -48,13 +49,13 @@ let test_string_of_spec_swap () =
 
 let test_string_of_spec_sugar_prime_swap () =
   let spec = Sugar_prime [ ("a", "b"); ("b", "a") ] in
-  let actual = Sl_ast.string_of_spec spec in
+  let actual = string_of_spec spec in
   let expected = "ens (*a)'==(*b) && (*b)'==(*a);" in
   assert_string_equality "string_of_spec_sugar_prime_swap" expected actual
 
 let test_string_of_spec_sugar_old_swap () =
   let spec = Sugar_old [ ("a", "b"); ("b", "a") ] in
-  let actual = Sl_ast.string_of_spec spec in
+  let actual = string_of_spec spec in
   let expected = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
   assert_string_equality "string_of_spec_sugar_old_swap" expected actual
 
@@ -102,7 +103,7 @@ let test_spec_of_pointer_eq_eq () =
   in
 
   let spec = Case [case_one] in
-  let actual = Sl_ast.string_of_spec spec in
+  let actual = string_of_spec spec in
   let expected = "case {a==b => req a->int*(u); ens a->int*(u);};" in
   assert_string_equality test_name expected actual
 
@@ -135,7 +136,7 @@ let test_spec_of_pointer_eq_neq () =
   in
 
   let spec = Case [case_one; case_two] in
-  let actual = Sl_ast.string_of_spec spec in
+  let actual = string_of_spec spec in
   let expected =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a!=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
@@ -171,7 +172,7 @@ let test_spec_of_pointer_eq_lte () =
   in
 
   let spec = Case [case_one; case_two] in
-  let actual = Sl_ast.string_of_spec spec in
+  let actual = string_of_spec spec in
   let expected =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a<=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
@@ -207,7 +208,7 @@ let test_spec_of_pointer_eq_lt () =
   in
 
   let spec = Case [case_one; case_two] in
-  let actual = Sl_ast.string_of_spec spec in
+  let actual = string_of_spec spec in
   let expected =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a<b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
@@ -243,7 +244,7 @@ let test_spec_of_pointer_eq_gte () =
   in
 
   let spec = Case [case_one; case_two] in
-  let actual = Sl_ast.string_of_spec spec in
+  let actual = string_of_spec spec in
   let expected =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a>=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
@@ -279,7 +280,7 @@ let test_spec_of_pointer_eq_gt () =
   in
 
   let spec = Case [case_one; case_two] in
-  let actual = Sl_ast.string_of_spec spec in
+  let actual = string_of_spec spec in
   let expected =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a>b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
@@ -299,7 +300,7 @@ let test_loop_case_with_variant () =
     }
   in
   let spec = Case [case_loop] in
-  let actual = Sl_ast.string_of_spec spec in
+  let actual = string_of_spec spec in
   let expected =
     "case {i<30 => req Term[30-i]; ens i'==30;};"
   in
@@ -317,7 +318,7 @@ let test_loop_case_with_variant_prime () =
     }
   in
   let spec = Case [case_loop] in
-  let actual = Sl_ast.string_of_spec spec in
+  let actual = string_of_spec spec in
   let expected =
     "case {i<30 => req Term[30-i]; ens i'==i;};"
   in
@@ -335,7 +336,7 @@ let test_loop_case_with_variant_old () =
     }
   in
   let spec   = Case [case_loop] in
-  let actual = Sl_ast.string_of_spec spec in
+  let actual = string_of_spec spec in
   let expected =
     "case {i<30 => req Term[30-i]; ens i==\\old(i);};"
   in
@@ -362,7 +363,7 @@ let test_loop_case_with_variant_and_exit () =
   in
 
   let spec = Case [case1; case2] in
-  let actual = Sl_ast.string_of_spec spec in
+  let actual = string_of_spec spec in
   let expected =
     "case {i<30 => req Term[30-i]; ens i'==30; \
      i>=30 => req Term[]; ens i'==i;};"

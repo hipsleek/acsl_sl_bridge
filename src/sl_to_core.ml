@@ -63,14 +63,14 @@ let term_of_arith (e : Sl_ast.arith_expr) : C.term =
   | A_old inner ->
       begin match inner with
       | A_var x -> C.var_pre x
-      | _       -> C.T_var (C.Pre, Sl_ast.string_of_arith inner)
+      | _       -> C.T_var (C.Pre, Sl_ast_printer.string_of_arith inner)
       end
   | A_int n      -> C.T_int n
   | A_add _
   | A_sub _
   | A_mul _
   | A_div _      ->
-      C.T_var (C.Post, Sl_ast.string_of_arith e)
+      C.T_var (C.Post, Sl_ast_printer.string_of_arith e)
 
 let get_predicate (e : Sl_ast.conditional_expr) : C.predicate =
   match e with

@@ -1,3 +1,4 @@
+open Sl_ast_printer
 
 let parse_spec (input : string) : Sl_ast.spec =
   let lexbuf = Lexing.from_string input in
@@ -11,7 +12,7 @@ let assert_string_equality name expected actual =
 
 let test_framework test_name input expected =
   let spec = parse_spec input in
-  let actual = Sl_ast.string_of_spec spec in
+  let actual = string_of_spec spec in
   assert_string_equality test_name expected actual
 
 
