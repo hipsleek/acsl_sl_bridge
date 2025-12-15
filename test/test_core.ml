@@ -131,6 +131,60 @@ let test_core_string_of_spec_with_variant _ =
 
   assert_equal expected actual
 
+let test_core_string_of_spec_simple_contract _ =
+  let b : behavior =
+    {
+      assumes  = [];
+      requires = [ P_valid "a"; P_valid "b" ];
+      ensures  =
+        [
+          P_eq (T_heap (Post, "a"), T_heap (Pre, "b"));
+          P_eq (T_heap (Post, "b"), T_heap (Pre, "a"));
+        ];
+      frame    = [ "a"; "b" ];
+      variant  = None;
+    }
+  in
+  let spec   = { params = [ { name = "a"; mode = InOut }; { name = "b"; mode = InOut } ];
+                 behaviors = [ b ] }
+  in
+  let actual = string_of_spec spec in
+  let expected =
+    "params (a:inout, b:inout)\n" ^
+    "assumes true\n" ^
+    "requires valid(a) && valid(b)\n" ^
+    "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "frame {a, b}"
+  in
+  assert_equal expected actual
+
+let test_core_string_of_spec_two_assigns_and_variant _ =
+  let b : behavior =
+    {
+      assumes  = [ P_lte (T_var (Post, "i"), T_int 10) ];
+      requires = [];
+      ensures  =
+        [
+          P_eq (T_var (Post, "i"), T_int 10);
+          P_eq (T_var (Post, "a"), T_var (Post, "a"));
+        ];
+      frame    = [];
+      variant  = Some (T_arith (Sub, T_int 10, T_var (Post, "i")));
+    }
+  in
+  let spec   = { params = []; behaviors = [ b ] } in
+  let actual = string_of_spec spec in
+  let expected =
+    "params ()\n" ^
+    "assumes i <= 10\n" ^
+    "requires true\n" ^
+    "ensures i == 10 && a == a\n" ^
+    "frame {}\n" ^
+    "variant 10-i"
+  in
+  assert_equal expected actual
+
+
 let suite =
   "core printer tests" >::: [
     "term_heap_pre"        >:: test_core_string_of_term_heap_pre;
@@ -145,6 +199,8 @@ let suite =
     "spec_swap"            >:: test_core_string_of_spec_swap;
     "spec_empty"           >:: test_core_string_of_spec_empty;
     "spec_with_variant"    >:: test_core_string_of_spec_with_variant;
+    "spec_simple_contract" >:: test_core_string_of_spec_simple_contract;
+    "spec_two_assigns_and_variant" >:: test_core_string_of_spec_two_assigns_and_variant
   ]
 
 let () = run_test_tt_main suite

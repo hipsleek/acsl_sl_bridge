@@ -12,7 +12,7 @@ let test_string_of_spec_atom_char _ =
   let atom = Atom (PointTo ("a", "char", "u")) in
   let actual = string_of_heap atom in
   let expected = "a->char*(u)" in
-  assert_equal  expected actual
+  assert_equal expected actual
 
 let test_string_of_spec_formula _ =
   let atom1 = Atom (PointTo ("a", "int", "u")) in
@@ -276,7 +276,7 @@ let test_spec_of_pointer_eq_gt _ =
   in
   assert_equal expected actual
 
-
+(* UPDATED: Post_expr now takes a list *)
 let test_loop_case_with_variant _ =
   let heap_i_u = Atom (PointTo ("i", "int", "u")) in
 
@@ -285,7 +285,7 @@ let test_loop_case_with_variant _ =
       test = E_lt (A_var "i", A_int 30);
       term = Some (Term (A_sub (A_int 30, A_var "i")));
       pre  = heap_i_u;
-      post = Post_expr (E_eq (A_post_var "i", A_int 30));
+      post = Post_expr [ E_eq (A_post_var "i", A_int 30) ];
     }
   in
   let spec = Case [case_loop] in
@@ -301,9 +301,9 @@ let test_loop_case_with_variant_prime _ =
   let case_loop : case_spec =
     {
       test = E_lt (A_var "i", A_int 30);
-      term = Some (Term (A_sub (A_int 30, A_var "i"))); 
+      term = Some (Term (A_sub (A_int 30, A_var "i")));
       pre  = heap_i_u;
-      post = Post_expr (E_eq (A_post_var "i", A_var "i"));
+      post = Post_expr [ E_eq (A_post_var "i", A_var "i") ];
     }
   in
   let spec = Case [case_loop] in
@@ -321,15 +321,15 @@ let test_loop_case_with_variant_old _ =
       test = E_lt (A_var "i", A_int 30);
       term = Some (Term (A_sub (A_int 30, A_var "i")));
       pre  = heap_i_u;
-      post = Post_expr (E_eq (A_var "i", A_old (A_var "i")));
+      post = Post_expr [ E_eq (A_var "i", A_old (A_var "i")) ];
     }
   in
-  let spec   = Case [case_loop] in
+  let spec = Case [case_loop] in
   let actual = string_of_spec spec in
   let expected =
     "case {i<30 => req Term[30-i]; ens i==\\old(i);};"
   in
-  assert_equal  expected actual
+  assert_equal expected actual
 
 let test_loop_case_with_variant_and_exit _ =
   let heap_i_u = Atom (PointTo ("i", "int", "u")) in
@@ -339,7 +339,7 @@ let test_loop_case_with_variant_and_exit _ =
       test = E_lt (A_var "i", A_int 30);
       term = Some (Term (A_sub (A_int 30, A_var "i")));
       pre  = heap_i_u;
-      post = Post_expr (E_eq (A_post_var "i", A_int 30));
+      post = Post_expr [ E_eq (A_post_var "i", A_int 30) ];
     }
   in
   let case2 : case_spec =
@@ -347,7 +347,7 @@ let test_loop_case_with_variant_and_exit _ =
       test = E_gte (A_var "i", A_int 30);
       term = Some Term_none;
       pre  = heap_i_u;
-      post = Post_expr (E_eq (A_post_var "i", A_var "i"));
+      post = Post_expr [ E_eq (A_post_var "i", A_var "i") ];
     }
   in
 
@@ -356,6 +356,33 @@ let test_loop_case_with_variant_and_exit _ =
   let expected =
     "case {i<30 => req Term[30-i]; ens i'==30; \
      i>=30 => req Term[]; ens i'==i;};"
+  in
+  assert_equal expected actual
+
+(* NEW: single req/ens loop-style spec desugared into a Case with Post_expr conj *)
+let test_loop_single_req_ens_conj_post _ =
+  let dummy_pre = Atom (PointTo ("_", "int", "_")) in
+
+  let loop_case : case_spec =
+    {
+      test = E_lte (A_var "i", A_int 10);
+      term = Some (Term (A_sub (A_int 10, A_var "i")));
+      pre  = dummy_pre;
+      post =
+        Post_expr
+          [
+            E_eq (A_post_var "i", A_int 10);
+            E_eq
+              ( A_post_var "a"
+              , A_add (A_var "a", A_sub (A_post_var "i", A_var "i")) );
+          ];
+    }
+  in
+
+  let spec = Case [ loop_case ] in
+  let actual = string_of_spec spec in
+  let expected =
+    "case {i<=10 => req Term[10-i]; ens i'==10 && a'==a+i'-i;};"
   in
   assert_equal expected actual
 
@@ -382,6 +409,7 @@ let suite =
     "loop_case_with_variant_prime"       >:: test_loop_case_with_variant_prime;
     "loop_case_with_variant_old"         >:: test_loop_case_with_variant_old;
     "loop_case_with_variant_and_exit"    >:: test_loop_case_with_variant_and_exit;
+    "loop_single_req_ens_conj_post"      >:: test_loop_single_req_ens_conj_post;
   ]
 
 let () = run_test_tt_main suite

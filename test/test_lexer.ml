@@ -32,6 +32,9 @@ let string_of_token = function
   | SEMICOLON -> "SEMICOLON"
   | EOF -> "EOF"
   | MINUS -> "MINUS"
+  | PLUS -> "PLUS"
+  | TIMES -> "TIMES"
+  | DIV -> "DIV"
   | ID s -> "ID(" ^ s ^ ")"
   | INT n -> "INT(" ^ string_of_int n ^ ")"
 

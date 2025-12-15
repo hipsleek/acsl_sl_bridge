@@ -198,7 +198,49 @@ let test_core_to_acsl_loop_simple _ctx =
   loop assigns i;
   loop variant 30 - i;
 */"
-  in assert_equal ~printer:(fun s -> "\n" ^ s ^ "\n") expected actual
+  in
+  assert_equal ~printer:(fun s -> "\n" ^ s ^ "\n") expected actual
+
+(* NEW: loop with a single behavior carrying Term + pure ensures mentioning 'a' and 'i' *)
+let test_core_to_acsl_loop_term_and_effects _ctx =
+  let open Core in
+
+  let core_spec : Core.spec =
+    {
+      params = [];
+      behaviors =
+        [
+          {
+            assumes  = [ P_lte (T_var (Post, "i"), T_int 10) ];
+            requires = [];
+            ensures  =
+              [
+                P_eq (T_var (Post, "i"), T_int 10);
+                P_eq
+                  ( T_var (Post, "a"),
+                    T_var (Post, "a") );
+              ];
+            frame    = [];
+            variant  = Some (T_arith (Sub, T_int 10, T_var (Post, "i")));
+          };
+        ];
+    }
+  in
+
+  let actual = Core_to_acsl.spec_to_acsl core_spec in
+
+  (* NOTE:
+     - loop assigns is inferred from invariants+ensures(+variant).
+     - depending on Set ordering, it may print "a, i" or "i, a".
+     Adjust this line if your ordering differs. *)
+  let expected =
+"/*@
+  loop invariant i <= 10;
+  loop assigns a, i;
+  loop variant 10 - i;
+*/"
+  in
+  assert_equal ~printer:(fun s -> "\n" ^ s ^ "\n") expected actual
 
 let suite =
   "core_to_acsl tests" >::: [
@@ -207,6 +249,7 @@ let suite =
     "core_to_acsl_triple_swap" >:: test_core_to_acsl_triple_swap;
     "core_to_acsl_case_behaviors" >:: test_core_to_acsl_case_behaviors;
     "core_to_acsl_loop_simple" >:: test_core_to_acsl_loop_simple;
+    "core_to_acsl_loop_term_and_effects" >:: test_core_to_acsl_loop_term_and_effects;
   ]
 
 let () = run_test_tt_main suite

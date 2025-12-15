@@ -54,20 +54,39 @@ let make_ensures
   List.rev !buf
 
 (*1:1 translation*)
-let term_of_arith (e : Sl_ast.arith_expr) : C.term =
+let rec term_of_arith (e : Sl_ast.arith_expr) : C.term =
   match e with
-  | A_var x  -> Core_builder.var_post x
-  | A_post_var x -> Core_builder.var_post x
+  | A_var x ->
+      C.T_var (C.Post, x)
+
+  | A_post_var x ->
+      C.T_var (C.Post, x)
+
   | A_old inner ->
       begin match inner with
-      | A_var x -> Core_builder.var_pre x
-      | _  -> C.T_var (C.Pre, Sl_ast_printer.string_of_arith inner)
+      | A_var x ->
+          C.T_var (C.Pre, x)
+      | A_post_var x ->
+          C.T_var (C.Pre, x)
+      | _ ->
+          failwith "nested \\old over arithmetic not supported yet"
       end
-  | A_int n -> C.T_int n
-  | A_add _
-  | A_sub _
-  | A_mul _
-  | A_div _  -> C.T_var (C.Post, Sl_ast_printer.string_of_arith e)
+
+  | A_int n ->
+      C.T_int n
+
+  | A_add (e1, e2) ->
+      C.T_arith (C.Add, term_of_arith e1, term_of_arith e2)
+
+  | A_sub (e1, e2) ->
+      C.T_arith (C.Sub, term_of_arith e1, term_of_arith e2)
+
+  | A_mul (e1, e2) ->
+      C.T_arith (C.Mul, term_of_arith e1, term_of_arith e2)
+
+  | A_div (e1, e2) ->
+      C.T_arith (C.Div, term_of_arith e1, term_of_arith e2)
+
 
 let get_predicate (e : Sl_ast.conditional_expr) : C.predicate =
   match e with

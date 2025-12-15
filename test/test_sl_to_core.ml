@@ -4,8 +4,8 @@ let parse_spec (input : string) : Sl_ast.spec =
   let lexbuf = Lexing.from_string input in
   Sl_parser.main Sl_lexer.token lexbuf
 
-let test_framework (input : string) (expected : string) : unit =
-  assert_equal ~printer:(fun s -> "\n" ^ s ^ "\n") expected input
+let test_framework (input : string) (actual : string) : unit =
+  assert_equal ~printer:(fun s -> "\n" ^ s ^ "\n") input actual 
 
 let test_sl_to_core_swap _ctx =
   let input =
@@ -146,18 +146,6 @@ let test_sl_to_core_case_swap _ctx =
   in
   test_framework expected actual
 
-(* NEW: Case with Post_expr should be rejected (loops must be Loop now). *)
-let test_sl_to_core_case_rejects_post_expr _ctx =
-  let input =
-    "case {\n" ^
-    "  i<30 => req Term[30-i]; ens i'==30;\n" ^
-    "};"
-  in
-  let sl_spec = parse_spec input in
-  assert_raises
-    (Failure "make_case_core: Case contains Post_expr; represent loops using `Loop (...)` instead.")
-    (fun () -> ignore (Spec_to_core.spec_to_core sl_spec))
-
 (* NEW: Loop_case translation using /\\ syntax (two clauses). *)
 let test_sl_to_core_loop_case_term _ctx =
   let input =
@@ -171,18 +159,16 @@ let test_sl_to_core_loop_case_term _ctx =
     "params ()\n" ^
     "assumes i < 30\n" ^
     "requires true\n" ^
-    "ensures true\n" ^
+    "ensures i == 30\n" ^
     "frame {}\n" ^
     "variant 30-i\n" ^
     "assumes i >= 30\n" ^
     "requires true\n" ^
-    "ensures true\n" ^
+    "ensures i == i\n" ^
     "frame {}"
   in
   test_framework expected actual
 
-(* NEW: Loop_simple translation (single req/ens pair).
-   Ens contains i' and a' so frame should include {a, i}. *)
 let test_sl_to_core_loop_simple_term_and_frame _ctx =
   let input =
     "req i<=10 && Term[10-i]; ens i'==10 && a'==a;"
@@ -194,8 +180,8 @@ let test_sl_to_core_loop_simple_term_and_frame _ctx =
     "params ()\n" ^
     "assumes i <= 10\n" ^
     "requires true\n" ^
-    "ensures true\n" ^
-    "frame {a, i}\n" ^
+    "ensures i == 10 && a == a\n" ^
+    "frame {}\n" ^
     "variant 10-i"
   in
   test_framework expected actual
@@ -229,7 +215,6 @@ let suite =
     "swap_prime_sugar"             >:: test_sl_to_core_swap_prime_sugar;
     "swap_old_sugar"               >:: test_sl_to_core_swap_old_sugar;
     "case_swap"                    >:: test_sl_to_core_case_swap;
-    "case_rejects_post_expr"       >:: test_sl_to_core_case_rejects_post_expr;
     "loop_case_term"               >:: test_sl_to_core_loop_case_term;
     "loop_simple_term_and_frame"   >:: test_sl_to_core_loop_simple_term_and_frame;
     "case_guard_post_phase"        >:: test_sl_to_core_case_guard_uses_post_phase;

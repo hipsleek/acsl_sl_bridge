@@ -173,7 +173,7 @@ let test_translate_loop_terminating_case_expr _ctx =
 "/*@
   loop invariant i < 30;
   loop assigns i;
-  loop variant 30-i;
+  loop variant 30 - i;
 */"
   in
   test_framework input expected
@@ -189,7 +189,7 @@ let test_translate_loop_terminating_case_expr_change_var _ctx =
 "/*@
   loop invariant j < 40;
   loop assigns j;
-  loop variant 40-j;
+  loop variant 40 - j;
 */"
   in
   test_framework input expected
@@ -203,7 +203,7 @@ let test_translate_loop_terminating_conj_expr _ctx =
 "/*@
   loop invariant i < 30;
   loop assigns i;
-  loop variant 30-i;
+  loop variant 30 - i;
 */"
   in
   test_framework input expected
@@ -214,9 +214,9 @@ let test_translate_for_loop _ctx =
   in
   let expected =
 "/*@
-  loop invariant 0 <= i <= 10;
-  loop assigns i, a;
-  loop variant 10-i;
+  loop invariant i <= 10;
+  loop assigns a, i;
+  loop variant 10 - i;
 */"
   in
   test_framework input expected

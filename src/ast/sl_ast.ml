@@ -33,7 +33,7 @@ type terminate_expr =
 
 type post_kind =
   | Post_heap of heap
-  | Post_expr of conditional_expr
+  | Post_expr of conditional_expr list
 
 type base_spec = {
   pre : heap;

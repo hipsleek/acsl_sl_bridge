@@ -114,8 +114,8 @@ let test_acsl_loop_contract_simple _ctx =
   let lc : loop_contract =
     {
       l_invariants = [ TBinOp (Lte, TVar "i", TInt 30) ];
-      l_assigns = [ TVar "i" ];
-      l_variant = Some (TVar "30-i");
+      l_assigns    = [ TVar "i" ];
+      l_variant    = Some (TBinOp (Sub, TInt 30, TVar "i"));
     }
   in
   let actual = acsl_loop_contract lc in
@@ -123,10 +123,32 @@ let test_acsl_loop_contract_simple _ctx =
 "/*@
   loop invariant i <= 30;
   loop assigns i;
-  loop variant 30-i;
+  loop variant 30 - i;
 */"
   in
   assert_equal expected actual
+
+let test_acsl_loop_contract_with_two_assigns_and_variant _ctx =
+  let lc : loop_contract =
+    {
+      l_invariants =
+        [ TBinOp (Lte, TVar "i", TInt 10) ];
+      l_assigns =
+        [ TVar "a"; TVar "i" ];
+      l_variant =
+        Some (TBinOp (Sub, TInt 10, TVar "i"));
+    }
+  in
+  let actual = acsl_loop_contract lc in
+  let expected =
+"/*@
+  loop invariant i <= 10;
+  loop assigns a, i;
+  loop variant 10 - i;
+*/"
+  in
+  assert_equal expected actual
+
 
 let suite =
   "acsl_ast" >::: [
@@ -142,6 +164,7 @@ let suite =
     "acsl_contract_cases"        >:: test_acsl_contract_cases;
 
     "acsl_loop_contract_simple"  >:: test_acsl_loop_contract_simple;
+    "acsl_loop_contract_with_two_assigns_and_variant" >:: test_acsl_loop_contract_with_two_assigns_and_variant
   ]
 
 let () = run_test_tt_main suite

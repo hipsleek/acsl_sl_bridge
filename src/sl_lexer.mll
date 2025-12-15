@@ -33,6 +33,10 @@ rule token = parse
   | "=>" {IMPLIES}
   | ';' { SEMICOLON }
   | '-' {MINUS}
+  | '+' { PLUS }
+  | '-' { MINUS }
+  | '*' { TIMES }
+  | '/' { DIV }
   | "int" { TYPE "int" }
   | "char" { TYPE "char" } (*Is there better way to do this??*)
   | digits as d { INT (int_of_string d) }
