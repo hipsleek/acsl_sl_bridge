@@ -11,5 +11,4 @@ let spec_to_core (s : Sl_ast.spec) : Core.spec =
       make_simple_core pre_atoms post_atoms
   | Case sl_cases -> make_case_core sl_cases
   | Sugar_prime pairs
-  | Sugar_old   pairs ->
-      make_sugar_core pairs
+  | Sugar_old pairs -> make_sugar_core pairs
