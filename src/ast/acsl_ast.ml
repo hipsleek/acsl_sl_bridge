@@ -1,12 +1,6 @@
 type ident = string
 
-type binop =
-  | Eq
-  | Neq
-  | Lt
-  | Lte
-  | Gt
-  | Gte
+type binop = | Eq | Neq | Lt | Lte | Gt | Gte | Add | Sub | Mul | Div
 
 type term =
   | TVar of ident

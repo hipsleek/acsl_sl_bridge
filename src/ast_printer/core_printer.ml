@@ -4,11 +4,18 @@ let string_of_heap_phase = function
   | Pre -> "H"
   | Post -> "H'"
 
-let string_of_term = function
+let string_of_arith_op = function
+  | Add -> "+"
+  | Sub -> "-"
+  | Mul -> "*"
+  | Div -> "/"
+
+let rec string_of_term = function
   | T_var (_,x) -> x
   | T_int n -> string_of_int n
   | T_heap (ph, p) -> Printf.sprintf "%s(%s)" (string_of_heap_phase ph) p
   | T_ptr p -> p
+  | T_arith (op, t1, t2) -> Printf.sprintf "%s%s%s" (string_of_term t1) (string_of_arith_op op) (string_of_term t2)
 
 let string_of_predicate = function
   | P_eq (t1, t2) -> Printf.sprintf "%s == %s" (string_of_term t1) (string_of_term t2)

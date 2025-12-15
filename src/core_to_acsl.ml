@@ -4,7 +4,7 @@ module A = Acsl_ast
 module AP = Acsl_ast_printer
 module StringSet = Set.Make (String)
 
-let acsl_term_of_core (t : term) : A.term =
+let rec acsl_term_of_core (t : term) : A.term =
   match t with
   | T_var (Pre, x) -> A.TOld (A.TVar x)
   | T_var (Post, x) -> A.TVar x
@@ -12,6 +12,14 @@ let acsl_term_of_core (t : term) : A.term =
   | T_heap (Post, p) -> A.TDeref (A.TVar p)
   | T_int n -> A.TInt n
   | T_ptr p -> A.TVar p
+  | T_arith (op, t1, t2) -> let op_prime =
+        match op with
+        | Add -> A.Add
+        | Sub -> A.Sub
+        | Mul -> A.Mul
+        | Div -> A.Div
+      in
+      A.TBinOp (op_prime, acsl_term_of_core t1, acsl_term_of_core t2)
 
 let acsl_pred_of_core (p : predicate) : A.predicate =
   match p with

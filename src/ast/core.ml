@@ -15,11 +15,18 @@ type phase =
   | Pre
   | Post
 
+  type arith_op =
+  | Add
+  | Sub
+  | Mul
+  | Div
+
 type term =
   | T_var of phase * var
   | T_int of int
   | T_heap of phase * ptr
-  | T_ptr of ptr  
+  | T_ptr of ptr
+  | T_arith of arith_op * term * term
 
 type predicate =
   | P_eq of term * term

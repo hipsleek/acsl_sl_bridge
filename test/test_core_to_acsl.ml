@@ -164,13 +164,49 @@ let test_core_to_acsl_case_behaviors _ctx =
   in
   assert_equal expected actual
 
+let test_core_to_acsl_loop_simple _ctx =
+  let open Core in
+
+  let core_spec : Core.spec =
+    {
+      params = [];
+      behaviors =
+        [
+          {
+            assumes  = [ P_lt (T_var (Post, "i"), T_int 30) ];
+            requires = [];
+            ensures  = [];
+            frame    = [];
+            variant  = Some (T_arith (Sub, T_int 30, T_var (Post, "i")));
+          };
+          {
+            assumes  = [ P_gte (T_var (Post, "i"), T_int 30) ];
+            requires = [];
+            ensures  = [];
+            frame    = [];
+            variant  = None;
+          };
+        ];
+    }
+  in
+
+  let actual = Core_to_acsl.spec_to_acsl core_spec in
+
+  let expected =
+"/*@
+  loop invariant i < 30;
+  loop assigns i;
+  loop variant 30 - i;
+*/"
+  in assert_equal ~printer:(fun s -> "\n" ^ s ^ "\n") expected actual
 
 let suite =
   "core_to_acsl tests" >::: [
-    "core_to_acsl_swap"           >:: test_core_to_acsl_swap;
-    "core_to_acsl_no_swap"        >:: test_core_to_acsl_no_swap;
-    "core_to_acsl_triple_swap"    >:: test_core_to_acsl_triple_swap;
+    "core_to_acsl_swap" >:: test_core_to_acsl_swap;
+    "core_to_acsl_no_swap" >:: test_core_to_acsl_no_swap;
+    "core_to_acsl_triple_swap" >:: test_core_to_acsl_triple_swap;
     "core_to_acsl_case_behaviors" >:: test_core_to_acsl_case_behaviors;
+    "core_to_acsl_loop_simple" >:: test_core_to_acsl_loop_simple;
   ]
 
 let () = run_test_tt_main suite

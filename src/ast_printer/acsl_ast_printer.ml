@@ -7,6 +7,10 @@ let string_of_binop = function
   | Lte -> "<="
   | Gt  -> ">"
   | Gte -> ">="
+  | Add -> "+"
+  | Sub -> "-"
+  | Mul -> "*"
+  | Div -> "/"
 
 let rec acsl_term = function
   | TVar x ->
