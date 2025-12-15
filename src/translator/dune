@@ -1,0 +1,5 @@
+(library
+ (name translator)
+ ; (modules sl_parser )
+ (libraries sl_to_core)
+ (wrapped false))

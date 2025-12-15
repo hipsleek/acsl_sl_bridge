@@ -12,7 +12,7 @@ let test_sl_to_core_swap _ctx =
     "ens a->int*(v) && b->int*(u);"
   in
   let sl_spec   = parse_spec input in
-  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let core_spec =Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
@@ -29,7 +29,7 @@ let test_sl_to_core_no_swap _ctx =
     "ens a->int*(u);"
   in
   let sl_spec   = parse_spec input in
-  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let core_spec =Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout)\n" ^
@@ -46,7 +46,7 @@ let test_sl_to_core_triple_swap _ctx =
     "ens a->int*(w) && b->int*(u) && c->int*(v);"
   in
   let sl_spec   = parse_spec input in
-  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let core_spec =Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout, c:inout)\n" ^
@@ -63,7 +63,7 @@ let test_sl_to_core_swap_type_mismatch _ctx =
     "ens a->char*(v) && b->int*(u);"
   in
   let sl_spec   = parse_spec input in
-  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let core_spec =Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
@@ -77,7 +77,7 @@ let test_sl_to_core_swap_type_mismatch _ctx =
 let test_sl_to_core_swap_prime_sugar _ctx =
   let input = "ens (*a)'==(*b) && (*b)'==(*a);" in
   let sl_spec   = parse_spec input in
-  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let core_spec =Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
@@ -91,7 +91,7 @@ let test_sl_to_core_swap_prime_sugar _ctx =
 let test_sl_to_core_swap_old_sugar _ctx =
   let input = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
   let sl_spec   = parse_spec input in
-  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let core_spec =Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
@@ -114,7 +114,7 @@ let test_sl_to_core_case_swap _ctx =
     "};"
   in
   let sl_spec   = parse_spec input in
-  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let core_spec =Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
@@ -153,7 +153,7 @@ let test_sl_to_core_case_loop_term _ctx =
     "};"
   in
   let sl_spec   = parse_spec input in
-  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let core_spec =Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params ()\n" ^
@@ -175,7 +175,7 @@ let test_sl_to_core_conj_loop_term _ctx =
     "/\\ req i>=30 && Term[]; ens i'==i;"
   in
   let sl_spec   = parse_spec input in
-  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let core_spec =Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params ()\n" ^
@@ -194,7 +194,7 @@ let test_sl_to_core_conj_loop_term _ctx =
 let test_sl_to_core_case_guard_uses_post_phase _ctx =
   let input = "case { a==b => req a->int*(u); ens a->int*(u); };" in
   let sl_spec   = parse_spec input in
-  let core_spec = Sl_to_core.spec_to_core sl_spec in
+  let core_spec =Spec_to_core.spec_to_core sl_spec in
   match core_spec.Core.behaviors with
   | [ b ] -> begin
       match b.Core.assumes with
