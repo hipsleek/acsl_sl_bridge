@@ -2,10 +2,10 @@ type ptr = string
 type car_type = string
 type car = string
 
-type heap_atom = 
-  | PointTo of ptr * car_type * car 
+type heap_atom =
+  | PointTo of ptr * car_type * car
 
-type heap = 
+type heap =
   | Atom of heap_atom
   | Sep of heap * heap
 
@@ -31,9 +31,13 @@ type terminate_expr =
   | Term_none
   | Term of arith_expr
 
+type pred =
+  | Pred of conditional_expr
+  | Pred_and of pred * pred
+
 type post_kind =
   | Post_heap of heap
-  | Post_expr of conditional_expr
+  | Post_expr of pred
 
 type base_spec = {
   pre : heap;
@@ -43,14 +47,23 @@ type base_spec = {
 type case_spec = {
   test : conditional_expr;
   term : terminate_expr option;
-  pre : heap;
+  pre  : heap;
   post : post_kind;
 }
+
+type loop_simple = {
+  req  : pred;
+  term : terminate_expr option;
+  ens  : pred;
+}
+
+type loop_spec =
+  | Loop_case of case_spec list
+  | Loop_simple of loop_simple
 
 type spec =
   | Simple of base_spec
   | Sugar_prime of (ptr * ptr) list
   | Sugar_old of (ptr * ptr) list
   | Case of case_spec list
-
-
+  | Loop of loop_spec
