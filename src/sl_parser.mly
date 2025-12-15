@@ -2,23 +2,23 @@
   open Sl_ast
 %}
 
-%token REQ ENS CASE TERM
-%token ARROW
-%token STAR
-%token AND SL_CONJ
-%token EQEQ NEQ GTE GT LTE LT
-%token PRIME
-%token OLD
-%token LPAREN RPAREN
-%token LBRACE RBRACE
-%token LBRACK RBRACK
-%token SEMICOLON
-%token IMPLIES
+%token REQ ENS CASE TERM /* req ens case Term */
+%token ARROW /* -> */
+%token STAR/* * */
+%token AND SL_CONJ   /* &&      /\ */
+%token EQEQ NEQ GTE GT LTE LT /* == != >= > <= <   */
+%token PRIME   /* '  */
+%token OLD  /* \old */
+%token LPAREN RPAREN  /* ( ) */
+%token LBRACE RBRACE /* { } */
+%token LBRACK RBRACK  /* [ ] */
+%token SEMICOLON   /* ; */
+%token IMPLIES /* => */
 %token EOF
 %token <int>    INT
-%token <string> ID
-%token <string> TYPE
-%token MINUS
+%token <string> ID  /* a, u, i, ... */
+%token <string> TYPE  /* int, char, ... */
+%token MINUS   /* -  */
 
 %start <Sl_ast.spec> main
 
@@ -33,24 +33,14 @@ main:
 spec:
   | REQ heap SEMICOLON ENS heap SEMICOLON
       { Simple { pre = $2; post = $5 } }
-
   | ENS sugar_prime SEMICOLON
       { Sugar_prime $2 }
-
   | ENS sugar_old SEMICOLON
       { Sugar_old $2 }
-
   | CASE LBRACE case_list RBRACE SEMICOLON
       { Case $3 }
-
   | loop_clause SL_CONJ loop_clause_list
-      { Loop (Loop_case ($1 :: $3)) }
-
-  | loop_clause
-      { Loop (Loop_case [$1]) }
-
-  | loop_simple SEMICOLON
-      { Loop (Loop_simple $1) }
+      { Case ($1 :: $3) }
 
 
 heap:
@@ -114,17 +104,10 @@ conditional_expr:
       { E_gt ($1, $3) }
 
 
-pred:
-  | conditional_expr
-      { Pred $1 }
-  | pred AND pred
-      { Pred_and ($1, $3) }
-
-
 post_kind:
   | heap
       { Post_heap $1 }
-  | pred
+  | conditional_expr
       { Post_expr $1 }
 
 
@@ -171,7 +154,6 @@ case_list:
   | case case_list
       { $1 :: $2 }
 
-
 loop_req:
   | conditional_expr AND TERM LBRACK arith_expr RBRACK
       { ($1, Some (Term $5)) }
@@ -179,7 +161,7 @@ loop_req:
       { ($1, Some Term_none) }
 
 loop_clause:
-  | REQ loop_req SEMICOLON ENS pred SEMICOLON
+  | REQ loop_req SEMICOLON ENS conditional_expr SEMICOLON
       {
         let (cond, term_opt) = $2 in
         {
@@ -195,21 +177,3 @@ loop_clause_list:
       { [$1] }
   | loop_clause SL_CONJ loop_clause_list
       { $1 :: $3 }
-
-
-term_opt:
-  | { None }
-  | AND TERM LBRACK arith_expr RBRACK
-      { Some (Term $4) }
-  | AND TERM LBRACK RBRACK
-      { Some Term_none }
-
-loop_simple:
-  | REQ pred term_opt SEMICOLON ENS pred
-      {
-        {
-          req  = $2;
-          term = $3;
-          ens  = $6;
-        }
-      }

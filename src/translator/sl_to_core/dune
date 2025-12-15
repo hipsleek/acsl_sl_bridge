@@ -1,5 +1,5 @@
 (library
  (name sl_to_core)
- (modules helper make_simple_core make_case_core make_sugar_core make_loop_core spec_to_core)
+ (modules helper make_simple_core make_case_core make_sugar_core spec_to_core)
  (libraries ast builder ast_printer)
  (wrapped false))
