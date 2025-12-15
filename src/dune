@@ -1,6 +1,6 @@
 (library
  (name sl_to_acsl_lib)
- (modules sl_parser sl_lexer core_to_acsl translate)
+ (modules sl_parser sl_lexer)
  (libraries ast ast_printer builder translator)
  (wrapped false))
 
