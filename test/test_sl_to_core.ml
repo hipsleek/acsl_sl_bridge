@@ -4,7 +4,8 @@ let parse_spec (input : string) : Sl_ast.spec =
   let lexbuf = Lexing.from_string input in
   Sl_parser.main Sl_lexer.token lexbuf
 
-
+let test_framework (input : string) (expected : string) : unit =
+  assert_equal ~printer:(fun s -> "\n" ^ s ^ "\n") expected input
 
 let test_sl_to_core_swap _ctx =
   let input =
@@ -12,7 +13,7 @@ let test_sl_to_core_swap _ctx =
     "ens a->int*(v) && b->int*(u);"
   in
   let sl_spec   = parse_spec input in
-  let core_spec =Spec_to_core.spec_to_core sl_spec in
+  let core_spec = Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
@@ -21,7 +22,7 @@ let test_sl_to_core_swap _ctx =
     "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
     "frame {a, b}"
   in
-  assert_equal expected actual
+  test_framework expected actual
 
 let test_sl_to_core_no_swap _ctx =
   let input =
@@ -29,7 +30,7 @@ let test_sl_to_core_no_swap _ctx =
     "ens a->int*(u);"
   in
   let sl_spec   = parse_spec input in
-  let core_spec =Spec_to_core.spec_to_core sl_spec in
+  let core_spec = Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout)\n" ^
@@ -38,7 +39,7 @@ let test_sl_to_core_no_swap _ctx =
     "ensures H'(a) == H(a)\n" ^
     "frame {a}"
   in
-  assert_equal expected actual
+  test_framework expected actual
 
 let test_sl_to_core_triple_swap _ctx =
   let input =
@@ -46,7 +47,7 @@ let test_sl_to_core_triple_swap _ctx =
     "ens a->int*(w) && b->int*(u) && c->int*(v);"
   in
   let sl_spec   = parse_spec input in
-  let core_spec =Spec_to_core.spec_to_core sl_spec in
+  let core_spec = Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout, c:inout)\n" ^
@@ -55,7 +56,7 @@ let test_sl_to_core_triple_swap _ctx =
     "ensures H'(a) == H(c) && H'(b) == H(a) && H'(c) == H(b)\n" ^
     "frame {a, b, c}"
   in
-  assert_equal expected actual
+  test_framework expected actual
 
 let test_sl_to_core_swap_type_mismatch _ctx =
   let input =
@@ -63,7 +64,7 @@ let test_sl_to_core_swap_type_mismatch _ctx =
     "ens a->char*(v) && b->int*(u);"
   in
   let sl_spec   = parse_spec input in
-  let core_spec =Spec_to_core.spec_to_core sl_spec in
+  let core_spec = Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
@@ -72,12 +73,12 @@ let test_sl_to_core_swap_type_mismatch _ctx =
     "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
     "frame {a, b}"
   in
-  assert_equal expected actual
+  test_framework expected actual
 
 let test_sl_to_core_swap_prime_sugar _ctx =
   let input = "ens (*a)'==(*b) && (*b)'==(*a);" in
   let sl_spec   = parse_spec input in
-  let core_spec =Spec_to_core.spec_to_core sl_spec in
+  let core_spec = Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
@@ -86,12 +87,12 @@ let test_sl_to_core_swap_prime_sugar _ctx =
     "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
     "frame {a, b}"
   in
-  assert_equal expected actual
+  test_framework expected actual
 
 let test_sl_to_core_swap_old_sugar _ctx =
   let input = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
   let sl_spec   = parse_spec input in
-  let core_spec =Spec_to_core.spec_to_core sl_spec in
+  let core_spec = Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
@@ -100,7 +101,7 @@ let test_sl_to_core_swap_old_sugar _ctx =
     "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
     "frame {a, b}"
   in
-  assert_equal expected actual
+  test_framework expected actual
 
 let test_sl_to_core_case_swap _ctx =
   let input =
@@ -114,7 +115,7 @@ let test_sl_to_core_case_swap _ctx =
     "};"
   in
   let sl_spec   = parse_spec input in
-  let core_spec =Spec_to_core.spec_to_core sl_spec in
+  let core_spec = Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params (a:inout, b:inout)\n" ^
@@ -143,39 +144,28 @@ let test_sl_to_core_case_swap _ctx =
     "ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
     "frame {a, b}"
   in
-  assert_equal expected actual
+  test_framework expected actual
 
-let test_sl_to_core_case_loop_term _ctx =
+(* NEW: Case with Post_expr should be rejected (loops must be Loop now). *)
+let test_sl_to_core_case_rejects_post_expr _ctx =
   let input =
     "case {\n" ^
-    "  i<30  => req Term[30-i]; ens i'==30;\n" ^
-    "  i>=30 => req Term[];     ens i'==i;\n" ^
+    "  i<30 => req Term[30-i]; ens i'==30;\n" ^
     "};"
   in
-  let sl_spec   = parse_spec input in
-  let core_spec =Spec_to_core.spec_to_core sl_spec in
-  let actual    = Core_printer.string_of_spec core_spec in
-  let expected =
-    "params ()\n" ^
-    "assumes i < 30\n" ^
-    "requires true\n" ^
-    "ensures true\n" ^
-    "frame {}\n" ^
-    "variant 30-i\n" ^
-    "assumes i >= 30\n" ^
-    "requires true\n" ^
-    "ensures true\n" ^
-    "frame {}"
-  in
-  assert_equal expected actual
+  let sl_spec = parse_spec input in
+  assert_raises
+    (Failure "make_case_core: Case contains Post_expr; represent loops using `Loop (...)` instead.")
+    (fun () -> ignore (Spec_to_core.spec_to_core sl_spec))
 
-let test_sl_to_core_conj_loop_term _ctx =
+(* NEW: Loop_case translation using /\\ syntax (two clauses). *)
+let test_sl_to_core_loop_case_term _ctx =
   let input =
     "req i<30 && Term[30-i]; ens i'==30;\n" ^
     "/\\ req i>=30 && Term[]; ens i'==i;"
   in
   let sl_spec   = parse_spec input in
-  let core_spec =Spec_to_core.spec_to_core sl_spec in
+  let core_spec = Spec_to_core.spec_to_core sl_spec in
   let actual    = Core_printer.string_of_spec core_spec in
   let expected =
     "params ()\n" ^
@@ -189,12 +179,31 @@ let test_sl_to_core_conj_loop_term _ctx =
     "ensures true\n" ^
     "frame {}"
   in
-  assert_equal expected actual
+  test_framework expected actual
+
+(* NEW: Loop_simple translation (single req/ens pair).
+   Ens contains i' and a' so frame should include {a, i}. *)
+let test_sl_to_core_loop_simple_term_and_frame _ctx =
+  let input =
+    "req i<=10 && Term[10-i]; ens i'==10 && a'==a;"
+  in
+  let sl_spec   = parse_spec input in
+  let core_spec = Spec_to_core.spec_to_core sl_spec in
+  let actual    = Core_printer.string_of_spec core_spec in
+  let expected =
+    "params ()\n" ^
+    "assumes i <= 10\n" ^
+    "requires true\n" ^
+    "ensures true\n" ^
+    "frame {a, i}\n" ^
+    "variant 10-i"
+  in
+  test_framework expected actual
 
 let test_sl_to_core_case_guard_uses_post_phase _ctx =
   let input = "case { a==b => req a->int*(u); ens a->int*(u); };" in
   let sl_spec   = parse_spec input in
-  let core_spec =Spec_to_core.spec_to_core sl_spec in
+  let core_spec = Spec_to_core.spec_to_core sl_spec in
   match core_spec.Core.behaviors with
   | [ b ] -> begin
       match b.Core.assumes with
@@ -213,16 +222,17 @@ let test_sl_to_core_case_guard_uses_post_phase _ctx =
 
 let suite =
   "sl_to_core" >::: [
-    "swap"                    >:: test_sl_to_core_swap;
-    "no_swap"                 >:: test_sl_to_core_no_swap;
-    "triple_swap"             >:: test_sl_to_core_triple_swap;
-    "swap_type_mismatch"      >:: test_sl_to_core_swap_type_mismatch;
-    "swap_prime_sugar"        >:: test_sl_to_core_swap_prime_sugar;
-    "swap_old_sugar"          >:: test_sl_to_core_swap_old_sugar;
-    "case_swap"               >:: test_sl_to_core_case_swap;
-    "case_loop_term"          >:: test_sl_to_core_case_loop_term;
-    "conj_loop_term"          >:: test_sl_to_core_conj_loop_term;
-    "case_guard_post_phase"   >:: test_sl_to_core_case_guard_uses_post_phase;
+    "swap"                         >:: test_sl_to_core_swap;
+    "no_swap"                      >:: test_sl_to_core_no_swap;
+    "triple_swap"                  >:: test_sl_to_core_triple_swap;
+    "swap_type_mismatch"           >:: test_sl_to_core_swap_type_mismatch;
+    "swap_prime_sugar"             >:: test_sl_to_core_swap_prime_sugar;
+    "swap_old_sugar"               >:: test_sl_to_core_swap_old_sugar;
+    "case_swap"                    >:: test_sl_to_core_case_swap;
+    "case_rejects_post_expr"       >:: test_sl_to_core_case_rejects_post_expr;
+    "loop_case_term"               >:: test_sl_to_core_loop_case_term;
+    "loop_simple_term_and_frame"   >:: test_sl_to_core_loop_simple_term_and_frame;
+    "case_guard_post_phase"        >:: test_sl_to_core_case_guard_uses_post_phase;
   ]
 
 let () = run_test_tt_main suite

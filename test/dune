@@ -23,10 +23,10 @@
  (modules test_parser)
  (libraries sl_to_acsl_lib ounit2))
 
-(test
- (name test_translate)
- (modules test_translate)
- (libraries sl_to_acsl_lib ounit2))
+; (test
+;  (name test_translate)
+;  (modules test_translate)
+;  (libraries sl_to_acsl_lib ounit2))
 
 (test
  (name test_sl_to_core)

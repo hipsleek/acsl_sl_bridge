@@ -10,6 +10,7 @@ let test_framework (input : string) (expected : string) : unit =
   let spec = parse_spec input in
   let actual = Translate.sl_to_acsl spec in
   assert_equal
+    ~printer:(fun s -> "\n" ^ s ^ "\n")
     expected
     actual
 
@@ -207,6 +208,19 @@ let test_translate_loop_terminating_conj_expr _ctx =
   in
   test_framework input expected
 
+let test_translate_for_loop _ctx =
+  let input =
+    "req i<=10 && Term[10-i]; ens i'==10 && a'==a+(i'-i);"
+  in
+  let expected =
+"/*@
+  loop invariant 0 <= i <= 10;
+  loop assigns i, a;
+  loop variant 10-i;
+*/"
+  in
+  test_framework input expected
+
 let suite =
   "translate" >::: [
     "swap"                               >:: test_translate_swap;
@@ -221,6 +235,7 @@ let suite =
     "loop_terminating_case_expr"          >:: test_translate_loop_terminating_case_expr;
     "loop_case_expr_change_var"          >:: test_translate_loop_terminating_case_expr_change_var;
     "loop_terminating_conj_expr"         >:: test_translate_loop_terminating_conj_expr;
+    "translate_for_loop" >:: test_translate_for_loop;
   ]
 
 let () = run_test_tt_main suite

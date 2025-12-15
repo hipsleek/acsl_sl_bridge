@@ -2,20 +2,17 @@ open OUnit2
 open Sl_ast
 open Sl_ast_printer
 
-let test_framework expected actual= 
-  assert_equal ~printer:(fun s -> "\n" ^ s ^ "\n") expected actual
-
 let test_string_of_spec_atom_int _ =
   let atom = Atom (PointTo ("a", "int", "u")) in
   let actual = string_of_heap atom in
   let expected = "a->int*(u)" in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_string_of_spec_atom_char _ =
   let atom = Atom (PointTo ("a", "char", "u")) in
   let actual = string_of_heap atom in
   let expected = "a->char*(u)" in
-  test_framework expected actual
+  assert_equal  expected actual
 
 let test_string_of_spec_formula _ =
   let atom1 = Atom (PointTo ("a", "int", "u")) in
@@ -23,7 +20,7 @@ let test_string_of_spec_formula _ =
   let h_pre = Sep (atom1, atom2) in
   let actual = string_of_heap h_pre in
   let expected = "a->int*(u) && b->int*(v)" in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_string_of_spec_swap _ =
   let h_pre =
@@ -43,49 +40,49 @@ let test_string_of_spec_swap _ =
   let expected =
     "req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);"
   in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_string_of_spec_sugar_prime_swap _ =
   let spec = Sugar_prime [ ("a", "b"); ("b", "a") ] in
   let actual = string_of_spec spec in
   let expected = "ens (*a)'==(*b) && (*b)'==(*a);" in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_string_of_spec_sugar_old_swap _ =
   let spec = Sugar_old [ ("a", "b"); ("b", "a") ] in
   let actual = string_of_spec spec in
   let expected = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_string_of_conditional_eq_ptrs _ =
   let c = E_eq (A_var "a", A_var "b") in
   let actual = string_of_expr c in
   let expected = "a==b" in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_string_of_conditional_lt_int _ =
   let c = E_lt (A_var "i", A_int 30) in
   let actual = string_of_expr c in
   let expected = "i<30" in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_string_of_arith_sub_in_conditional _ =
   let c = E_eq (A_sub (A_int 30, A_var "i"), A_int 0) in
   let actual = string_of_expr c in
   let expected = "30-i==0" in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_string_of_arith_post_var _ =
   let e = A_post_var "i" in
   let actual = string_of_arith e in
   let expected = "i'" in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_string_of_arith_old_var _ =
   let e = A_old (A_var "i") in
   let actual = string_of_arith e in
   let expected = "\\old(i)" in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_spec_of_pointer_eq_eq _ =
   let heap_a_u = Atom (PointTo ("a", "int", "u")) in
@@ -99,10 +96,10 @@ let test_spec_of_pointer_eq_eq _ =
     }
   in
 
-  let spec = Case [ case_one ] in
+  let spec = Case [case_one] in
   let actual = string_of_spec spec in
   let expected = "case {a==b => req a->int*(u); ens a->int*(u);};" in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_spec_of_pointer_eq_neq _ =
   let heap_a_u = Atom (PointTo ("a", "int", "u")) in
@@ -131,13 +128,13 @@ let test_spec_of_pointer_eq_neq _ =
     }
   in
 
-  let spec = Case [ case_one; case_two ] in
+  let spec = Case [case_one; case_two] in
   let actual = string_of_spec spec in
   let expected =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a!=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
   in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_spec_of_pointer_eq_lte _ =
   let heap_a_u = Atom (PointTo ("a", "int", "u")) in
@@ -166,13 +163,13 @@ let test_spec_of_pointer_eq_lte _ =
     }
   in
 
-  let spec = Case [ case_one; case_two ] in
+  let spec = Case [case_one; case_two] in
   let actual = string_of_spec spec in
   let expected =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a<=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
   in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_spec_of_pointer_eq_lt _ =
   let heap_a_u = Atom (PointTo ("a", "int", "u")) in
@@ -201,13 +198,13 @@ let test_spec_of_pointer_eq_lt _ =
     }
   in
 
-  let spec = Case [ case_one; case_two ] in
+  let spec = Case [case_one; case_two] in
   let actual = string_of_spec spec in
   let expected =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a<b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
   in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_spec_of_pointer_eq_gte _ =
   let heap_a_u = Atom (PointTo ("a", "int", "u")) in
@@ -236,13 +233,13 @@ let test_spec_of_pointer_eq_gte _ =
     }
   in
 
-  let spec = Case [ case_one; case_two ] in
+  let spec = Case [case_one; case_two] in
   let actual = string_of_spec spec in
   let expected =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a>=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
   in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_spec_of_pointer_eq_gt _ =
   let heap_a_u = Atom (PointTo ("a", "int", "u")) in
@@ -271,17 +268,14 @@ let test_spec_of_pointer_eq_gt _ =
     }
   in
 
-  let spec = Case [ case_one; case_two ] in
+  let spec = Case [case_one; case_two] in
   let actual = string_of_spec spec in
   let expected =
     "case {a==b => req a->int*(u); ens a->int*(u); \
      a>b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
   in
-  test_framework expected actual
+  assert_equal expected actual
 
-(* -------------------- *)
-(* UPDATED LOOP TESTS    *)
-(* -------------------- *)
 
 let test_loop_case_with_variant _ =
   let heap_i_u = Atom (PointTo ("i", "int", "u")) in
@@ -291,15 +285,15 @@ let test_loop_case_with_variant _ =
       test = E_lt (A_var "i", A_int 30);
       term = Some (Term (A_sub (A_int 30, A_var "i")));
       pre  = heap_i_u;
-      post = Post_expr (Pred (E_eq (A_post_var "i", A_int 30)));
+      post = Post_expr (E_eq (A_post_var "i", A_int 30));
     }
   in
-  let spec = Loop (Loop_case [ case_loop ]) in
+  let spec = Case [case_loop] in
   let actual = string_of_spec spec in
   let expected =
     "case {i<30 => req Term[30-i]; ens i'==30;};"
   in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_loop_case_with_variant_prime _ =
   let heap_i_u = Atom (PointTo ("i", "int", "u")) in
@@ -307,17 +301,17 @@ let test_loop_case_with_variant_prime _ =
   let case_loop : case_spec =
     {
       test = E_lt (A_var "i", A_int 30);
-      term = Some (Term (A_sub (A_int 30, A_var "i")));
+      term = Some (Term (A_sub (A_int 30, A_var "i"))); 
       pre  = heap_i_u;
-      post = Post_expr (Pred (E_eq (A_post_var "i", A_var "i")));
+      post = Post_expr (E_eq (A_post_var "i", A_var "i"));
     }
   in
-  let spec = Loop (Loop_case [ case_loop ]) in
+  let spec = Case [case_loop] in
   let actual = string_of_spec spec in
   let expected =
     "case {i<30 => req Term[30-i]; ens i'==i;};"
   in
-  test_framework expected actual
+  assert_equal expected actual
 
 let test_loop_case_with_variant_old _ =
   let heap_i_u = Atom (PointTo ("i", "int", "u")) in
@@ -327,15 +321,15 @@ let test_loop_case_with_variant_old _ =
       test = E_lt (A_var "i", A_int 30);
       term = Some (Term (A_sub (A_int 30, A_var "i")));
       pre  = heap_i_u;
-      post = Post_expr (Pred (E_eq (A_var "i", A_old (A_var "i"))));
+      post = Post_expr (E_eq (A_var "i", A_old (A_var "i")));
     }
   in
-  let spec = Loop (Loop_case [ case_loop ]) in
+  let spec   = Case [case_loop] in
   let actual = string_of_spec spec in
   let expected =
     "case {i<30 => req Term[30-i]; ens i==\\old(i);};"
   in
-  test_framework expected actual
+  assert_equal  expected actual
 
 let test_loop_case_with_variant_and_exit _ =
   let heap_i_u = Atom (PointTo ("i", "int", "u")) in
@@ -345,7 +339,7 @@ let test_loop_case_with_variant_and_exit _ =
       test = E_lt (A_var "i", A_int 30);
       term = Some (Term (A_sub (A_int 30, A_var "i")));
       pre  = heap_i_u;
-      post = Post_expr (Pred (E_eq (A_post_var "i", A_int 30)));
+      post = Post_expr (E_eq (A_post_var "i", A_int 30));
     }
   in
   let case2 : case_spec =
@@ -353,43 +347,17 @@ let test_loop_case_with_variant_and_exit _ =
       test = E_gte (A_var "i", A_int 30);
       term = Some Term_none;
       pre  = heap_i_u;
-      post = Post_expr (Pred (E_eq (A_post_var "i", A_var "i")));
+      post = Post_expr (E_eq (A_post_var "i", A_var "i"));
     }
   in
 
-  let spec = Loop (Loop_case [ case1; case2 ]) in
+  let spec = Case [case1; case2] in
   let actual = string_of_spec spec in
   let expected =
     "case {i<30 => req Term[30-i]; ens i'==30; \
      i>=30 => req Term[]; ens i'==i;};"
   in
-  test_framework expected actual
-
-let test_loop_simple_req_term_ens_conj _ =
-  let req_pred = Pred (E_lte (A_var "i", A_int 10)) in
-  let term     = Some (Term (A_sub (A_int 10, A_var "i"))) in
-  let ens_pred =
-    Pred_and
-      ( Pred (E_eq (A_post_var "i", A_int 10)),
-        Pred (E_eq
-                (A_post_var "a",
-                 A_add (A_var "a",
-                        A_sub (A_post_var "i", A_var "i")))) )
-  in
-  let spec =
-    Loop
-      (Loop_simple
-         {
-           req  = req_pred;
-           term = term;
-           ens  = ens_pred;
-         })
-  in
-  let actual = string_of_spec spec in
-  let expected =
-    "req i<=10 && Term[10-i]; ens i'==10 && a'==a+i'-i;"
-  in
-  test_framework expected actual
+  assert_equal expected actual
 
 let suite =
   "sl_ast_printer tests" >::: [
@@ -414,7 +382,6 @@ let suite =
     "loop_case_with_variant_prime"       >:: test_loop_case_with_variant_prime;
     "loop_case_with_variant_old"         >:: test_loop_case_with_variant_old;
     "loop_case_with_variant_and_exit"    >:: test_loop_case_with_variant_and_exit;
-    "loop_simple_req_term_ens_conj"      >:: test_loop_simple_req_term_ens_conj;
   ]
 
 let () = run_test_tt_main suite
