@@ -169,8 +169,6 @@ let test_core_to_acsl_case_behaviors _ctx =
   test_framework expected actual
 
 let test_core_to_acsl_loop_simple _ctx =
-  let open Core in
-
   let core_spec : Core.spec =
     {
       params = [];
@@ -207,8 +205,6 @@ let test_core_to_acsl_loop_simple _ctx =
 
 (* NEW: loop with a single behavior carrying Term + pure ensures mentioning 'a' and 'i' *)
 let test_core_to_acsl_loop_term_and_effects _ctx =
-  let open Core in
-
   let core_spec : Core.spec =
     {
       params = [];
@@ -241,6 +237,39 @@ let test_core_to_acsl_loop_term_and_effects _ctx =
   in
   test_framework expected actual
 
+let test_core_to_acsl_result_ens _ctx =
+  let core_spec : Core.spec =
+    {
+      params = [];
+      behaviors =
+        [
+          {
+            assumes  = [];
+            requires = [];
+            ensures  =
+              [
+                P_eq
+                  ( T_result,
+                    T_arith (Add, T_var (Pre, "a"), T_int 10) );
+              ];
+            frame    = [];
+            variant  = None;
+          };
+        ];
+    }
+  in
+
+  let actual = Core_to_acsl.spec_to_acsl core_spec in
+  let expected =
+"/*@
+  requires \\true;
+  assigns \\nothing;
+  ensures \\result == \\old(a) + 10;
+*/"
+  in
+  test_framework expected actual
+
+
 let suite =
   "core_to_acsl tests" >::: [
     "core_to_acsl_swap" >:: test_core_to_acsl_swap;
@@ -249,6 +278,7 @@ let suite =
     "core_to_acsl_case_behaviors" >:: test_core_to_acsl_case_behaviors;
     "core_to_acsl_loop_simple" >:: test_core_to_acsl_loop_simple;
     "core_to_acsl_loop_term_and_effects" >:: test_core_to_acsl_loop_term_and_effects;
+    "core_to_acsl_result_ens" >:: test_core_to_acsl_result_ens;
   ]
 
 let () = run_test_tt_main suite

@@ -186,6 +186,22 @@ let test_sl_to_core_loop_simple_term_and_frame _ctx =
   in
   test_framework expected actual
 
+let test_sl_to_core_ens_result _ctx =
+  let input =
+    "ens[r] r==a+10;"
+  in
+  let sl_spec   = parse_spec input in
+  let core_spec = Spec_to_core.spec_to_core sl_spec in
+  let actual    = Core_printer.string_of_spec core_spec in
+  let expected =
+    "params ()\n" ^
+    "assumes true\n" ^
+    "requires true\n" ^
+    "ensures \\result == a+10\n" ^
+    "frame {}"
+  in
+  test_framework expected actual
+
 let test_sl_to_core_case_guard_uses_post_phase _ctx =
   let input = "case { a==b => req a->int*(u); ens a->int*(u); };" in
   let sl_spec   = parse_spec input in
@@ -218,6 +234,7 @@ let suite =
     "loop_case_term"               >:: test_sl_to_core_loop_case_term;
     "loop_simple_term_and_frame"   >:: test_sl_to_core_loop_simple_term_and_frame;
     "case_guard_post_phase"        >:: test_sl_to_core_case_guard_uses_post_phase;
+    "ens_result"                   >:: test_sl_to_core_ens_result;
   ]
 
 let () = run_test_tt_main suite

@@ -60,7 +60,7 @@ let test_string_of_spec_swap _ =
 
 let test_string_of_spec_sugar_prime_swap _ =
   let spec =
-    Ens (A_sugar_prime [ ("a", "b"); ("b", "a") ])
+    Ens { ret = None; post = A_sugar_prime [ ("a", "b"); ("b", "a") ] }
   in
   let actual = string_of_spec spec in
   let expected = "ens (*a)'==(*b) && (*b)'==(*a);"
@@ -69,13 +69,12 @@ let test_string_of_spec_sugar_prime_swap _ =
 
 let test_string_of_spec_sugar_old_swap _ =
   let spec =
-    Ens (A_sugar_old [ ("a", "b"); ("b", "a") ])
+    Ens { ret = None; post = A_sugar_old [ ("a", "b"); ("b", "a") ] }
   in
   let actual = string_of_spec spec in
   let expected = "ens (*a)==\\old(*b) && (*b)==\\old(*a);"
   in
   test_framework expected actual
-
 
 (* ---------- Pure / arith printing tests ---------- *)
 
@@ -383,6 +382,20 @@ let test_loop_single_req_ens_conj_post _ =
   in
   test_framework expected actual
 
+(* ---------- NEW: ens[r] return-binder test ---------- *)
+
+let test_ens_result_binder _ =
+  let post =
+    eq A_result (A_add (A_var "a", A_int 10))
+  in
+  let spec =
+    Ens { ret = Some "r"; post }
+  in
+  let actual = string_of_spec spec in
+  let expected = "ens[r] r==a+10;"
+  in
+  test_framework expected actual
+
 (* ---------- Test suite ---------- *)
 
 let suite =
@@ -412,6 +425,8 @@ let suite =
     "loop_case_with_variant_old"         >:: test_loop_case_with_variant_old;
     "loop_case_with_variant_and_exit"    >:: test_loop_case_with_variant_and_exit;
     "loop_single_req_ens_conj_post"      >:: test_loop_single_req_ens_conj_post;
+
+    "ens_result_binder"                  >:: test_ens_result_binder;
   ]
 
 let () = run_test_tt_main suite

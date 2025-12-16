@@ -39,20 +39,29 @@ spec:
   | REQ assertion SEMICOLON ENS assertion SEMICOLON
       { Simple { pre = $2; post = $5 } }
 
-  (* NEW: top-level ensures-only spec *)
-  | ENS assertion SEMICOLON
-      { Ens $2 }
+  (* ensures-only spec *)
+  | ens_clause
+      { Ens $1 }
 
   | CASE LBRACE case_list RBRACE SEMICOLON
       { Case $3 }
 
-  (* allow a single loop req/ens pair to desugar into a singleton Case *)
   | loop_clause
       { Case [ $1 ] }
 
-  (* allow multiple loop clauses joined by /\ to desugar into Case list *)
   | loop_clause SL_CONJ loop_clause_list
       { Case ($1 :: $3) }
+
+
+(* ------------------ Ens clause (new) ------------------ *)
+
+ens_clause:
+  | ENS assertion SEMICOLON
+      { { ret = None; post = $2 } }
+
+  | ENS LBRACK ID RBRACK assertion SEMICOLON
+      { { ret = Some $3; post = $5 } }
+
 
 (* ------------------ Assertions ------------------ *)
 
@@ -77,10 +86,8 @@ assertion_atom:
       { $1 }
   | ID
       {
-        (* lightweight 'emp' without adding a new token *)
         if $1 = "emp" then A_emp
-        else
-          failwith ("Unexpected bare identifier in assertion: " ^ $1)
+        else failwith ("Unexpected bare identifier in assertion: " ^ $1)
       }
   | LPAREN assertion RPAREN
       { $2 }
@@ -154,44 +161,43 @@ sugar_atom_old:
 (* ------------------ Case clauses ------------------ *)
 
 case:
-  (* Normal case: guard => req <assertion>; ens <assertion>; *)
   | assertion IMPLIES
       REQ assertion SEMICOLON
-      ENS assertion SEMICOLON
+      ens_clause
       {
         {
           test = $1;
           term = None;
           pre  = $4;
-          post = $7;
+          post = $6.post;
         }
       }
 
-  (* Variant-only req: guard => req Term[e]; ens <assertion>; *)
-  | assertion IMPLIES
+
+    | assertion IMPLIES
       REQ TERM LBRACK arith_expr RBRACK SEMICOLON
-      ENS assertion SEMICOLON
+      ens_clause
       {
         {
           test = $1;
           term = Some (Term $6);
           pre  = A_emp;
-          post = $10;
+          post = $9.post;
         }
       }
 
-  (* Variant-none req: guard => req Term[]; ens <assertion>; *)
   | assertion IMPLIES
       REQ TERM LBRACK RBRACK SEMICOLON
-      ENS assertion SEMICOLON
+      ens_clause
       {
         {
           test = $1;
           term = Some Term_none;
           pre  = A_emp;
-          post = $9;
+          post = $8.post;
         }
       }
+
 
 case_list:
   | case
@@ -208,14 +214,14 @@ loop_req:
       { (A_pure $1, Some Term_none) }
 
 loop_clause:
-  | REQ loop_req SEMICOLON ENS assertion SEMICOLON
+  | REQ loop_req SEMICOLON ens_clause
       {
         let (cond_as_assertion, term_opt) = $2 in
         {
           test = cond_as_assertion;
           term = term_opt;
           pre  = A_emp;
-          post = $5;
+          post = $4.post;
         }
       }
 

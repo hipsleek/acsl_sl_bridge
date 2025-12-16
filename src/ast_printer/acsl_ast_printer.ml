@@ -21,8 +21,8 @@ let rec acsl_term = function
   | TApp (f, args) ->
       let args_str = args |> List.map acsl_term |> String.concat ", " in
       Printf.sprintf "%s(%s)" f args_str
-  | TBinOp (op, t1, t2) ->
-      Printf.sprintf "%s %s %s" (acsl_term t1) (string_of_binop op) (acsl_term t2)
+  | TBinOp (op, t1, t2) -> Printf.sprintf "%s %s %s" (acsl_term t1) (string_of_binop op) (acsl_term t2)
+  | TResult -> Printf.sprintf "\\result" 
 
 let acsl_pred (p : predicate) : string = acsl_term p
 

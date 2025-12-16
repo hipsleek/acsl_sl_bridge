@@ -27,6 +27,7 @@ type term =
   | T_heap of phase * ptr
   | T_ptr of ptr
   | T_arith of arith_op * term * term
+  | T_result
 
 type predicate =
   | P_eq of term * term

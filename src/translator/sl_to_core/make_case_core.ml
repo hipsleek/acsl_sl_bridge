@@ -78,8 +78,6 @@ let make_case_heap_expression (sl_cases : Sl_ast.case_spec list) : C.spec =
   { C.params = params; behaviors }
 
 let make_case_core (sl_cases : Sl_ast.case_spec list) : C.spec =
-  let has_any_pure_post =
-    List.exists (fun c -> not (has_heap c.post)) sl_cases
-  in
+  let has_any_pure_post = List.exists (fun (c : Sl_ast.case_spec) -> not (has_heap c.post)) sl_cases in
   if has_any_pure_post then make_case_term_expression sl_cases
   else make_case_heap_expression sl_cases

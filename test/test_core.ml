@@ -184,6 +184,34 @@ let test_core_string_of_spec_two_assigns_and_variant _ =
   in
   assert_equal expected actual
 
+let test_core_string_of_spec_result_ens _ =
+  let b =
+    {
+      assumes  = [];
+      requires = [];
+      ensures  =
+        [
+          P_eq
+            ( T_result,
+              T_arith (Add, T_var (Pre, "a"), T_int 10) );
+        ];
+      frame    = [];
+      variant  = None;
+    }
+  in
+
+  let spec   = { params = []; behaviors = [ b ] } in
+  let actual = string_of_spec spec in
+
+  let expected =
+    "params ()\n" ^
+    "assumes true\n" ^
+    "requires true\n" ^
+    "ensures \\result == a+10\n" ^
+    "frame {}"
+  in
+
+  assert_equal expected actual
 
 let suite =
   "core printer tests" >::: [
@@ -200,7 +228,9 @@ let suite =
     "spec_empty"           >:: test_core_string_of_spec_empty;
     "spec_with_variant"    >:: test_core_string_of_spec_with_variant;
     "spec_simple_contract" >:: test_core_string_of_spec_simple_contract;
-    "spec_two_assigns_and_variant" >:: test_core_string_of_spec_two_assigns_and_variant
+    "spec_two_assigns_and_variant" >:: test_core_string_of_spec_two_assigns_and_variant;
+
+    "spec_result_ens" >:: test_core_string_of_spec_result_ens;
   ]
 
 let () = run_test_tt_main suite

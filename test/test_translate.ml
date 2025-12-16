@@ -1,5 +1,3 @@
-(* test_translate_ounit.ml *)
-
 open OUnit2
 
 let parse_spec (input : string) : Sl_ast.spec =
@@ -217,6 +215,19 @@ let test_translate_for_loop _ctx =
   in
   test_framework input expected
 
+let test_translate_ens_res _ctx =
+  let input =
+    "ens[r] r==a+10;"
+  in
+  let expected =
+"/*@
+  requires \\true;
+  assigns \\nothing;
+  ensures \\result == a + 10;
+*/"
+  in
+  test_framework input expected
+
 let suite =
   "translate" >::: [
     "swap"                               >:: test_translate_swap;
@@ -232,6 +243,7 @@ let suite =
     "loop_case_expr_change_var"          >:: test_translate_loop_terminating_case_expr_change_var;
     "loop_terminating_conj_expr"         >:: test_translate_loop_terminating_conj_expr;
     "translate_for_loop" >:: test_translate_for_loop;
+    "translate_ens_res" >:: test_translate_ens_res;
   ]
 
 let () = run_test_tt_main suite

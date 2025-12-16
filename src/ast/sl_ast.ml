@@ -12,6 +12,7 @@ type arith_expr =
   | A_sub of arith_expr * arith_expr
   | A_mul of arith_expr * arith_expr
   | A_div of arith_expr * arith_expr
+  | A_result
 
 type pure_atom =
   | P_eq of arith_expr * arith_expr
@@ -52,7 +53,12 @@ type case_spec = {
   post : assertion;
 }
 
+type ens_spec = {
+  ret : var option;
+  post : assertion;
+}
+
 type spec =
   | Simple of base_spec
-  | Ens of assertion
+  | Ens of ens_spec
   | Case of case_spec list
