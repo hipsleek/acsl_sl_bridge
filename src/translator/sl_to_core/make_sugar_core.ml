@@ -1,8 +1,14 @@
 open Helper
 
-let make_sugar_core (pairs : (Sl_ast.ptr * Sl_ast.ptr) list) : Core.spec =
-  let ptrs_set = List.fold_left 
-    (fun acc (p, q) -> StringSet.add p (StringSet.add q acc)) StringSet.empty pairs in
+module C = Core
+
+let make_sugar_core (pairs : (Sl_ast.ptr * Sl_ast.ptr) list) : C.spec =
+  let ptrs_set =
+    List.fold_left
+      (fun acc (p, q) -> StringSet.add p (StringSet.add q acc))
+      StringSet.empty
+      pairs
+  in
   let ptrs = StringSet.elements ptrs_set in
   let params = List.map (fun p -> Core_builder.mk_param C.InOut p) ptrs in
   let frame = ptrs in
@@ -16,12 +22,6 @@ let make_sugar_core (pairs : (Sl_ast.ptr * Sl_ast.ptr) list) : Core.spec =
       pairs
   in
   let behavior : C.behavior =
-    {
-      C.assumes = [];
-      requires;
-      ensures;
-      frame;
-      variant = None;
-    }
+    { C.assumes = []; requires; ensures; frame; variant = None }
   in
   { C.params = params; behaviors = [ behavior ] }
