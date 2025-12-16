@@ -31,17 +31,13 @@ let string_of_mode = function
   | Out   -> "out"
   | InOut -> "inout"
 
-let string_of_param (p : param) : string =
-  Printf.sprintf "%s:%s" p.name (string_of_mode p.mode)
+let string_of_param (p : param) : string = Printf.sprintf "%s:%s" p.name (string_of_mode p.mode)
 
 let string_of_behavior (b : behavior) : string =
   let preds_to_str ps =
     match ps with
     | [] -> "true"
-    | _ ->
-        ps
-        |> List.map string_of_predicate
-        |> String.concat " && "
+    | _ -> ps |> List.map string_of_predicate |> String.concat " && "
   in
   let frame_str = String.concat ", " b.frame in
   let base = Printf.sprintf

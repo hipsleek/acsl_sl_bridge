@@ -57,13 +57,11 @@ let make_case_heap_expression (sl_cases : Sl_ast.case_spec list) : C.spec =
            | Post_heap h_post -> atoms_of_heap h_post
            | Post_expr _ -> []
          in
-         let frame_set =
-           StringSet.union (ptrs_of_atoms pre_atoms) (ptrs_of_atoms post_atoms)
-         in
-         let frame    = StringSet.elements frame_set in
-         let assumes  = [ get_predicate c.test ] in
+         let frame_set = StringSet.union (ptrs_of_atoms pre_atoms) (ptrs_of_atoms post_atoms) in
+         let frame = StringSet.elements frame_set in
+         let assumes = [ get_predicate c.test ] in
          let requires = List.map Core_builder.valid global_ptrs in
-         let ensures  = make_ensures pre_atoms post_atoms in
+         let ensures = make_ensures pre_atoms post_atoms in
          let variant =
            match c.term with
            | None

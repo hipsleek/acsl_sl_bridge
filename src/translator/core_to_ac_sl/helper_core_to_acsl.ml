@@ -26,9 +26,9 @@ let acsl_pred_of_core (p : predicate) : A.predicate =
   | P_eq (t1, t2) -> A.TBinOp (A.Eq, acsl_term_of_core t1, acsl_term_of_core t2)
   | P_neq (t1, t2) -> A.TBinOp (A.Neq,acsl_term_of_core t1, acsl_term_of_core t2)
   | P_lte (t1, t2) -> A.TBinOp (A.Lte, acsl_term_of_core t1, acsl_term_of_core t2)
-  | P_lt  (t1, t2) -> A.TBinOp (A.Lt, acsl_term_of_core t1, acsl_term_of_core t2)
+  | P_lt (t1, t2) -> A.TBinOp (A.Lt, acsl_term_of_core t1, acsl_term_of_core t2)
   | P_gte (t1, t2) -> A.TBinOp (A.Gte, acsl_term_of_core t1, acsl_term_of_core t2)
-  | P_gt  (t1, t2) -> A.TBinOp (A.Gt, acsl_term_of_core t1, acsl_term_of_core t2)
+  | P_gt (t1, t2) -> A.TBinOp (A.Gt, acsl_term_of_core t1, acsl_term_of_core t2)
 
 let rec vars_of_term (acc : StringSet.t) (t : A.term) : StringSet.t =
   match t with
@@ -36,8 +36,7 @@ let rec vars_of_term (acc : StringSet.t) (t : A.term) : StringSet.t =
   | A.TInt _ -> acc
   | A.TDeref t'
   | A.TOld t' -> vars_of_term acc t'
-  | A.TApp (_, args) ->
-      List.fold_left vars_of_term acc args
+  | A.TApp (_, args) -> List.fold_left vars_of_term acc args
   | A.TBinOp (_, t1, t2) ->
       let acc = vars_of_term acc t1 in
       vars_of_term acc t2

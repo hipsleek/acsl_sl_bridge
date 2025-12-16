@@ -3,31 +3,19 @@ module StringSet = Set.Make (String)
 module StringMap = Map.Make (String)
 
 (*Relation makers*)
-let rec atoms_of_heap
-    (h : Sl_ast.heap)
-  : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list =
+let rec atoms_of_heap (h : Sl_ast.heap) : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list =
   match h with
   | Atom (PointTo (p, t, v)) -> [ (p, t, v) ]
   | Sep (h1, h2) -> atoms_of_heap h1 @ atoms_of_heap h2
 
-let ptrs_of_atoms
-    (atoms : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list)
-  : StringSet.t =
-  List.fold_left
-    (fun acc (p, _, _) -> StringSet.add p acc)
-    StringSet.empty
-    atoms
+let ptrs_of_atoms (atoms : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list) : StringSet.t =
+  List.fold_left (fun acc (p, _, _) -> StringSet.add p acc) StringSet.empty atoms
 
-let map_of_atoms
-    (atoms : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list)
-  : string StringMap.t =
-  List.fold_left
-    (fun acc (p, _t, v) -> StringMap.add p v acc)
-    StringMap.empty
-    atoms
+let map_of_atoms (atoms : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list) : string StringMap.t =
+  List.fold_left (fun acc (p, _t, v) -> StringMap.add p v acc) StringMap.empty atoms
 
 let make_ensures
-    (pre_atoms  : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list)
+    (pre_atoms : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list)
     (post_atoms : (Sl_ast.ptr * Sl_ast.car_type * Sl_ast.car) list)
   : C.predicate list =
   let buf = ref [] in
@@ -56,36 +44,18 @@ let make_ensures
 (*1:1 translation*)
 let rec term_of_arith (e : Sl_ast.arith_expr) : C.term =
   match e with
-  | A_var x ->
-      C.T_var (C.Post, x)
-
-  | A_post_var x ->
-      C.T_var (C.Post, x)
-
-  | A_old inner ->
-      begin match inner with
-      | A_var x ->
-          C.T_var (C.Pre, x)
-      | A_post_var x ->
-          C.T_var (C.Pre, x)
-      | _ ->
-          failwith "nested \\old over arithmetic not supported yet"
+  | A_var x -> C.T_var (C.Post, x)
+  | A_post_var x -> C.T_var (C.Post, x)
+  | A_old inner -> begin match inner with
+      | A_var x -> C.T_var (C.Pre, x)
+      | A_post_var x -> C.T_var (C.Pre, x)
+      | _ -> failwith "nested \\old over arithmetic not supported yet"
       end
-
-  | A_int n ->
-      C.T_int n
-
-  | A_add (e1, e2) ->
-      C.T_arith (C.Add, term_of_arith e1, term_of_arith e2)
-
-  | A_sub (e1, e2) ->
-      C.T_arith (C.Sub, term_of_arith e1, term_of_arith e2)
-
-  | A_mul (e1, e2) ->
-      C.T_arith (C.Mul, term_of_arith e1, term_of_arith e2)
-
-  | A_div (e1, e2) ->
-      C.T_arith (C.Div, term_of_arith e1, term_of_arith e2)
+  | A_int n -> C.T_int n
+  | A_add (e1, e2) -> C.T_arith (C.Add, term_of_arith e1, term_of_arith e2)
+  | A_sub (e1, e2) -> C.T_arith (C.Sub, term_of_arith e1, term_of_arith e2)
+  | A_mul (e1, e2) -> C.T_arith (C.Mul, term_of_arith e1, term_of_arith e2)
+  | A_div (e1, e2) -> C.T_arith (C.Div, term_of_arith e1, term_of_arith e2)
 
 
 let get_predicate (e : Sl_ast.conditional_expr) : C.predicate =
