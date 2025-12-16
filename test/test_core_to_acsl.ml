@@ -1,4 +1,9 @@
 open OUnit2
+let test_framework (expected : string) (actual : string) : unit =
+  assert_equal
+    ~printer:(fun s -> "\n" ^ s ^ "\n")
+    expected
+    actual
 
 let mk_inout_param (name : string) : Core.param =
   Core_builder.mk_param Core.InOut name
@@ -40,11 +45,11 @@ let test_core_to_acsl_swap _ctx =
   let expected =
 "/*@
   requires \\valid(a) && \\valid(b);
-  assigns  *a, *b;
-  ensures  *a == \\old(*b) && *b == \\old(*a);
+  assigns *a, *b;
+  ensures *a == \\old(*b) && *b == \\old(*a);
 */"
   in
-  assert_equal expected actual
+  test_framework expected actual
 
 let test_core_to_acsl_no_swap _ctx =
   let ptrs = [ "a"; "b" ] in
@@ -63,11 +68,11 @@ let test_core_to_acsl_no_swap _ctx =
   let expected =
 "/*@
   requires \\valid(a) && \\valid(b);
-  assigns  *a, *b;
-  ensures  *a == \\old(*a) && *b == \\old(*b);
+  assigns *a, *b;
+  ensures *a == \\old(*a) && *b == \\old(*b);
 */"
   in
-  assert_equal expected actual
+  test_framework expected actual
 
 let test_core_to_acsl_triple_swap _ctx =
   let ptrs = [ "a"; "b"; "c" ] in
@@ -89,11 +94,11 @@ let test_core_to_acsl_triple_swap _ctx =
   let expected =
 "/*@
   requires \\valid(a) && \\valid(b) && \\valid(c);
-  assigns  *a, *b, *c;
-  ensures  *a == \\old(*c) && *b == \\old(*a) && *c == \\old(*b);
+  assigns *a, *b, *c;
+  ensures *a == \\old(*c) && *b == \\old(*a) && *c == \\old(*b);
 */"
   in
-  assert_equal expected actual
+  test_framework expected actual
 
 let test_core_to_acsl_case_behaviors _ctx =
   let params = [ mk_inout_param "a"; mk_inout_param "b" ] in
@@ -151,18 +156,17 @@ let test_core_to_acsl_case_behaviors _ctx =
   let actual   = Core_to_acsl.spec_to_acsl core_spec in
   let expected =
 "/*@
-  assigns  *a, *b;
+  requires \\valid(a) && \\valid(b);
+  assigns *a, *b;
   behavior case1:
     assumes a == b;
-    requires \\valid(a) && \\valid(b);
-    ensures  *a == \\old(*a);
+    ensures *a == \\old(*a);
   behavior case2:
     assumes a != b;
-    requires \\valid(a) && \\valid(b);
-    ensures  *a == \\old(*b) && *b == \\old(*a);
+    ensures *a == \\old(*b) && *b == \\old(*a);
 */"
   in
-  assert_equal expected actual
+  test_framework expected actual
 
 let test_core_to_acsl_loop_simple _ctx =
   let open Core in
@@ -199,7 +203,7 @@ let test_core_to_acsl_loop_simple _ctx =
   loop variant 30 - i;
 */"
   in
-  assert_equal ~printer:(fun s -> "\n" ^ s ^ "\n") expected actual
+  test_framework expected actual
 
 (* NEW: loop with a single behavior carrying Term + pure ensures mentioning 'a' and 'i' *)
 let test_core_to_acsl_loop_term_and_effects _ctx =
@@ -228,11 +232,6 @@ let test_core_to_acsl_loop_term_and_effects _ctx =
   in
 
   let actual = Core_to_acsl.spec_to_acsl core_spec in
-
-  (* NOTE:
-     - loop assigns is inferred from invariants+ensures(+variant).
-     - depending on Set ordering, it may print "a, i" or "i, a".
-     Adjust this line if your ordering differs. *)
   let expected =
 "/*@
   loop invariant i <= 10;
@@ -240,7 +239,7 @@ let test_core_to_acsl_loop_term_and_effects _ctx =
   loop variant 10 - i;
 */"
   in
-  assert_equal ~printer:(fun s -> "\n" ^ s ^ "\n") expected actual
+  test_framework expected actual
 
 let suite =
   "core_to_acsl tests" >::: [

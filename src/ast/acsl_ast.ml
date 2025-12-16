@@ -15,11 +15,11 @@ type predicate = term
 type behavior = {
   b_name: string option;
   b_assumes: predicate list;
-  b_requires: predicate list;
   b_ensures: predicate list;
 }
 
 type contract = {
+  requires: predicate list;
   assigns : term list;
   behaviors : behavior list;
 }

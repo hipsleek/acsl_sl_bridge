@@ -22,8 +22,8 @@ let test_translate_swap _ctx =
   let expected =
 "/*@
   requires \\valid(a) && \\valid(b);
-  assigns  *a, *b;
-  ensures  *a == \\old(*b) && *b == \\old(*a);
+  assigns *a, *b;
+  ensures *a == \\old(*b) && *b == \\old(*a);
 */"
   in
   test_framework input expected
@@ -36,8 +36,8 @@ let test_translate_no_swap _ctx =
   let expected =
 "/*@
   requires \\valid(a);
-  assigns  *a;
-  ensures  *a == \\old(*a);
+  assigns *a;
+  ensures *a == \\old(*a);
 */"
   in
   test_framework input expected
@@ -50,8 +50,8 @@ let test_translate_triple_swap _ctx =
   let expected =
 "/*@
   requires \\valid(a) && \\valid(b) && \\valid(c);
-  assigns  *a, *b, *c;
-  ensures  *a == \\old(*c) && *b == \\old(*a) && *c == \\old(*b);
+  assigns *a, *b, *c;
+  ensures *a == \\old(*c) && *b == \\old(*a) && *c == \\old(*b);
 */"
   in
   test_framework input expected
@@ -64,8 +64,8 @@ let test_translate_swap_type_mismatch _ctx =
   let expected =
 "/*@
   requires \\valid(a) && \\valid(b);
-  assigns  *a, *b;
-  ensures  *a == \\old(*b) && *b == \\old(*a);
+  assigns *a, *b;
+  ensures *a == \\old(*b) && *b == \\old(*a);
 */"
   in
   test_framework input expected
@@ -75,8 +75,8 @@ let test_translate_swap_prime_notation_sugar _ctx =
   let expected =
 "/*@
   requires \\valid(a) && \\valid(b);
-  assigns  *a, *b;
-  ensures  *a == \\old(*b) && *b == \\old(*a);
+  assigns *a, *b;
+  ensures *a == \\old(*b) && *b == \\old(*a);
 */"
   in
   test_framework input expected
@@ -86,8 +86,8 @@ let test_translate_swap_old_notation_sugar _ctx =
   let expected =
 "/*@
   requires \\valid(a) && \\valid(b);
-  assigns  *a, *b;
-  ensures  *a == \\old(*b) && *b == \\old(*a);
+  assigns *a, *b;
+  ensures *a == \\old(*b) && *b == \\old(*a);
 */"
   in
   test_framework input expected
@@ -98,11 +98,11 @@ let test_translate_case_single _ctx =
   in
   let expected =
 "/*@
-  assigns  *a;
+  requires \\valid(a);
+  assigns *a;
   behavior case1:
     assumes a == b;
-    requires \\valid(a);
-    ensures  *a == \\old(*a);
+    ensures *a == \\old(*a);
 */"
   in
   test_framework input expected
@@ -117,15 +117,14 @@ let test_translate_case_two _ctx =
   in
   let expected =
 "/*@
-  assigns  *a, *b;
+  requires \\valid(a) && \\valid(b);
+  assigns *a, *b;
   behavior case1:
     assumes a == b;
-    requires \\valid(a) && \\valid(b);
-    ensures  *a == \\old(*a);
+    ensures *a == \\old(*a);
   behavior case2:
     assumes a != b;
-    requires \\valid(a) && \\valid(b);
-    ensures  *a == \\old(*b) && *b == \\old(*a);
+    ensures *a == \\old(*b) && *b == \\old(*a);
 */"
   in
   test_framework input expected
@@ -141,23 +140,20 @@ let test_translate_case_operators _ctx =
   in
   let expected =
 "/*@
-  assigns  *a;
+  requires \\valid(a);
+  assigns *a;
   behavior case1:
     assumes a < b;
-    requires \\valid(a);
-    ensures  *a == \\old(*a);
+    ensures *a == \\old(*a);
   behavior case2:
     assumes a <= b;
-    requires \\valid(a);
-    ensures  *a == \\old(*a);
+    ensures *a == \\old(*a);
   behavior case3:
     assumes a > b;
-    requires \\valid(a);
-    ensures  *a == \\old(*a);
+    ensures *a == \\old(*a);
   behavior case4:
     assumes a >= b;
-    requires \\valid(a);
-    ensures  *a == \\old(*a);
+    ensures *a == \\old(*a);
 */"
   in
   test_framework input expected
@@ -210,7 +206,7 @@ let test_translate_loop_terminating_conj_expr _ctx =
 
 let test_translate_for_loop _ctx =
   let input =
-    "req i<=10 && Term[10-i]; ens i'==10 && a'==a+(i'-i);"
+    "req i<=10 && Term[10-i];\n" ^ "ens i'==10 && a'==a+(i'-i);"
   in
   let expected =
 "/*@
