@@ -78,6 +78,8 @@ assertion:
 assertion_atom:
   | heap_atom
       { A_heap_atom $1 }
+  | chain_cmp
+      { $1 }
   | pure_atom
       { A_pure $1 }
   | sugar_prime_assertion
@@ -98,7 +100,32 @@ heap_atom:
   | ID ARROW TYPE STAR LPAREN ID RPAREN
       { PointTo ($1, $3, $6) }
 
-(* ------------------ Pure atoms ------------------ *)
+
+chain_cmp:
+  | arith_expr LT  arith_expr LT  arith_expr
+      { A_and (A_pure (P_lt  ($1, $3)), A_pure (P_lt  ($3, $5))) }
+
+  | arith_expr LT  arith_expr LTE arith_expr
+      { A_and (A_pure (P_lt  ($1, $3)), A_pure (P_lte ($3, $5))) }
+
+  | arith_expr LTE arith_expr LT  arith_expr
+      { A_and (A_pure (P_lte ($1, $3)), A_pure (P_lt  ($3, $5))) }
+
+  | arith_expr LTE arith_expr LTE arith_expr
+      { A_and (A_pure (P_lte ($1, $3)), A_pure (P_lte ($3, $5))) }
+
+  | arith_expr GT  arith_expr GT  arith_expr
+      { A_and (A_pure (P_gt  ($1, $3)), A_pure (P_gt  ($3, $5))) }
+
+  | arith_expr GT  arith_expr GTE arith_expr
+      { A_and (A_pure (P_gt  ($1, $3)), A_pure (P_gte ($3, $5))) }
+
+  | arith_expr GTE arith_expr GT  arith_expr
+      { A_and (A_pure (P_gte ($1, $3)), A_pure (P_gt  ($3, $5))) }
+
+  | arith_expr GTE arith_expr GTE arith_expr
+      { A_and (A_pure (P_gte ($1, $3)), A_pure (P_gte ($3, $5))) }
+
 
 pure_atom:
   | arith_expr EQEQ arith_expr { P_eq ($1, $3) }

@@ -188,6 +188,23 @@ let test_translate_loop_terminating_case_expr_change_var _ctx =
   in
   test_framework input expected
 
+let test_translate_loop_terminating_triple_case_expr _ctx =
+  let input =
+    "case {\n" ^
+    "  i>=30  => req Term[]; ens  i'==i;\n" ^
+    "  20<=i<30 => req Term[30-i]; ens i'==30;\n" ^
+    "  i<20 => req Term[20-i]; ens i'==20;\n" ^
+    "};"
+  in
+  let expected =
+"/*@
+  loop invariant i < 30;
+  loop assigns i;
+  loop variant 30 - i;
+*/"
+  in
+  test_framework input expected
+
 let test_translate_loop_terminating_conj_expr _ctx =
   let input =
     "req i<30 && Term[30-i]; ens i'==30;\n" ^
@@ -239,8 +256,9 @@ let suite =
     "case_single"                        >:: test_translate_case_single;
     "case_two"                           >:: test_translate_case_two;
     "case_operators"                     >:: test_translate_case_operators;
-    "loop_terminating_case_expr"          >:: test_translate_loop_terminating_case_expr;
+    "loop_terminating_case_expr"         >:: test_translate_loop_terminating_case_expr;
     "loop_case_expr_change_var"          >:: test_translate_loop_terminating_case_expr_change_var;
+    "loop_terminating_triple_case_expr"  >:: test_translate_loop_terminating_triple_case_expr;
     "loop_terminating_conj_expr"         >:: test_translate_loop_terminating_conj_expr;
     "translate_for_loop" >:: test_translate_for_loop;
     "translate_ens_res" >:: test_translate_ens_res;
