@@ -39,7 +39,6 @@ spec:
   | REQ assertion SEMICOLON ENS assertion SEMICOLON
       { Simple { pre = $2; post = $5 } }
 
-  (* ensures-only spec *)
   | ens_clause
       { Ens $1 }
 
@@ -52,8 +51,7 @@ spec:
   | loop_clause SL_CONJ loop_clause_list
       { Case ($1 :: $3) }
 
-
-(* ------------------ Ens clause (new) ------------------ *)
+(* ---------- Ens clause ---------- *)
 
 ens_clause:
   | ENS assertion SEMICOLON
@@ -62,104 +60,124 @@ ens_clause:
   | ENS LBRACK ID RBRACK assertion SEMICOLON
       { { ret = Some $3; post = $5 } }
 
-
-(* ------------------ Assertions ------------------ *)
+(* ---------- Assertions ---------- *)
 
 assertion:
   | assertion IMPLIES assertion
-      { A_implies ($1, $3) }
+      { AImplies ($1, $3) }
+
   | assertion AND assertion
-      { A_and ($1, $3) }
+      { AAnd ($1, $3) }
+
   | assertion STAR assertion
-      { A_sep ($1, $3) }
+      { ASep ($1, $3) }
+
   | assertion_atom
       { $1 }
 
 assertion_atom:
   | heap_atom
-      { A_heap_atom $1 }
+      { AHeapAtom $1 }
+
   | chain_cmp
       { $1 }
+
   | pure_atom
-      { A_pure $1 }
+      { APure $1 }
+
   | sugar_prime_assertion
       { $1 }
+
   | sugar_old_assertion
       { $1 }
+
   | ID
       {
-        if $1 = "emp" then A_emp
+        if $1 = "emp" then AEmp
         else failwith ("Unexpected bare identifier in assertion: " ^ $1)
       }
+
   | LPAREN assertion RPAREN
       { $2 }
 
-(* ------------------ Heap atoms ------------------ *)
+(* ---------- Heap atoms ---------- *)
 
 heap_atom:
   | ID ARROW TYPE STAR LPAREN ID RPAREN
       { PointTo ($1, $3, $6) }
 
+(* ---------- Chained comparisons ---------- *)
 
 chain_cmp:
   | arith_expr LT  arith_expr LT  arith_expr
-      { A_and (A_pure (P_lt  ($1, $3)), A_pure (P_lt  ($3, $5))) }
+      { AAnd (APure (PLt  ($1, $3)), APure (PLt  ($3, $5))) }
 
   | arith_expr LT  arith_expr LTE arith_expr
-      { A_and (A_pure (P_lt  ($1, $3)), A_pure (P_lte ($3, $5))) }
+      { AAnd (APure (PLt  ($1, $3)), APure (PLte ($3, $5))) }
 
   | arith_expr LTE arith_expr LT  arith_expr
-      { A_and (A_pure (P_lte ($1, $3)), A_pure (P_lt  ($3, $5))) }
+      { AAnd (APure (PLte ($1, $3)), APure (PLt  ($3, $5))) }
 
   | arith_expr LTE arith_expr LTE arith_expr
-      { A_and (A_pure (P_lte ($1, $3)), A_pure (P_lte ($3, $5))) }
+      { AAnd (APure (PLte ($1, $3)), APure (PLte ($3, $5))) }
 
   | arith_expr GT  arith_expr GT  arith_expr
-      { A_and (A_pure (P_gt  ($1, $3)), A_pure (P_gt  ($3, $5))) }
+      { AAnd (APure (PGt  ($1, $3)), APure (PGt  ($3, $5))) }
 
   | arith_expr GT  arith_expr GTE arith_expr
-      { A_and (A_pure (P_gt  ($1, $3)), A_pure (P_gte ($3, $5))) }
+      { AAnd (APure (PGt  ($1, $3)), APure (PGte ($3, $5))) }
 
   | arith_expr GTE arith_expr GT  arith_expr
-      { A_and (A_pure (P_gte ($1, $3)), A_pure (P_gt  ($3, $5))) }
+      { AAnd (APure (PGte ($1, $3)), APure (PGt  ($3, $5))) }
 
   | arith_expr GTE arith_expr GTE arith_expr
-      { A_and (A_pure (P_gte ($1, $3)), A_pure (P_gte ($3, $5))) }
+      { AAnd (APure (PGte ($1, $3)), APure (PGte ($3, $5))) }
 
+(* ---------- Pure atoms ---------- *)
 
 pure_atom:
-  | arith_expr EQEQ arith_expr { P_eq ($1, $3) }
-  | arith_expr NEQ  arith_expr { P_neq ($1, $3) }
-  | arith_expr LTE  arith_expr { P_lte ($1, $3) }
-  | arith_expr LT   arith_expr { P_lt ($1, $3) }
-  | arith_expr GTE  arith_expr { P_gte ($1, $3) }
-  | arith_expr GT   arith_expr { P_gt ($1, $3) }
+  | arith_expr EQEQ arith_expr { PEq  ($1, $3) }
+  | arith_expr NEQ  arith_expr { PNeq ($1, $3) }
+  | arith_expr LTE  arith_expr { PLte ($1, $3) }
+  | arith_expr LT   arith_expr { PLt  ($1, $3) }
+  | arith_expr GTE  arith_expr { PGte ($1, $3) }
+  | arith_expr GT   arith_expr { PGt  ($1, $3) }
+
+(* ---------- Arithmetic ---------- *)
 
 arith_expr:
   | ID
-      { A_var $1 }
+      { AVar $1 }
+
   | ID PRIME
-      { A_post_var $1 }
+      { APostVar $1 }
+
   | OLD LPAREN arith_expr RPAREN
-      { A_old $3 }
+      { AOld $3 }
+
   | INT
-      { A_int $1 }
+      { AInt $1 }
+
   | arith_expr PLUS  arith_expr
-      { A_add ($1, $3) }
+      { AAdd ($1, $3) }
+
   | arith_expr MINUS arith_expr
-      { A_sub ($1, $3) }
+      { ASub ($1, $3) }
+
   | arith_expr TIMES arith_expr
-      { A_mul ($1, $3) }
+      { AMul ($1, $3) }
+
   | arith_expr DIV   arith_expr
-      { A_div ($1, $3) }
+      { ADiv ($1, $3) }
+
   | LPAREN arith_expr RPAREN
       { $2 }
 
-(* ------------------ Sugar assertions ------------------ *)
+(* ---------- Sugar assertions ---------- *)
 
 sugar_prime_assertion:
   | sugar_prime
-      { A_sugar_prime $1 }
+      { ASugarPrime $1 }
 
 sugar_prime:
   | sugar_atom_prime
@@ -173,7 +191,7 @@ sugar_atom_prime:
 
 sugar_old_assertion:
   | sugar_old
-      { A_sugar_old $1 }
+      { ASugarOld $1 }
 
 sugar_old:
   | sugar_atom_old
@@ -185,7 +203,7 @@ sugar_atom_old:
   | LPAREN STAR ID RPAREN EQEQ OLD LPAREN STAR ID RPAREN
       { ($3, $9) }
 
-(* ------------------ Case clauses ------------------ *)
+(* ---------- Case clauses ---------- *)
 
 case:
   | assertion IMPLIES
@@ -200,15 +218,14 @@ case:
         }
       }
 
-
-    | assertion IMPLIES
+  | assertion IMPLIES
       REQ TERM LBRACK arith_expr RBRACK SEMICOLON
       ens_clause
       {
         {
           test = $1;
           term = Some (Term $6);
-          pre  = A_emp;
+          pre  = AEmp;
           post = $9.post;
         }
       }
@@ -219,12 +236,11 @@ case:
       {
         {
           test = $1;
-          term = Some Term_none;
-          pre  = A_emp;
+          term = Some TermNone;
+          pre  = AEmp;
           post = $8.post;
         }
       }
-
 
 case_list:
   | case
@@ -232,22 +248,23 @@ case_list:
   | case case_list
       { $1 :: $2 }
 
-(* ------------------ Loop sugar into Case ------------------ *)
+(* ---------- Loop sugar ---------- *)
 
 loop_req:
   | pure_atom AND TERM LBRACK arith_expr RBRACK
-      { (A_pure $1, Some (Term $5)) }
+      { (APure $1, Some (Term $5)) }
+
   | pure_atom AND TERM LBRACK RBRACK
-      { (A_pure $1, Some Term_none) }
+      { (APure $1, Some TermNone) }
 
 loop_clause:
   | REQ loop_req SEMICOLON ens_clause
       {
-        let (cond_as_assertion, term_opt) = $2 in
+        let (cond, term_opt) = $2 in
         {
-          test = cond_as_assertion;
+          test = cond;
           term = term_opt;
-          pre  = A_emp;
+          pre  = AEmp;
           post = $4.post;
         }
       }

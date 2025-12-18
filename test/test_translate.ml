@@ -4,6 +4,16 @@ let parse_spec (input : string) : Sl_ast.spec =
   let lexbuf = Lexing.from_string input in
   Sl_parser.main Sl_lexer.token lexbuf
 
+(* let normalize_newlines s =
+  s |> String.split_on_char '\r' |> String.concat ""
+
+let test_framework (input : string) (expected : string) : unit =
+  let spec = parse_spec input in
+  let actual = Translate.sl_to_acsl spec in
+  assert_equal
+    ~printer:(fun s -> "\n" ^ show_ws s ^ "\n")
+    (normalize_newlines expected)
+    (normalize_newlines actual) *)
 let test_framework (input : string) (expected : string) : unit =
   let spec = parse_spec input in
   let actual = Translate.sl_to_acsl spec in

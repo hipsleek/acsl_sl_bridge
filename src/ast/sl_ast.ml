@@ -3,43 +3,44 @@ type var = string
 type car_type = string
 type car = string
 
-type arith_expr =
-  | A_var of var
-  | A_post_var of var
-  | A_old of arith_expr
-  | A_int of int
-  | A_add of arith_expr * arith_expr
-  | A_sub of arith_expr * arith_expr
-  | A_mul of arith_expr * arith_expr
-  | A_div of arith_expr * arith_expr
-  | A_result
+type arith =
+  | AVar of var
+  | APostVar of var
+  | AOld of arith
+  | AInt of int
+  | AAdd of arith * arith
+  | ASub of arith * arith
+  | AMul of arith * arith
+  | ADiv of arith * arith
+  | AResult
 
 type pure_atom =
-  | P_eq of arith_expr * arith_expr
-  | P_neq of arith_expr * arith_expr
-  | P_lte of arith_expr * arith_expr
-  | P_lt of arith_expr * arith_expr
-  | P_gte of arith_expr * arith_expr
-  | P_gt of arith_expr * arith_expr
+  | PEq  of arith * arith
+  | PNeq of arith * arith
+  | PLte of arith * arith
+  | PLt  of arith * arith
+  | PGte of arith * arith
+  | PGt  of arith * arith
 
 type terminate_expr =
-  | Term_none
-  | Term of arith_expr
+  | TermNone
+  | Term of arith
 
 type heap_atom =
   | PointTo of ptr * car_type * car
 
 type assertion =
-  | A_emp
-  | A_heap_atom of heap_atom
-  | A_sep of assertion * assertion
-  | A_pure of pure_atom
-  | A_and of assertion * assertion
-  | A_or of assertion * assertion
-  | A_not of assertion
-  | A_implies of assertion * assertion
-  | A_sugar_prime of (ptr * ptr) list
-  | A_sugar_old of (ptr * ptr) list
+  | AEmp
+  | AHeapAtom of heap_atom
+  | ASep of assertion * assertion
+  | APure of pure_atom
+  | AAnd of assertion * assertion
+  | AOr of assertion * assertion
+  | ANot of assertion
+  | AImplies of assertion * assertion
+  (* Keep sugar (denormalised) *)
+  | ASugarPrime of (ptr * ptr) list
+  | ASugarOld of (ptr * ptr) list
 
 type base_spec = {
   pre : assertion;
@@ -49,12 +50,12 @@ type base_spec = {
 type case_spec = {
   test : assertion;
   term : terminate_expr option;
-  pre : assertion;
+  pre  : assertion;
   post : assertion;
 }
 
 type ens_spec = {
-  ret : var option;
+  ret  : var option;
   post : assertion;
 }
 

@@ -1,8 +1,22 @@
+
 open Core
 
-let string_of_heap_phase = function
-  | Pre -> "H"
-  | Post -> "H'"
+
+
+let join sep xs = String.concat sep xs
+
+let parens s = "(" ^ s ^ ")"
+
+
+
+let string_of_mode = function
+  | In -> "in"
+  | Out -> "out"
+  | InOut -> "inout"
+
+let string_of_phase = function
+  | Pre -> "pre"
+  | Post -> "post"
 
 let string_of_arith_op = function
   | Add -> "+"
@@ -10,51 +24,181 @@ let string_of_arith_op = function
   | Mul -> "*"
   | Div -> "/"
 
-let rec string_of_term = function
-  | T_var (_,x) -> x
-  | T_int n -> string_of_int n
-  | T_heap (ph, p) -> Printf.sprintf "%s(%s)" (string_of_heap_phase ph) p
-  | T_ptr p -> p
-  | T_arith (op, t1, t2) -> Printf.sprintf "%s%s%s" (string_of_term t1) (string_of_arith_op op) (string_of_term t2)
-  | T_result -> Printf.sprintf "\\result"
+let string_of_rel = function
+  | Eq -> "=="
+  | Neq -> "!="
+  | Lt -> "<"
+  | Lte -> "<="
+  | Gt -> ">"
+  | Gte -> ">="
 
-let string_of_predicate = function
-  | P_eq (t1, t2) -> Printf.sprintf "%s == %s" (string_of_term t1) (string_of_term t2)
-  | P_neq (t1, t2) -> Printf.sprintf "%s != %s" (string_of_term t1) (string_of_term t2)
-  | P_lte (t1, t2) -> Printf.sprintf "%s <= %s" (string_of_term t1) (string_of_term t2)
-  | P_lt (t1, t2) -> Printf.sprintf "%s < %s" (string_of_term t1) (string_of_term t2)
-  | P_gte (t1, t2) -> Printf.sprintf "%s >= %s" (string_of_term t1) (string_of_term t2)
-  | P_gt (t1, t2) -> Printf.sprintf "%s > %s" (string_of_term t1) (string_of_term t2)
-  | P_valid p -> Printf.sprintf "valid(%s)" p
+let string_of_binder (b : binder) : string =
+  match b.b_ty with
+  | None -> b.b_name
+  | Some ty_s -> ty_s ^ " " ^ b.b_name
 
-let string_of_mode = function
-  | In    -> "in"
-  | Out   -> "out"
-  | InOut -> "inout"
 
-let string_of_param (p : param) : string = Printf.sprintf "%s:%s" p.name (string_of_mode p.mode)
+let rec string_of_term (t : term) : string =
+  match t with
+  | TVar (_ph, x) -> x
+  | TInt n -> string_of_int n
+  | TPtr p -> p
+  | THeap (Pre, p) -> "H(" ^ p ^ ")"
+  | THeap (Post, p) -> "H'(" ^ p ^ ")"
+  | TResult -> "\\result"
+  | TArith (op, t1, t2) ->
+      let lhs = string_of_term t1 in
+      let rhs = string_of_term t2 in
+      begin match op with
+      | Add | Sub -> lhs ^ " " ^ string_of_arith_op op ^ " " ^ rhs
+      | Mul | Div -> lhs ^ string_of_arith_op op ^ rhs
+      end
+  | TApp (f, args) ->
+      f ^ parens (args |> List.map string_of_term |> join ", ")
 
-let string_of_behavior (b : behavior) : string =
-  let preds_to_str ps =
-    match ps with
-    | [] -> "true"
-    | _ -> ps |> List.map string_of_predicate |> String.concat " && "
+
+
+let string_of_atom (a : atom) : string =
+  match a with
+  | ARel (r, t1, t2) ->
+      string_of_term t1 ^ " " ^ string_of_rel r ^ " " ^ string_of_term t2
+  | APred (name, args) ->
+      name ^ parens (args |> List.map string_of_term |> join ", ")
+
+let rec string_of_predicate (p : predicate) : string =
+  match p with
+  | PTrue -> "true"
+  | PFalse -> "false"
+  | PAtom a -> string_of_atom a
+  | PNot p1 ->
+      "not " ^ parens (string_of_predicate p1)
+  | PAnd ps ->
+      begin match ps with
+      | [] -> "true"
+      | [x] -> string_of_predicate x
+      | _ -> ps |> List.map string_of_predicate |> join " && "
+      end
+  | POr ps ->
+      begin match ps with
+      | [] -> "false"
+      | [x] -> string_of_predicate x
+      | _ -> ps |> List.map string_of_predicate |> join " || "
+      end
+  | PImplies (p1, p2) ->
+      parens (string_of_predicate p1) ^ " ==> " ^ parens (string_of_predicate p2)
+  | PForall (bs, body) ->
+      "forall " ^ (bs |> List.map string_of_binder |> join ", ")
+      ^ ". " ^ string_of_predicate body
+  | PExists (bs, body) ->
+      "exists " ^ (bs |> List.map string_of_binder |> join ", ")
+      ^ ". " ^ string_of_predicate body
+
+
+
+let string_of_assignable (a : assignable) : string =
+  match a with
+  | AsVar x -> x
+  | AsHeap p -> "*" ^ p
+  | AsRange (p, lo, hi) ->
+      
+      p ^ "+(" ^ string_of_term lo ^ ".." ^ string_of_term hi ^ ")"
+  | AsTerm t ->
+      
+      "assign(" ^ string_of_term t ^ ")"
+
+let string_of_assignables (xs : assignable list) : string =
+  match xs with
+  | [] -> "{}"
+  | _ -> "{ " ^ (xs |> List.map string_of_assignable |> join ", ") ^ " }"
+
+
+
+type clause_bucket = {
+  assumes : predicate list;
+  requires : predicate list;
+  ensures : predicate list;
+  assigns : assignable list option;   
+  variant : term option;              
+}
+
+let empty_bucket =
+  { assumes = []; requires = []; ensures = []; assigns = None; variant = None }
+
+let bucket_add (b : clause_bucket) (c : clause) : clause_bucket =
+  match c with
+  | Assumes p -> { b with assumes = b.assumes @ [p] }
+  | Requires p -> { b with requires = b.requires @ [p] }
+  | Ensures p -> { b with ensures = b.ensures @ [p] }
+  | Assigns xs ->
+      
+      let merged =
+        match b.assigns with
+        | None -> xs
+        | Some ys -> ys @ xs
+      in
+      { b with assigns = Some merged }
+  | Variant t ->
+      
+      { b with variant = Some t }
+
+let bucket_of_clauses (cs : clause list) : clause_bucket =
+  List.fold_left bucket_add empty_bucket cs
+
+let conjunct (ps : predicate list) : predicate =
+  match ps with
+  | [] -> PTrue
+  | [p] -> p
+  | _ -> PAnd ps
+
+
+
+let string_of_param (p : param) : string =
+  p.name ^ ":" ^ string_of_mode p.mode
+
+let string_of_behavior (bhv : behavior) : string =
+  let b = bucket_of_clauses bhv.clauses in
+  let header =
+    match bhv.b_name with
+    | None -> ""
+    | Some n -> "behavior " ^ n ^ "\n"
   in
-  let frame_str = String.concat ", " b.frame in
-  let base = Printf.sprintf
-    "assumes %s\nrequires %s\nensures %s\nframe {%s}"
-    (preds_to_str b.assumes)
-    (preds_to_str b.requires)
-    (preds_to_str b.ensures)
-    frame_str
+  let assumes_s = "assumes " ^ string_of_predicate (conjunct b.assumes) in
+  let requires_s = "requires " ^ string_of_predicate (conjunct b.requires) in
+  let ensures_s = "ensures " ^ string_of_predicate (conjunct b.ensures) in
+  let assigns_s =
+    match b.assigns with
+    | None -> "assigns {}"
+    | Some xs -> "assigns " ^ string_of_assignables xs
   in
-  match b.variant with
-  | None -> base
-  | Some t ->
-      let variant_str = string_of_term t in
-      base ^ Printf.sprintf "\nvariant %s" variant_str
+  let variant_s =
+    match b.variant with
+    | None -> None
+    | Some t -> Some ("variant " ^ string_of_term t)
+  in
+  let lines =
+    [ Some header
+    ; Some (assumes_s ^ "\n")
+    ; Some (requires_s ^ "\n")
+    ; Some (ensures_s ^ "\n")
+    ; Some (assigns_s)
+    ; (match variant_s with None -> None | Some v -> Some ("\n" ^ v))
+    ]
+    |> List.filter_map (fun x -> x)
+  in
+  join "" lines
+
+let string_of_spec_kind = function
+  | FunctionContract -> "function"
+  | LoopContract -> "loop"
 
 let string_of_spec (s : spec) : string =
-  let params_str = s.params |> List.map string_of_param |> String.concat ", " in
-  let behaviors_str = s.behaviors |> List.map string_of_behavior |> String.concat "\n" in
-  Printf.sprintf "params (%s)\n%s" params_str behaviors_str
+  let params_s =
+    "params (" ^ (s.params |> List.map string_of_param |> join ", ") ^ ")\n"
+  in
+  let kind_s =
+    "kind " ^ string_of_spec_kind s.kind ^ "\n"
+  in
+  let behaviors_s =
+    s.behaviors |> List.map string_of_behavior |> join "\n"
+  in
+  kind_s ^ params_s ^ behaviors_s
