@@ -9,6 +9,7 @@ type term =
   | TOld of term
   | TApp of string * term list
   | TBinOp of binop * term * term
+  | TResult
 
 type predicate = term
 

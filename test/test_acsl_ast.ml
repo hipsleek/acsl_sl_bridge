@@ -149,6 +149,37 @@ let test_acsl_loop_contract_with_two_assigns_and_variant _ctx =
   test_framework expected actual
 
 
+let test_acsl_contract_with_result_ensures _ctx =
+  let c : contract =
+    {
+      requires = [];
+      assigns  = [];
+      behaviors =
+        [
+          {
+            b_name = None;
+            b_assumes = [];
+            b_ensures =
+              [
+                TBinOp
+                  ( Eq,
+                    TResult,
+                    TBinOp (Add, TOld ( TVar "a"), TInt 10) );
+              ];
+          };
+        ];
+    }
+  in
+  let actual = acsl_contract c in
+  let expected =
+"/*@
+  requires \\true;
+  assigns \\nothing;
+  ensures \\result == \\old(a) + 10;
+*/"
+  in
+  test_framework expected actual
+
 let suite =
   "acsl_ast" >::: [
     "acsl_term_var"              >:: test_acsl_term_var;
@@ -163,7 +194,9 @@ let suite =
     "acsl_contract_cases"        >:: test_acsl_contract_cases;
 
     "acsl_loop_contract_simple"  >:: test_acsl_loop_contract_simple;
-    "acsl_loop_contract_with_two_assigns_and_variant" >:: test_acsl_loop_contract_with_two_assigns_and_variant
+    "acsl_loop_contract_with_two_assigns_and_variant" >:: test_acsl_loop_contract_with_two_assigns_and_variant;
+
+    "test_acsl_contract_with_result_ensures" >:: test_acsl_contract_with_result_ensures;
   ]
 
 let () = run_test_tt_main suite

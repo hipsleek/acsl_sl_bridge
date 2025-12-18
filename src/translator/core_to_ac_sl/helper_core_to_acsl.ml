@@ -11,7 +11,8 @@ let rec acsl_term_of_core (t : term) : A.term =
   | T_heap (Post, p) -> A.TDeref (A.TVar p)
   | T_int n -> A.TInt n
   | T_ptr p -> A.TVar p
-  | T_arith (op, t1, t2) -> let op_prime =
+  | T_arith (op, t1, t2) ->
+      let op_prime =
         match op with
         | Add -> A.Add
         | Sub -> A.Sub
@@ -19,6 +20,8 @@ let rec acsl_term_of_core (t : term) : A.term =
         | Div -> A.Div
       in
       A.TBinOp (op_prime, acsl_term_of_core t1, acsl_term_of_core t2)
+  | T_result ->
+      A.TResult
 
 let acsl_pred_of_core (p : predicate) : A.predicate =
   match p with
@@ -33,6 +36,7 @@ let acsl_pred_of_core (p : predicate) : A.predicate =
 let rec vars_of_term (acc : StringSet.t) (t : A.term) : StringSet.t =
   match t with
   | A.TVar x -> StringSet.add x acc
+  | A.TResult -> acc
   | A.TInt _ -> acc
   | A.TDeref t'
   | A.TOld t' -> vars_of_term acc t'

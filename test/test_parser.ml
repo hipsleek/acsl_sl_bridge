@@ -1,3 +1,5 @@
+(* test_parser.ml *)
+
 open OUnit2
 open Sl_ast_printer
 
@@ -30,6 +32,7 @@ let test_parser_swap_spec_char _ctx =
   in
   test_framework input expected
 
+(* Sugar is now an assertion, so it must appear inside req/ens. *)
 let test_parser_swap_spec_prime_sugar _ctx =
   let input = "ens (*a)'==(*b) && (*b)'==(*a);" in
   let expected = "ens (*a)'==(*b) && (*b)'==(*a);" in
@@ -105,6 +108,11 @@ let test_parser_loop_simple_req_term_ens_conj _ctx =
   in
   test_framework input expected
 
+let test_simple_ens _ctx =
+  let input =  "ens[r] r==a+10;"  in
+  let expected = "ens[r] r==a+10;" in
+  test_framework input expected
+
 let suite =
   "sl_parser" >::: [
     "swap_spec_int"                 >:: test_parser_swap_spec_int;
@@ -117,6 +125,7 @@ let suite =
     "loop_case_two_clauses"         >:: test_parser_loop_case_two_clauses;
     "loop_case_single_clause"       >:: test_parser_loop_case_single_clause;
     "loop_simple_req_term_ens_conj" >:: test_parser_loop_simple_req_term_ens_conj;
+    "simple_ens" >:: test_simple_ens;
   ]
 
 let () = run_test_tt_main suite

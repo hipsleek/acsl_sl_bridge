@@ -16,6 +16,7 @@ let rec string_of_term = function
   | T_heap (ph, p) -> Printf.sprintf "%s(%s)" (string_of_heap_phase ph) p
   | T_ptr p -> p
   | T_arith (op, t1, t2) -> Printf.sprintf "%s%s%s" (string_of_term t1) (string_of_arith_op op) (string_of_term t2)
+  | T_result -> Printf.sprintf "\\result"
 
 let string_of_predicate = function
   | P_eq (t1, t2) -> Printf.sprintf "%s == %s" (string_of_term t1) (string_of_term t2)
