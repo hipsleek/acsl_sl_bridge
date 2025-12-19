@@ -4,27 +4,34 @@ type binop =
   | Eq | Neq | Lt | Lte | Gt | Gte
   | Add | Sub | Mul | Div
 
+type label =
+  | LoopEntry
+  | Here
+  | Old
+  | Label of string
+
 type term =
   | TVar of ident
   | TInt of int
-  | TDeref of term                
-  | TOld of term                
-  | TResult                      
-  | TApp of string * term list  
-  | TBinOp of binop * term * term 
+  | TDeref of term
+  | TOld of term
+  | TResult
+  | TApp of string * term list
+  | TBinOp of binop * term * term
+  | TAt of term * label
 
 type rel = Eq | Neq | Lt | Lte | Gt | Gte
 
 type predicate =
   | PTrue
   | PFalse
-  | PRel of rel * term * term          
-  | PApp of string * term list         
+  | PRel of rel * term * term
+  | PApp of string * term list
   | PNot of predicate
   | PAnd of predicate list
   | POr of predicate list
   | PImplies of predicate * predicate
-  | PForall of (ident * string option) list * predicate  
+  | PForall of (ident * string option) list * predicate
   | PExists of (ident * string option) list * predicate
 
 type assigns =
@@ -33,8 +40,8 @@ type assigns =
 
 type behavior = {
   b_name : string option;
-  b_assumes : predicate list;      
-  b_ensures : predicate list;      
+  b_assumes : predicate list;
+  b_ensures : predicate list;
 }
 
 type contract = {
@@ -45,6 +52,6 @@ type contract = {
 
 type loop_contract = {
   l_invariants : predicate list;
-  l_assigns : assigns;          
+  l_assigns : assigns;
   l_variant : term option;
 }

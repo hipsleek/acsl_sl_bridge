@@ -208,7 +208,23 @@ let test_acsl_loop_contract_simple _ctx =
 let test_acsl_loop_contract_with_two_assigns_and_variant _ctx =
   let lc : A.loop_contract =
     {
-      l_invariants = [ A.PRel (A.Lte, A.TVar "i", A.TInt 10) ];
+      l_invariants =
+        [
+          (* i <= 10 *)
+          A.PRel (A.Lte, A.TVar "i", A.TInt 10);
+
+          (* a == \at(a,LoopEntry) + (i-\at(i,LoopEntry)) *)
+          A.PRel
+            ( A.Eq,
+              A.TVar "a",
+              A.TBinOp
+                ( A.Add,
+                  A.TAt (A.TVar "a", A.LoopEntry),
+                  A.TBinOp
+                    ( A.Sub,
+                      A.TVar "i",
+                      A.TAt (A.TVar "i", A.LoopEntry) ) ) );
+        ];
       l_assigns = A.AList [ A.TVar "a"; A.TVar "i" ];
       l_variant = Some (A.TBinOp (A.Sub, A.TInt 10, A.TVar "i"));
     }
@@ -216,11 +232,13 @@ let test_acsl_loop_contract_with_two_assigns_and_variant _ctx =
   let expected =
     "/*@\n" ^
     "  loop invariant i <= 10;\n" ^
+    "  loop invariant a == \\at(a, LoopEntry) + (i - \\at(i, LoopEntry));\n" ^
     "  loop assigns a, i;\n" ^
     "  loop variant 10 - i;\n" ^
     "*/"
   in
   test_framework expected (acsl_loop_contract lc)
+
 
 let test_acsl_loop_contract_defaults _ctx =
   let lc : A.loop_contract =

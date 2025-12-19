@@ -4,8 +4,6 @@ let join sep xs = String.concat sep xs
 let parens s = "(" ^ s ^ ")"
 let comma_list xs = join ", " xs
 
-
-
 type prec =
   | PTop
   | PImpl
@@ -30,8 +28,6 @@ let prec_to_int = function
 
 let need_parens ctx here = prec_to_int here < prec_to_int ctx
 let with_parens_if ctx here s = if need_parens ctx here then parens s else s
-
-
 
 let string_of_binop : binop -> string = function
   | Eq -> "=="
@@ -58,7 +54,11 @@ let prec_of_binop = function
   | Mul | Div -> PMul
   | Eq | Neq | Lt | Lte | Gt | Gte -> PRel
 
-
+let string_of_label : label -> string = function
+  | LoopEntry -> "LoopEntry"
+  | Here -> "Here"
+  | Old -> "Old"
+  | Label s -> s
 
 let rec acsl_term ?(ctx=PTop) (t : term) : string =
   let (here, s) =
@@ -70,17 +70,25 @@ let rec acsl_term ?(ctx=PTop) (t : term) : string =
         (PUnary, "*" ^ acsl_term ~ctx:PUnary t1)
     | TOld t1 ->
         (PAtom, "\\old(" ^ acsl_term ~ctx:PTop t1 ^ ")")
+    | TAt (t1, lab) ->
+        (PAtom, "\\at(" ^ acsl_term ~ctx:PTop t1 ^ ", " ^ string_of_label lab ^ ")")
     | TApp (f, args) ->
         (PAtom, f ^ parens (args |> List.map (acsl_term ~ctx:PTop) |> comma_list))
+
     | TBinOp (op, t1, t2) ->
         let p = prec_of_binop op in
         let lhs = acsl_term ~ctx:p t1 in
-        let rhs = acsl_term ~ctx:p t2 in
+
+        let rhs_ctx =
+          match op, t2 with
+          | (Add | Sub), TBinOp ((Add | Sub), _, _) -> PUnary
+          | (Mul | Div), TBinOp ((Mul | Div), _, _) -> PUnary
+          | _ -> p
+        in
+        let rhs = acsl_term ~ctx:rhs_ctx t2 in
         (p, lhs ^ " " ^ string_of_binop op ^ " " ^ rhs)
   in
   with_parens_if ctx here s
-
-
 
 let prec_of_pred = function
   | PTrue | PFalse | PRel _ | PApp _ -> PAtom
@@ -139,8 +147,6 @@ let rec acsl_pred ?(ctx=PTop) (p : predicate) : string =
   in
   with_parens_if ctx here s
 
-
-
 let acsl_assigns = function
   | ANothing -> "\\nothing"
   | AList ts ->
@@ -148,8 +154,6 @@ let acsl_assigns = function
       | [] -> "\\nothing"
       | _ -> ts |> List.map (acsl_term ~ctx:PTop) |> comma_list
       end
-
-
 
 let acsl_behavior (b : behavior) : string list =
   match b.b_name with
@@ -168,8 +172,9 @@ let acsl_contract (c : contract) : string =
   let requires = c.requires |> List.map acsl_pred |> conj in
   let assigns = acsl_assigns c.assigns in
   let body = c.behaviors |> List.concat_map acsl_behavior in
-  join "\n" (["/*@"; "  requires " ^ requires ^ ";"; "  assigns " ^ assigns ^ ";"]
-             @ body @ ["*/"])
+  join "\n"
+    (["/*@"; "  requires " ^ requires ^ ";"; "  assigns " ^ assigns ^ ";"]
+     @ body @ ["*/"])
 
 let acsl_loop_contract (lc : loop_contract) : string =
   let invs =

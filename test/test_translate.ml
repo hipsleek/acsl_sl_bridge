@@ -227,6 +227,7 @@ let test_translate_for_loop _ctx =
   let expected =
     "/*@\n" ^
     "  loop invariant i <= 10;\n" ^
+    "  loop invariant a == \\at(a, LoopEntry) + (i - \\at(i, LoopEntry));\n" ^
     "  loop assigns a, i;\n" ^
     "  loop variant 10 - i;\n" ^
     "*/"
