@@ -222,13 +222,13 @@ let test_translate_loop_terminating_conj_expr _ctx =
 let test_translate_for_loop _ctx =
   let input =
     "req i<=10 && Term[10-i];\n" ^
-    "ens i'==10 && a'==a+(i'-i);"
+    "ens i'==10 && b'==b+(i'-i);"
   in
   let expected =
     "/*@\n" ^
     "  loop invariant i <= 10;\n" ^
-    "  loop invariant a == \\at(a, LoopEntry) + (i - \\at(i, LoopEntry));\n" ^
-    "  loop assigns a, i;\n" ^
+    "  loop invariant b == \\at(b, LoopEntry) + (i - \\at(i, LoopEntry));\n" ^
+    "  loop assigns b, i;\n" ^
     "  loop variant 10 - i;\n" ^
     "*/"
   in

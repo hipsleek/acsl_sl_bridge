@@ -248,12 +248,15 @@ let test_core_to_acsl_loop_term_and_effects _ctx =
                 C.Assumes (mk_lte (mk_var_post "i") (mk_int 10));
                 C.Assigns [ C.AsVar "a"; C.AsVar "i" ];
                 C.Variant (mk_sub (mk_int 10) (mk_var_post "i"));
-                
                 C.Ensures
                   (C.PAnd
                      [
                        mk_eq (mk_var_post "i") (mk_int 10);
-                       mk_eq (mk_var_post "a") (mk_var_post "a");
+                       mk_eq
+                         (mk_var_post "a")
+                         (mk_add
+                            (mk_var_pre "a")
+                            (mk_sub (mk_var_post "i") (mk_var_pre "i")));
                      ]);
               ];
           };
@@ -261,16 +264,18 @@ let test_core_to_acsl_loop_term_and_effects _ctx =
     }
   in
 
-  let actual    = Core_to_acsl.spec_to_acsl core_spec in
+  let actual = Core_to_acsl.spec_to_acsl core_spec in
 
   let expected =
     "/*@\n" ^
     "  loop invariant i <= 10;\n" ^
+    "  loop invariant a == \\at(a, LoopEntry) + (i - \\at(i, LoopEntry));\n" ^
     "  loop assigns a, i;\n" ^
     "  loop variant 10 - i;\n" ^
     "*/"
   in
   test_framework expected actual
+
 
 let test_core_to_acsl_result_ens _ctx =
   let core_spec : C.spec =
