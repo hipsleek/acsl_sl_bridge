@@ -241,7 +241,7 @@ let test_translate_ens_res _ctx =
     "/*@\n" ^
     "  requires \\true;\n" ^
     "  assigns \\nothing;\n" ^
-    "  ensures \\result == a + 10;\n" ^
+    "  ensures \\result == \\old(a) + 10;\n" ^
     "*/"
   in
   test_framework input expected
