@@ -10,36 +10,36 @@ rule token = parse
   | whitespace { token lexbuf }
   | "req" { REQ }
   | "ens" { ENS }
-  | "case" {CASE}
-  | "Term" {TERM}
+  | "case" { CASE }
+  | "Term" { TERM }
+  | "\\old" { OLD }
   | "->" { ARROW }
+  | "=>" { IMPLIES }
   | "&&" { AND }
   | "/\\" { SL_CONJ }
   | "==" { EQEQ }
   | "!=" { NEQ }
   | ">=" { GTE }
-  | ">" { GT }
   | "<=" { LTE }
+  | "**" { STAR }          
+  | ">" { GT }
   | "<" { LT }
   | '\'' { PRIME }
-  | "\\old" { OLD }
-  | '*' { STAR }
   | '(' { LPAREN }
   | ')' { RPAREN }
-  | '{' {LBRACE}
-  | '}' {RBRACE}
+  | '{' { LBRACE }
+  | '}' { RBRACE }
   | '[' { LBRACK }
   | ']' { RBRACK }
-  | "=>" {IMPLIES}
   | ';' { SEMICOLON }
-  | '-' {MINUS}
   | '+' { PLUS }
   | '-' { MINUS }
-  | '*' { TIMES }
+  | '*' { TIMES }          
   | '/' { DIV }
   | "int" { TYPE "int" }
-  | "char" { TYPE "char" } (*Is there better way to do this??*)
+  | "char" { TYPE "char" }
   | digits as d { INT (int_of_string d) }
-  | ident { ID (Lexing.lexeme lexbuf) }
+  | ident as s { ID s }
   | eof { EOF }
-  | _  {failwith ("Unknown character: " ^ Lexing.lexeme lexbuf)}
+  | _ as c
+      { failwith ("Unknown character: " ^ String.make 1 c) }

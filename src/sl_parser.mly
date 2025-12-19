@@ -4,7 +4,7 @@
 
 %token REQ ENS CASE TERM
 %token ARROW
-%token STAR
+%token STAR 
 %token AND SL_CONJ
 %token EQEQ NEQ GTE GT LTE LT
 %token PLUS MINUS TIMES DIV
@@ -17,167 +17,157 @@
 %token IMPLIES
 %token EOF
 
-%token <int>    INT
+%token <int> INT
 %token <string> ID
 %token <string> TYPE
 
 %start <Sl_ast.spec> main
-
-(* precedence (lowest to highest) *)
-%right IMPLIES
+ %right IMPLIES
 %left AND
 %left STAR
 %left PLUS MINUS
 %left TIMES DIV
-
 %%
 
 main:
   | spec EOF { $1 }
+ spec:
+  
+  | REQ sl SEMICOLON ENS sl SEMICOLON
+      {
+        {
+          ret = None;
+          behaviors = [
+            { name = None; assumes = STrue; body = [ CReq $2; CEns $5 ] }
+          ];
+        }
+      }
 
-spec:
-  | REQ assertion SEMICOLON ENS assertion SEMICOLON
-      { Simple { pre = $2; post = $5 } }
-
+  
   | ens_clause
-      { Ens $1 }
+      {
+        let (ret_opt, post) = $1 in
+        {
+          ret = ret_opt;
+          behaviors = [
+            { name = None; assumes = STrue; body = [ CEns post ] }
+          ];
+        }
+      }
 
+  
   | CASE LBRACE case_list RBRACE SEMICOLON
-      { Case $3 }
+      { { ret = None; behaviors = $3 } }
 
+  
   | loop_clause
-      { Case [ $1 ] }
+      { { ret = None; behaviors = [ $1 ] } }
 
   | loop_clause SL_CONJ loop_clause_list
-      { Case ($1 :: $3) }
+      { { ret = None; behaviors = $1 :: $3 } }
+ ens_clause:
+  | ENS sl SEMICOLON
+      { (None, $2) }
 
-(* ---------- Ens clause ---------- *)
+  | ENS LBRACK ID RBRACK sl SEMICOLON
+      { (Some $3, $5) }
+ sl:
+  | sl IMPLIES sl
+      { SImplies ($1, $3) }
 
-ens_clause:
-  | ENS assertion SEMICOLON
-      { { ret = None; post = $2 } }
+  | sl AND sl
+      { SAnd [$1; $3] }
 
-  | ENS LBRACK ID RBRACK assertion SEMICOLON
-      { { ret = Some $3; post = $5 } }
+  | sl STAR sl
+      { SSep [$1; $3] }
 
-(* ---------- Assertions ---------- *)
-
-assertion:
-  | assertion IMPLIES assertion
-      { AImplies ($1, $3) }
-
-  | assertion AND assertion
-      { AAnd ($1, $3) }
-
-  | assertion STAR assertion
-      { ASep ($1, $3) }
-
-  | assertion_atom
+  | sl_atom
       { $1 }
 
-assertion_atom:
+sl_atom:
   | heap_atom
-      { AHeapAtom $1 }
+      { SHeap $1 }
 
-  | chain_cmp
+  | cmp_sl { $1 }
+
+  | sugar_prime_sl
       { $1 }
 
-  | pure_atom
-      { APure $1 }
-
-  | sugar_prime_assertion
-      { $1 }
-
-  | sugar_old_assertion
+  | sugar_old_sl
       { $1 }
 
   | ID
       {
-        if $1 = "emp" then AEmp
-        else failwith ("Unexpected bare identifier in assertion: " ^ $1)
+        if $1 = "emp" then SEmp
+        else failwith ("Unexpected bare identifier in sl: " ^ $1)
       }
 
-  | LPAREN assertion RPAREN
+  | LPAREN sl RPAREN
       { $2 }
-
-(* ---------- Heap atoms ---------- *)
-
-heap_atom:
+ heap_atom:
+  
   | ID ARROW TYPE STAR LPAREN ID RPAREN
-      { PointTo ($1, $3, $6) }
+      { HPt { loc = EVar $1; ty = $3; value = EVar $6 } }
 
-(* ---------- Chained comparisons ---------- *)
+  
+  | ID ARROW TYPE STAR LPAREN expr RPAREN
+      { HPt { loc = EVar $1; ty = $3; value = $6 } }
+ cmp_sl:
+  | expr cmp_op expr
+      { SPure (EBinop ($2, $1, $3)) }
 
-chain_cmp:
-  | arith_expr LT  arith_expr LT  arith_expr
-      { AAnd (APure (PLt  ($1, $3)), APure (PLt  ($3, $5))) }
+  | expr cmp_op expr cmp_op expr
+      { SAnd [
+          SPure (EBinop ($2, $1, $3));
+          SPure (EBinop ($4, $3, $5));
+        ]
+      }
 
-  | arith_expr LT  arith_expr LTE arith_expr
-      { AAnd (APure (PLt  ($1, $3)), APure (PLte ($3, $5))) }
-
-  | arith_expr LTE arith_expr LT  arith_expr
-      { AAnd (APure (PLte ($1, $3)), APure (PLt  ($3, $5))) }
-
-  | arith_expr LTE arith_expr LTE arith_expr
-      { AAnd (APure (PLte ($1, $3)), APure (PLte ($3, $5))) }
-
-  | arith_expr GT  arith_expr GT  arith_expr
-      { AAnd (APure (PGt  ($1, $3)), APure (PGt  ($3, $5))) }
-
-  | arith_expr GT  arith_expr GTE arith_expr
-      { AAnd (APure (PGt  ($1, $3)), APure (PGte ($3, $5))) }
-
-  | arith_expr GTE arith_expr GT  arith_expr
-      { AAnd (APure (PGte ($1, $3)), APure (PGt  ($3, $5))) }
-
-  | arith_expr GTE arith_expr GTE arith_expr
-      { AAnd (APure (PGte ($1, $3)), APure (PGte ($3, $5))) }
-
-(* ---------- Pure atoms ---------- *)
-
-pure_atom:
-  | arith_expr EQEQ arith_expr { PEq  ($1, $3) }
-  | arith_expr NEQ  arith_expr { PNeq ($1, $3) }
-  | arith_expr LTE  arith_expr { PLte ($1, $3) }
-  | arith_expr LT   arith_expr { PLt  ($1, $3) }
-  | arith_expr GTE  arith_expr { PGte ($1, $3) }
-  | arith_expr GT   arith_expr { PGt  ($1, $3) }
-
-(* ---------- Arithmetic ---------- *)
-
-arith_expr:
+cmp_op:
+  | EQEQ { BEq }
+  | NEQ { BNeq }
+  | LT { BLt }
+  | LTE { BLe }
+  | GT { BGt }
+  | GTE { BGe }
+ expr:
   | ID
-      { AVar $1 }
+      {
+        if $1 = "\\result" then EResult else EVar $1
+      }
 
   | ID PRIME
-      { APostVar $1 }
+      { EPost (EVar $1) }
 
-  | OLD LPAREN arith_expr RPAREN
-      { AOld $3 }
+  | OLD LPAREN expr RPAREN
+      { EOld $3 }
 
   | INT
-      { AInt $1 }
+      { EConstInt $1 }
 
-  | arith_expr PLUS  arith_expr
-      { AAdd ($1, $3) }
+  | expr PLUS expr
+      { EBinop (BAdd, $1, $3) }
 
-  | arith_expr MINUS arith_expr
-      { ASub ($1, $3) }
+  | expr MINUS expr
+      { EBinop (BSub, $1, $3) }
 
-  | arith_expr TIMES arith_expr
-      { AMul ($1, $3) }
+  | expr TIMES expr
+      { EBinop (BMul, $1, $3) }
 
-  | arith_expr DIV   arith_expr
-      { ADiv ($1, $3) }
+  | expr DIV expr
+      { EBinop (BDiv, $1, $3) }
 
-  | LPAREN arith_expr RPAREN
+  | LPAREN expr RPAREN
       { $2 }
-
-(* ---------- Sugar assertions ---------- *)
-
-sugar_prime_assertion:
+ sugar_prime_sl:
   | sugar_prime
-      { ASugarPrime $1 }
+      {
+        
+        match $1 with
+        | [] -> STrue
+        | [p] -> p
+        | ps -> SAnd ps
+      }
 
 sugar_prime:
   | sugar_atom_prime
@@ -186,12 +176,21 @@ sugar_prime:
       { $1 :: $3 }
 
 sugar_atom_prime:
-  | LPAREN STAR ID RPAREN PRIME EQEQ LPAREN STAR ID RPAREN
-      { ($3, $9) }
+  | LPAREN STAR ID RPAREN PRIME EQEQ LPAREN TIMES ID RPAREN
+      {
+        let lhs = EPost (EDeref (EVar $3)) in
+        let rhs = EDeref (EVar $9) in
+        SPure (EBinop (BEq, lhs, rhs))
+      }
 
-sugar_old_assertion:
+sugar_old_sl:
   | sugar_old
-      { ASugarOld $1 }
+      {
+        match $1 with
+        | [] -> STrue
+        | [p] -> p
+        | ps -> SAnd ps
+      }
 
 sugar_old:
   | sugar_atom_old
@@ -200,73 +199,57 @@ sugar_old:
       { $1 :: $3 }
 
 sugar_atom_old:
-  | LPAREN STAR ID RPAREN EQEQ OLD LPAREN STAR ID RPAREN
-      { ($3, $9) }
-
-(* ---------- Case clauses ---------- *)
-
-case:
-  | assertion IMPLIES
-      REQ assertion SEMICOLON
-      ens_clause
+  | LPAREN STAR ID RPAREN EQEQ OLD LPAREN TIMES ID RPAREN
       {
-        {
-          test = $1;
-          term = None;
-          pre  = $4;
-          post = $6.post;
-        }
+        let lhs = EDeref (EVar $3) in
+        let rhs = EOld (EDeref (EVar $9)) in
+        SPure (EBinop (BEq, lhs, rhs))
+      }
+ case:
+  
+  | sl IMPLIES REQ sl SEMICOLON ens_clause
+      {
+        let (_ret_opt, post) = $6 in
+        { name = None; assumes = $1; body = [ CReq $4; CEns post ] }
       }
 
-  | assertion IMPLIES
-      REQ TERM LBRACK arith_expr RBRACK SEMICOLON
-      ens_clause
+  
+  | sl IMPLIES REQ TERM LBRACK expr RBRACK SEMICOLON ens_clause
       {
-        {
-          test = $1;
-          term = Some (Term $6);
-          pre  = AEmp;
-          post = $9.post;
-        }
+        (* RHS symbols:
+           1:sl 2:IMPLIES 3:REQ 4:TERM 5:LBRACK 6:expr 7:RBRACK 8:SEMICOLON 9:ens_clause *)
+        let (_ret_opt, post) = $9 in
+        { name = None; assumes = $1; body = [ CVar (Some $6); CEns post ] }
       }
 
-  | assertion IMPLIES
-      REQ TERM LBRACK RBRACK SEMICOLON
-      ens_clause
+  
+  | sl IMPLIES REQ TERM LBRACK RBRACK SEMICOLON ens_clause
       {
-        {
-          test = $1;
-          term = Some TermNone;
-          pre  = AEmp;
-          post = $8.post;
-        }
+        (* RHS symbols:
+           1:sl 2:IMPLIES 3:REQ 4:TERM 5:LBRACK 6:RBRACK 7:SEMICOLON 8:ens_clause *)
+        let (_ret_opt, post) = $8 in
+        { name = None; assumes = $1; body = [ CVar None; CEns post ] }
       }
-
-case_list:
+ case_list:
   | case
       { [$1] }
   | case case_list
       { $1 :: $2 }
+ loop_req:
+  | cmp_expr AND TERM LBRACK expr RBRACK
+      { (SPure $1, Some $5) }
+  | cmp_expr AND TERM LBRACK RBRACK
+      { (SPure $1, None) }
 
-(* ---------- Loop sugar ---------- *)
-
-loop_req:
-  | pure_atom AND TERM LBRACK arith_expr RBRACK
-      { (APure $1, Some (Term $5)) }
-
-  | pure_atom AND TERM LBRACK RBRACK
-      { (APure $1, Some TermNone) }
-
-loop_clause:
+cmp_expr:
+  | expr cmp_op expr
+      { EBinop ($2, $1, $3) }
+ loop_clause:
   | REQ loop_req SEMICOLON ens_clause
       {
-        let (cond, term_opt) = $2 in
-        {
-          test = cond;
-          term = term_opt;
-          pre  = AEmp;
-          post = $4.post;
-        }
+        let (assumes_sl, var_opt) = $2 in
+        let (_ret_opt, post) = $4 in
+        { name = None; assumes = assumes_sl; body = [ CVar var_opt; CEns post ] }
       }
 
 loop_clause_list:
