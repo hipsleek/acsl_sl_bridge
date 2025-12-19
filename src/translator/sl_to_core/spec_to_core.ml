@@ -146,9 +146,6 @@ let rec collect_heap_equalities_from_pure (s : Sl_ast.sl) : (string * string) li
 
 
 
-(* IMPORTANT FIX:
-   Only heap LOCATIONS are pointers/assignable heaps.
-   The "value" variable u/v/w is a pure value name, not a pointer. *)
 let ptrs_from_atoms (atoms : pt_atom list) : StringSet.t =
   List.fold_left (fun acc { loc; value = _ } -> StringSet.add loc acc) StringSet.empty atoms
 
