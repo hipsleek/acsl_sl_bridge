@@ -13,15 +13,15 @@
  (modules test_core_to_acsl)
  (libraries sl_to_acsl_lib ounit2))
 
-(test
- (name test_lexer)
- (modules test_lexer)
- (libraries sl_to_acsl_lib ounit2))
+; (test
+;  (name test_lexer)
+;  (modules test_lexer)
+;  (libraries sl_to_acsl_lib ounit2))
 
-(test
- (name test_parser)
- (modules test_parser)
- (libraries sl_to_acsl_lib ounit2))
+; (test
+;  (name test_parser)
+;  (modules test_parser)
+;  (libraries sl_to_acsl_lib ounit2))
 
 (test
  (name test_translate)

@@ -1,64 +1,61 @@
-type ptr = string
-type var = string
-type car_type = string
-type car = string
+ type ident = string
 
-type arith_expr =
-  | A_var of var
-  | A_post_var of var
-  | A_old of arith_expr
-  | A_int of int
-  | A_add of arith_expr * arith_expr
-  | A_sub of arith_expr * arith_expr
-  | A_mul of arith_expr * arith_expr
-  | A_div of arith_expr * arith_expr
-  | A_result
+type sort =
+  | SInt
+  | SBool
+  | SPtr
+  | SUser of string
 
-type pure_atom =
-  | P_eq of arith_expr * arith_expr
-  | P_neq of arith_expr * arith_expr
-  | P_lte of arith_expr * arith_expr
-  | P_lt of arith_expr * arith_expr
-  | P_gte of arith_expr * arith_expr
-  | P_gt of arith_expr * arith_expr
+type c_type = string  
+ type binop =
+  | BAdd | BSub | BMul | BDiv | BMod
+  | BEq | BNeq | BLt | BLe | BGt | BGe
+  | BAnd | BOr
+type unop = UNeg | UNot
 
-type terminate_expr =
-  | Term_none
-  | Term of arith_expr
+type expr =
+  | EVar of ident
+  | EConstInt of int
+  | EConstBool of bool
+  | EResult                       
+  | EUnop of unop * expr
+  | EBinop of binop * expr * expr
+  | EApp of ident * expr list   
+  | EDeref of expr                
+  | EOld of expr                
+  | EPost of expr                
+  
+ type heaplet =
+  | HPt of { loc : expr; ty : c_type; value : expr }   
+  | HPred of ident * expr list                         
 
-type heap_atom =
-  | PointTo of ptr * car_type * car
+type sl =
+  | STrue
+  | SFalse
+  | SPure of expr                     
+  | SHeap of heaplet
+  | SEmp
+  | SSep of sl list                  
+  | SAnd of sl list
+  | SOr of sl list
+  | SNot of sl
+  | SImplies of sl * sl
+  | SExists of (ident * sort option) list * sl
+  | SForall of (ident * sort option) list * sl
+ type clause =
+  | CReq of sl
+  | CEns of sl
+  | CVar of expr option
 
-type assertion =
-  | A_emp
-  | A_heap_atom of heap_atom
-  | A_sep of assertion * assertion
-  | A_pure of pure_atom
-  | A_and of assertion * assertion
-  | A_or of assertion * assertion
-  | A_not of assertion
-  | A_implies of assertion * assertion
-  | A_sugar_prime of (ptr * ptr) list
-  | A_sugar_old of (ptr * ptr) list
+type block = clause list
 
-type base_spec = {
-  pre : assertion;
-  post : assertion;
+type behavior = {
+  name : string option;
+  assumes : sl;     
+  body : block;  
 }
 
-type case_spec = {
-  test : assertion;
-  term : terminate_expr option;
-  pre : assertion;
-  post : assertion;
+type spec = {
+  ret : ident option;     
+  behaviors: behavior list;    
 }
-
-type ens_spec = {
-  ret : var option;
-  post : assertion;
-}
-
-type spec =
-  | Simple of base_spec
-  | Ens of ens_spec
-  | Case of case_spec list

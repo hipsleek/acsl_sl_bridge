@@ -1,4 +1,3 @@
-
 let read_all () : string =
   let buf = Buffer.create 256 in
   (try

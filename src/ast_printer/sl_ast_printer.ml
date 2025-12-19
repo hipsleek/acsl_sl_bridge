@@ -1,168 +1,215 @@
-open Sl_ast
+open Sl_ast  
 
-(* -------------------------------------------------------------------------- *)
-(* Arithmetic expressions                                                     *)
-(* -------------------------------------------------------------------------- *)
+type prec =
+  | PTop
+  | PImpl
+  | POr
+  | PAnd
+  | PCmp
+  | PAdd
+  | PMul
+  | PUnary
+  | PAtom
 
-(* Default printer: A_result must NOT appear here *)
-let rec string_of_arith (e : arith_expr) : string =
+let paren_if (need : bool) (s : string) : string =
+  if need then "(" ^ s ^ ")" else s
+ let string_of_binop = function
+  | BAdd -> "+" | BSub -> "-" | BMul -> "*" | BDiv -> "/" | BMod -> "%"
+  | BEq -> "=="| BNeq -> "!="| BLt -> "<" | BLe -> "<="| BGt -> ">" | BGe -> ">="
+  | BAnd -> "&&"| BOr -> "||"
+
+let string_of_unop = function
+  | UNeg -> "-" | UNot -> "!"
+
+let prec_of_binop = function
+  | BOr -> POr
+  | BAnd -> PAnd
+  | BEq | BNeq | BLt | BLe | BGt | BGe -> PCmp
+  | BAdd | BSub -> PAdd
+  | BMul | BDiv | BMod -> PMul
+
+let rec string_of_expr ?(ctx : prec = PTop) (e : expr) : string =
   match e with
-  | A_var x -> x
-  | A_post_var x -> x ^ "'"
-  | A_old e -> "\\old(" ^ string_of_arith e ^ ")"
-  | A_int n -> string_of_int n
-  | A_add (e1, e2) -> Printf.sprintf "%s+%s" (string_of_arith e1) (string_of_arith e2)
-  | A_sub (e1, e2) -> Printf.sprintf "%s-%s" (string_of_arith e1) (string_of_arith e2)
-  | A_mul (e1, e2) -> Printf.sprintf "%s*%s" (string_of_arith e1) (string_of_arith e2)
-  | A_div (e1, e2) -> Printf.sprintf "%s/%s" (string_of_arith e1) (string_of_arith e2)
-  | A_result ->
-      failwith "A_result cannot be printed outside ens[...]"
+  | EVar x -> x
+  | EConstInt n -> string_of_int n
+  | EConstBool true -> "true"
+  | EConstBool false -> "false"
+  | EResult -> "\\result"
 
-(* Binder-aware arithmetic printer *)
-let rec string_of_arith_with_ret (r : var) (e : arith_expr) : string =
-  match e with
-  | A_result -> r
-  | A_var x -> x
-  | A_post_var x -> x ^ "'"
-  | A_old e -> "\\old(" ^ string_of_arith_with_ret r e ^ ")"
-  | A_int n -> string_of_int n
-  | A_add (e1, e2) ->
-      Printf.sprintf "%s+%s"
-        (string_of_arith_with_ret r e1)
-        (string_of_arith_with_ret r e2)
-  | A_sub (e1, e2) ->
-      Printf.sprintf "%s-%s"
-        (string_of_arith_with_ret r e1)
-        (string_of_arith_with_ret r e2)
-  | A_mul (e1, e2) ->
-      Printf.sprintf "%s*%s"
-        (string_of_arith_with_ret r e1)
-        (string_of_arith_with_ret r e2)
-  | A_div (e1, e2) ->
-      Printf.sprintf "%s/%s"
-        (string_of_arith_with_ret r e1)
-        (string_of_arith_with_ret r e2)
+  | EDeref e1 ->
+      
+      let inner = string_of_expr ~ctx:PUnary e1 in
+      paren_if (ctx <> PTop && ctx <> PUnary && ctx <> PAtom) ("*" ^ inner)
 
-(* -------------------------------------------------------------------------- *)
-(* Pure atoms                                                                 *)
-(* -------------------------------------------------------------------------- *)
+  | EOld e1 ->
+      "\\old(" ^ string_of_expr ~ctx:PTop e1 ^ ")"
 
-let string_of_pure_atom (p : pure_atom) : string =
-  match p with
-  | P_eq (e1, e2) -> Printf.sprintf "%s==%s" (string_of_arith e1) (string_of_arith e2)
-  | P_neq (e1, e2) -> Printf.sprintf "%s!=%s" (string_of_arith e1) (string_of_arith e2)
-  | P_lt (e1, e2) -> Printf.sprintf "%s<%s"  (string_of_arith e1) (string_of_arith e2)
-  | P_lte (e1, e2) -> Printf.sprintf "%s<=%s" (string_of_arith e1) (string_of_arith e2)
-  | P_gt (e1, e2) -> Printf.sprintf "%s>%s"  (string_of_arith e1) (string_of_arith e2)
-  | P_gte (e1, e2) -> Printf.sprintf "%s>=%s" (string_of_arith e1) (string_of_arith e2)
-
-let string_of_pure_atom_with_ret (r : var) (p : pure_atom) : string =
-  match p with
-  | P_eq (e1, e2) -> Printf.sprintf "%s==%s"
-      (string_of_arith_with_ret r e1)
-      (string_of_arith_with_ret r e2)
-  | P_neq (e1, e2) -> Printf.sprintf "%s!=%s"
-      (string_of_arith_with_ret r e1)
-      (string_of_arith_with_ret r e2)
-  | P_lt (e1, e2) -> Printf.sprintf "%s<%s"
-      (string_of_arith_with_ret r e1)
-      (string_of_arith_with_ret r e2)
-  | P_lte (e1, e2) -> Printf.sprintf "%s<=%s"
-      (string_of_arith_with_ret r e1)
-      (string_of_arith_with_ret r e2)
-  | P_gt (e1, e2) -> Printf.sprintf "%s>%s"
-      (string_of_arith_with_ret r e1)
-      (string_of_arith_with_ret r e2)
-  | P_gte (e1, e2) -> Printf.sprintf "%s>=%s"
-      (string_of_arith_with_ret r e1)
-      (string_of_arith_with_ret r e2)
-
-(* -------------------------------------------------------------------------- *)
-(* Heap atoms and sugar                                                       *)
-(* -------------------------------------------------------------------------- *)
-
-let string_of_heap_atom = function
-  | PointTo (p, t, v) -> Printf.sprintf "%s->%s*(%s)" p t v
-
-let string_of_sugar_prime pairs =
-  pairs
-  |> List.map (fun (p,q) -> Printf.sprintf "(*%s)'==(*%s)" p q)
-  |> String.concat " && "
-
-let string_of_sugar_old pairs =
-  pairs
-  |> List.map (fun (p,q) -> Printf.sprintf "(*%s)==\\old(*%s)" p q)
-  |> String.concat " && "
-
-(* -------------------------------------------------------------------------- *)
-(* Assertions                                                                 *)
-(* -------------------------------------------------------------------------- *)
-
-let rec string_of_assertion (a : assertion) : string =
-  match a with
-  | A_emp -> "emp"
-  | A_heap_atom ha -> string_of_heap_atom ha
-  | A_pure p -> string_of_pure_atom p
-  | A_sep (a,b) -> string_of_assertion a ^ " ** " ^ string_of_assertion b
-  | A_and (a,b) -> string_of_assertion a ^ " && " ^ string_of_assertion b
-  | A_or (a,b)  -> string_of_assertion a ^ " || " ^ string_of_assertion b
-  | A_not a -> "!(" ^ string_of_assertion a ^ ")"
-  | A_implies (a,b) -> string_of_assertion a ^ " => " ^ string_of_assertion b
-  | A_sugar_prime ps -> string_of_sugar_prime ps
-  | A_sugar_old ps -> string_of_sugar_old ps
-
-let rec string_of_assertion_with_ret (r : var) (a : assertion) : string =
-  match a with
-  | A_emp -> "emp"
-  | A_heap_atom ha -> string_of_heap_atom ha
-  | A_pure p -> string_of_pure_atom_with_ret r p
-  | A_sep (a,b) -> string_of_assertion_with_ret r a ^ " ** " ^ string_of_assertion_with_ret r b
-  | A_and (a,b) -> string_of_assertion_with_ret r a ^ " && " ^ string_of_assertion_with_ret r b
-  | A_or (a,b)  -> string_of_assertion_with_ret r a ^ " || " ^ string_of_assertion_with_ret r b
-  | A_not a -> "!(" ^ string_of_assertion_with_ret r a ^ ")"
-  | A_implies (a,b) -> string_of_assertion_with_ret r a ^ " => " ^ string_of_assertion_with_ret r b
-  | A_sugar_prime ps -> string_of_sugar_prime ps
-  | A_sugar_old ps -> string_of_sugar_old ps
-
-(* -------------------------------------------------------------------------- *)
-(* Specs                                                                      *)
-(* -------------------------------------------------------------------------- *)
-
-let string_of_base_spec (s : base_spec) : string =
-  Printf.sprintf "req %s; ens %s;"
-    (string_of_assertion s.pre)
-    (string_of_assertion s.post)
-
-let string_of_sl_case (c : case_spec) : string =
-  match c.term with
-  | None ->
-      Printf.sprintf "%s => req %s; ens %s;"
-        (string_of_assertion c.test)
-        (string_of_assertion c.pre)
-        (string_of_assertion c.post)
-  | Some t ->
-      let term_str =
-        match t with
-        | Term e -> string_of_arith e
-        | Term_none -> ""
+  | EPost e1 ->
+      
+      let inner =
+        match e1 with
+        | EVar _ -> string_of_expr ~ctx:PAtom e1
+        | _ -> "(" ^ string_of_expr ~ctx:PTop e1 ^ ")"
       in
-      Printf.sprintf "%s => req Term[%s]; ens %s;"
-        (string_of_assertion c.test)
-        term_str
-        (string_of_assertion c.post)
+      inner ^ "'"
 
-let string_of_ens_spec (e : ens_spec) : string =
-  match e.ret with
-  | None ->
-      Printf.sprintf "ens %s;" (string_of_assertion e.post)
-  | Some r ->
-      Printf.sprintf "ens[%s] %s;"
-        r
-        (string_of_assertion_with_ret r e.post)
+  | EUnop (op, e1) ->
+      let s = string_of_unop op ^ string_of_expr ~ctx:PUnary e1 in
+      paren_if (ctx <> PTop && ctx <> PUnary && ctx <> PAtom) s
+
+  | EBinop (op, a, b) ->
+      let myp = prec_of_binop op in
+      let sa = string_of_expr ~ctx:myp a in
+      let sb = string_of_expr ~ctx:myp b in
+      let s = sa ^ " " ^ string_of_binop op ^ " " ^ sb in
+      
+      let need =
+        match ctx, myp with
+        | PTop, _ -> false
+        | PImpl, (POr | PAnd | PCmp | PAdd | PMul | PUnary | PAtom) -> false
+        | POr, (PAnd | PCmp | PAdd | PMul | PUnary | PAtom) -> false
+        | PAnd, (PCmp | PAdd | PMul | PUnary | PAtom) -> false
+        | PCmp, (PAdd | PMul | PUnary | PAtom) -> false
+        | PAdd, (PMul | PUnary | PAtom) -> false
+        | PMul, (PUnary | PAtom) -> false
+        | PUnary, PAtom -> false
+        | _ -> true
+      in
+      paren_if need s
+
+  | EApp (f, args) ->
+      let args_s =
+        args |> List.map (string_of_expr ~ctx:PTop) |> String.concat ", "
+      in
+      f ^ "(" ^ args_s ^ ")"
+ let string_of_sort = function
+  | SInt -> "int"
+  | SBool -> "bool"
+  | SPtr -> "ptr"
+  | SUser s -> s
+
+let string_of_binder (x, so : ident * sort option) : string =
+  match so with
+  | None -> x
+  | Some s -> x ^ ":" ^ string_of_sort s
+
+let rec string_of_sl ?(ctx : prec = PTop) (p : sl) : string =
+  match p with
+  | STrue -> "\\true"
+  | SFalse -> "\\false"
+  | SEmp -> "emp"
+
+  | SPure e ->
+      
+      string_of_expr ~ctx:ctx e
+
+  | SHeap h ->
+      string_of_heaplet h
+
+  | SSep xs ->
+      let xs' = List.filter (fun x -> x <> SEmp) xs in
+      begin match xs' with
+      | [] -> "emp"
+      | [x] -> string_of_sl ~ctx:ctx x
+      | _ ->
+          let s =
+            xs' |> List.map (string_of_sl ~ctx:PAnd) |> String.concat " ** "
+          in
+          paren_if (ctx <> PTop && ctx <> PAnd && ctx <> PAtom) s
+      end
+
+  | SAnd xs ->
+      let xs' = xs in
+      begin match xs' with
+      | [] -> "\\true"
+      | [x] -> string_of_sl ~ctx:ctx x
+      | _ ->
+          let s = xs' |> List.map (string_of_sl ~ctx:PAnd) |> String.concat " && " in
+          paren_if (ctx = POr || ctx = PImpl) s
+      end
+
+  | SOr xs ->
+      begin match xs with
+      | [] -> "\\false"
+      | [x] -> string_of_sl ~ctx:ctx x
+      | _ ->
+          let s = xs |> List.map (string_of_sl ~ctx:POr) |> String.concat " || " in
+          paren_if (ctx = PImpl) s
+      end
+
+  | SNot q ->
+      let s = "!(" ^ string_of_sl ~ctx:PTop q ^ ")" in
+      paren_if (ctx <> PTop && ctx <> PUnary && ctx <> PAtom) s
+
+  | SImplies (a, b) ->
+      let sa = string_of_sl ~ctx:PImpl a in
+      let sb = string_of_sl ~ctx:PImpl b in
+      let s = sa ^ " => " ^ sb in
+      paren_if (ctx <> PTop) s
+
+  | SExists (bs, q) ->
+      "exists " ^
+      (bs |> List.map string_of_binder |> String.concat ", ") ^
+      ". " ^ string_of_sl ~ctx:PTop q
+
+  | SForall (bs, q) ->
+      "forall " ^
+      (bs |> List.map string_of_binder |> String.concat ", ") ^
+      ". " ^ string_of_sl ~ctx:PTop q
+
+and string_of_heaplet = function
+  | HPt { loc; ty; value } ->
+      
+      let l = string_of_expr ~ctx:PAtom loc in
+      let v = string_of_expr ~ctx:PTop value in
+      l ^ "->" ^ ty ^ "*(" ^ v ^ ")"
+  | HPred (name, args) ->
+      let args_s =
+        args |> List.map (string_of_expr ~ctx:PTop) |> String.concat ", "
+      in
+      name ^ "(" ^ args_s ^ ")"
+ let string_of_clause ~(ret : ident option) (c : clause) : string =
+  match c with
+  | CReq p -> "req " ^ string_of_sl p ^ ";"
+  | CEns p ->
+      (match ret with
+       | None -> "ens " ^ string_of_sl p ^ ";"
+       | Some r -> "ens[" ^ r ^ "] " ^ string_of_sl p ^ ";")
+  | CVar None -> "req Term[];"
+  | CVar (Some e) -> "req Term[" ^ string_of_expr e ^ "];"
+
+let string_of_block ~(ret : ident option) (b : block) : string =
+  b |> List.map (string_of_clause ~ret) |> String.concat " "
+
+let string_of_behavior ~(ret : ident option) (b : behavior) : string =
+  let body_s = string_of_block ~ret b.body in
+  let guard_is_true = (b.assumes = STrue) in
+  match b.name, guard_is_true with
+  | None, true -> body_s
+  | _ ->
+      let name_prefix =
+        match b.name with
+        | None -> ""
+        | Some n -> n ^ ": "
+      in
+      name_prefix ^ string_of_sl b.assumes ^ " => " ^ body_s
 
 let string_of_spec (s : spec) : string =
-  match s with
-  | Simple bs -> string_of_base_spec bs
-  | Ens e -> string_of_ens_spec e
-  | Case cases ->
-      "case {" ^ String.concat " " (List.map string_of_sl_case cases) ^ "};"
+  let bs = s.behaviors in
+  let needs_case =
+    match bs with
+    | [] -> false
+    | [b] -> b.assumes <> STrue || b.name <> None
+    | _ -> true
+  in
+  if needs_case then
+    let body =
+      bs |> List.map (string_of_behavior ~ret:s.ret) |> String.concat " "
+    in
+    "case {" ^ body ^ "};"
+  else
+    match bs with
+    | [] -> ";"
+    | [b] -> string_of_block ~ret:s.ret b.body
+    | _ -> assert false
+

@@ -1,5 +1,5 @@
 (library
  (name core_to_ac_sl)
- (modules helper_core_to_acsl make_loop_contract make_contract_of_spec core_to_acsl)
+ (modules core_to_acsl)
  (libraries ast ast_printer)
  (wrapped false))

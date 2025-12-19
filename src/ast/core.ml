@@ -1,58 +1,77 @@
-(* the idea of this interface is generalise and distill the key information.
-so, it writes about the io variables, memory loc to be chanhged, the pre-state, the relation bw
-pre state and post state*)
-
 type ptr = string
-type ty = string
 type var = string
+type ty = string
 
-type mode = 
-  | In
-  | Out
-  | InOut
-
-type phase =
-  | Pre
-  | Post
-
-  type arith_op =
-  | Add
-  | Sub
-  | Mul
-  | Div
-
-type term =
-  | T_var of phase * var
-  | T_int of int
-  | T_heap of phase * ptr
-  | T_ptr of ptr
-  | T_arith of arith_op * term * term
-  | T_result
-
-type predicate =
-  | P_eq of term * term
-  | P_neq of term * term
-  | P_lte of term * term
-  | P_lt of term * term
-  | P_gte of term * term
-  | P_gt of term * term
-  | P_valid of ptr
+type mode = In | Out | InOut
 
 type param = {
   name : var;
-  (* ty : ty; *)
   mode : mode;
 }
 
-type behavior = {
-  assumes : predicate list; 
-  requires : predicate list;
-  ensures : predicate list;
-  frame : ptr list;
-  variant : term option;
+type phase = Pre | Post
+
+type arith_op = Add | Sub | Mul | Div
+
+type term =
+  | TVar of phase * var          
+  | TInt of int
+  | TPtr of ptr                  
+  | THeap of phase * ptr          
+  | TResult                         
+  | TArith of arith_op * term * term
+  | TApp of string * term list   
+
+
+type rel =
+  | Eq | Neq | Lt | Lte | Gt | Gte
+
+type binder = {
+  b_name : var;
+  b_ty : ty option;               
 }
 
+type atom =
+  | ARel of rel * term * term
+  | APred of string * term list     
+
+type predicate =
+  | PTrue
+  | PFalse
+  | PAtom of atom
+  | PNot of predicate
+  | PAnd of predicate list
+  | POr of predicate list
+  | PImplies of predicate * predicate
+  | PForall of binder list * predicate
+  | PExists of binder list * predicate
+
+
+type assignable =
+  | AsVar of var                 
+  | AsHeap of ptr                 
+  | AsRange of ptr * term * term   
+  | AsTerm of term                
+
+
+type clause =
+  | Assumes of predicate
+  | Requires of predicate
+  | Ensures of predicate
+  | Assigns of assignable list
+  | Variant of term
+
+type behavior = {
+  b_name : string option;         
+  clauses : clause list;
+}
+
+type spec_kind =
+  | FunctionContract
+  | LoopContract
+
 type spec = {
+  kind : spec_kind;
   params : param list;
   behaviors : behavior list;
 }

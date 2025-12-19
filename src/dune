@@ -1,7 +1,7 @@
 (library
  (name sl_to_acsl_lib)
  (modules sl_parser sl_lexer)
- (libraries ast ast_printer builder translator)
+ (libraries ast ast_printer translator)
  (wrapped false))
 
 (menhir
