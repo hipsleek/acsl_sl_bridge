@@ -1,4 +1,4 @@
-(* test/test_core_to_acsl.ml *)
+
 open OUnit2
 
 module C = Core
@@ -7,7 +7,7 @@ module A = Acsl_ast
 let test_framework (expected : string) (actual : string) : unit =
   assert_equal ~printer:(fun s -> "\n" ^ s ^ "\n") expected actual
 
-(* ---------- Builders for the *new* Core AST ---------- *)
+
 
 let mk_inout_param (name : string) : C.param =
   { C.name; mode = C.InOut }
@@ -76,7 +76,7 @@ let mk_basic_function_spec (ptrs : string list) (ens : C.predicate list) : C.spe
   in
   { C.kind = C.FunctionContract; params; behaviors = [ behavior ] }
 
-(* ---------- Unit tests (expected OUTPUTS unchanged) ---------- *)
+
 
 let test_core_to_acsl_swap _ctx =
   let ptrs = [ "a"; "b" ] in
@@ -89,11 +89,11 @@ let test_core_to_acsl_swap _ctx =
   let core_spec = mk_basic_function_spec ptrs ens in
   let actual    = Core_to_acsl.spec_to_acsl core_spec in
   let expected =
-"/*@
-  requires \\valid(a) && \\valid(b);
-  assigns *a, *b;
-  ensures *a == \\old(*b) && *b == \\old(*a);
-*/"
+    "/*@\n" ^
+    "  requires \\valid(a) && \\valid(b);\n" ^
+    "  assigns *a, *b;\n" ^
+    "  ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
+    "*/"
   in
   test_framework expected actual
 
@@ -108,11 +108,11 @@ let test_core_to_acsl_no_swap _ctx =
   let core_spec = mk_basic_function_spec ptrs ens in
   let actual    = Core_to_acsl.spec_to_acsl core_spec in
   let expected =
-"/*@
-  requires \\valid(a) && \\valid(b);
-  assigns *a, *b;
-  ensures *a == \\old(*a) && *b == \\old(*b);
-*/"
+    "/*@\n" ^
+    "  requires \\valid(a) && \\valid(b);\n" ^
+    "  assigns *a, *b;\n" ^
+    "  ensures *a == \\old(*a) && *b == \\old(*b);\n" ^
+    "*/"
   in
   test_framework expected actual
 
@@ -128,11 +128,11 @@ let test_core_to_acsl_triple_swap _ctx =
   let core_spec = mk_basic_function_spec ptrs ens in
   let actual    = Core_to_acsl.spec_to_acsl core_spec in
   let expected =
-"/*@
-  requires \\valid(a) && \\valid(b) && \\valid(c);
-  assigns *a, *b, *c;
-  ensures *a == \\old(*c) && *b == \\old(*a) && *c == \\old(*b);
-*/"
+    "/*@\n" ^
+    "  requires \\valid(a) && \\valid(b) && \\valid(c);\n" ^
+    "  assigns *a, *b, *c;\n" ^
+    "  ensures *a == \\old(*c) && *b == \\old(*a) && *c == \\old(*b);\n" ^
+    "*/"
   in
   test_framework expected actual
 
@@ -183,16 +183,16 @@ let test_core_to_acsl_case_behaviors _ctx =
 
   let actual    = Core_to_acsl.spec_to_acsl core_spec in
   let expected =
-"/*@
-  requires \\valid(a) && \\valid(b);
-  assigns *a, *b;
-  behavior case1:
-    assumes a == b;
-    ensures *a == \\old(*a);
-  behavior case2:
-    assumes a != b;
-    ensures *a == \\old(*b) && *b == \\old(*a);
-*/"
+    "/*@\n" ^
+    "  requires \\valid(a) && \\valid(b);\n" ^
+    "  assigns *a, *b;\n" ^
+    "  behavior case1:\n" ^
+    "    assumes a == b;\n" ^
+    "    ensures *a == \\old(*a);\n" ^
+    "  behavior case2:\n" ^
+    "    assumes a != b;\n" ^
+    "    ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
+    "*/"
   in
   test_framework expected actual
 
@@ -226,11 +226,11 @@ let test_core_to_acsl_loop_simple _ctx =
   let actual    = Core_to_acsl.spec_to_acsl core_spec in
 
   let expected =
-"/*@
-  loop invariant i < 30;
-  loop assigns i;
-  loop variant 30 - i;
-*/"
+    "/*@\n" ^
+    "  loop invariant i < 30;\n" ^
+    "  loop assigns i;\n" ^
+    "  loop variant 30 - i;\n" ^
+    "*/"
   in
   test_framework expected actual
 
@@ -248,7 +248,7 @@ let test_core_to_acsl_loop_term_and_effects _ctx =
                 C.Assumes (mk_lte (mk_var_post "i") (mk_int 10));
                 C.Assigns [ C.AsVar "a"; C.AsVar "i" ];
                 C.Variant (mk_sub (mk_int 10) (mk_var_post "i"));
-                (* ensures exist in Core but are ignored by loop printing in expected output *)
+                
                 C.Ensures
                   (C.PAnd
                      [
@@ -264,11 +264,11 @@ let test_core_to_acsl_loop_term_and_effects _ctx =
   let actual    = Core_to_acsl.spec_to_acsl core_spec in
 
   let expected =
-"/*@
-  loop invariant i <= 10;
-  loop assigns a, i;
-  loop variant 10 - i;
-*/"
+    "/*@\n" ^
+    "  loop invariant i <= 10;\n" ^
+    "  loop assigns a, i;\n" ^
+    "  loop variant 10 - i;\n" ^
+    "*/"
   in
   test_framework expected actual
 
@@ -295,11 +295,11 @@ let test_core_to_acsl_result_ens _ctx =
 
   let actual    = Core_to_acsl.spec_to_acsl core_spec in
   let expected =
-"/*@
-  requires \\true;
-  assigns \\nothing;
-  ensures \\result == \\old(a) + 10;
-*/"
+    "/*@\n" ^
+    "  requires \\true;\n" ^
+    "  assigns \\nothing;\n" ^
+    "  ensures \\result == \\old(a) + 10;\n" ^
+    "*/"
   in
   test_framework expected actual
 

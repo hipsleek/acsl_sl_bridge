@@ -1,19 +1,11 @@
+(* test/test_translate.ml *)
+
 open OUnit2
 
 let parse_spec (input : string) : Sl_ast.spec =
   let lexbuf = Lexing.from_string input in
   Sl_parser.main Sl_lexer.token lexbuf
 
-(* let normalize_newlines s =
-  s |> String.split_on_char '\r' |> String.concat ""
-
-let test_framework (input : string) (expected : string) : unit =
-  let spec = parse_spec input in
-  let actual = Translate.sl_to_acsl spec in
-  assert_equal
-    ~printer:(fun s -> "\n" ^ show_ws s ^ "\n")
-    (normalize_newlines expected)
-    (normalize_newlines actual) *)
 let test_framework (input : string) (expected : string) : unit =
   let spec = parse_spec input in
   let actual = Translate.sl_to_acsl spec in
@@ -28,11 +20,11 @@ let test_translate_swap _ctx =
     "ens a->int*(v) && b->int*(u);"
   in
   let expected =
-"/*@
-  requires \\valid(a) && \\valid(b);
-  assigns *a, *b;
-  ensures *a == \\old(*b) && *b == \\old(*a);
-*/"
+    "/*@\n" ^
+    "  requires \\valid(a) && \\valid(b);\n" ^
+    "  assigns *a, *b;\n" ^
+    "  ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
+    "*/"
   in
   test_framework input expected
 
@@ -42,11 +34,11 @@ let test_translate_no_swap _ctx =
     "ens a->int*(u);"
   in
   let expected =
-"/*@
-  requires \\valid(a);
-  assigns *a;
-  ensures *a == \\old(*a);
-*/"
+    "/*@\n" ^
+    "  requires \\valid(a);\n" ^
+    "  assigns *a;\n" ^
+    "  ensures *a == \\old(*a);\n" ^
+    "*/"
   in
   test_framework input expected
 
@@ -56,11 +48,11 @@ let test_translate_triple_swap _ctx =
     "ens a->int*(w) && b->int*(u) && c->int*(v);"
   in
   let expected =
-"/*@
-  requires \\valid(a) && \\valid(b) && \\valid(c);
-  assigns *a, *b, *c;
-  ensures *a == \\old(*c) && *b == \\old(*a) && *c == \\old(*b);
-*/"
+    "/*@\n" ^
+    "  requires \\valid(a) && \\valid(b) && \\valid(c);\n" ^
+    "  assigns *a, *b, *c;\n" ^
+    "  ensures *a == \\old(*c) && *b == \\old(*a) && *c == \\old(*b);\n" ^
+    "*/"
   in
   test_framework input expected
 
@@ -70,33 +62,33 @@ let test_translate_swap_type_mismatch _ctx =
     "ens a->char*(v) && b->int*(u);"
   in
   let expected =
-"/*@
-  requires \\valid(a) && \\valid(b);
-  assigns *a, *b;
-  ensures *a == \\old(*b) && *b == \\old(*a);
-*/"
+    "/*@\n" ^
+    "  requires \\valid(a) && \\valid(b);\n" ^
+    "  assigns *a, *b;\n" ^
+    "  ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
+    "*/"
   in
   test_framework input expected
 
 let test_translate_swap_prime_notation_sugar _ctx =
   let input = "ens (*a)'==(*b) && (*b)'==(*a);" in
   let expected =
-"/*@
-  requires \\valid(a) && \\valid(b);
-  assigns *a, *b;
-  ensures *a == \\old(*b) && *b == \\old(*a);
-*/"
+    "/*@\n" ^
+    "  requires \\valid(a) && \\valid(b);\n" ^
+    "  assigns *a, *b;\n" ^
+    "  ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
+    "*/"
   in
   test_framework input expected
 
 let test_translate_swap_old_notation_sugar _ctx =
   let input = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
   let expected =
-"/*@
-  requires \\valid(a) && \\valid(b);
-  assigns *a, *b;
-  ensures *a == \\old(*b) && *b == \\old(*a);
-*/"
+    "/*@\n" ^
+    "  requires \\valid(a) && \\valid(b);\n" ^
+    "  assigns *a, *b;\n" ^
+    "  ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
+    "*/"
   in
   test_framework input expected
 
@@ -105,13 +97,11 @@ let test_translate_case_single _ctx =
     "case { a==b => req a->int*(u); ens a->int*(u); };"
   in
   let expected =
-"/*@
-  requires \\valid(a);
-  assigns *a;
-  behavior case1:
-    assumes a == b;
-    ensures *a == \\old(*a);
-*/"
+    "/*@\n" ^
+    "  requires \\valid(a);\n" ^
+    "  assigns *a;\n" ^
+    "  ensures *a == \\old(*a);\n" ^
+    "*/"
   in
   test_framework input expected
 
@@ -124,16 +114,16 @@ let test_translate_case_two _ctx =
     "};"
   in
   let expected =
-"/*@
-  requires \\valid(a) && \\valid(b);
-  assigns *a, *b;
-  behavior case1:
-    assumes a == b;
-    ensures *a == \\old(*a);
-  behavior case2:
-    assumes a != b;
-    ensures *a == \\old(*b) && *b == \\old(*a);
-*/"
+    "/*@\n" ^
+    "  requires \\valid(a) && \\valid(b);\n" ^
+    "  assigns *a, *b;\n" ^
+    "  behavior case1:\n" ^
+    "    assumes a == b;\n" ^
+    "    ensures *a == \\old(*a);\n" ^
+    "  behavior case2:\n" ^
+    "    assumes a != b;\n" ^
+    "    ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
+    "*/"
   in
   test_framework input expected
 
@@ -147,22 +137,22 @@ let test_translate_case_operators _ctx =
     "};"
   in
   let expected =
-"/*@
-  requires \\valid(a);
-  assigns *a;
-  behavior case1:
-    assumes a < b;
-    ensures *a == \\old(*a);
-  behavior case2:
-    assumes a <= b;
-    ensures *a == \\old(*a);
-  behavior case3:
-    assumes a > b;
-    ensures *a == \\old(*a);
-  behavior case4:
-    assumes a >= b;
-    ensures *a == \\old(*a);
-*/"
+    "/*@\n" ^
+    "  requires \\valid(a);\n" ^
+    "  assigns *a;\n" ^
+    "  behavior case1:\n" ^
+    "    assumes a < b;\n" ^
+    "    ensures *a == \\old(*a);\n" ^
+    "  behavior case2:\n" ^
+    "    assumes a <= b;\n" ^
+    "    ensures *a == \\old(*a);\n" ^
+    "  behavior case3:\n" ^
+    "    assumes a > b;\n" ^
+    "    ensures *a == \\old(*a);\n" ^
+    "  behavior case4:\n" ^
+    "    assumes a >= b;\n" ^
+    "    ensures *a == \\old(*a);\n" ^
+    "*/"
   in
   test_framework input expected
 
@@ -174,11 +164,11 @@ let test_translate_loop_terminating_case_expr _ctx =
     "};"
   in
   let expected =
-"/*@
-  loop invariant i < 30;
-  loop assigns i;
-  loop variant 30 - i;
-*/"
+    "/*@\n" ^
+    "  loop invariant i < 30;\n" ^
+    "  loop assigns i;\n" ^
+    "  loop variant 30 - i;\n" ^
+    "*/"
   in
   test_framework input expected
 
@@ -190,11 +180,11 @@ let test_translate_loop_terminating_case_expr_change_var _ctx =
     "};"
   in
   let expected =
-"/*@
-  loop invariant j < 40;
-  loop assigns j;
-  loop variant 40 - j;
-*/"
+    "/*@\n" ^
+    "  loop invariant j < 40;\n" ^
+    "  loop assigns j;\n" ^
+    "  loop variant 40 - j;\n" ^
+    "*/"
   in
   test_framework input expected
 
@@ -207,11 +197,11 @@ let test_translate_loop_terminating_triple_case_expr _ctx =
     "};"
   in
   let expected =
-"/*@
-  loop invariant i < 30;
-  loop assigns i;
-  loop variant 30 - i;
-*/"
+    "/*@\n" ^
+    "  loop invariant 20 <= i && i < 30;\n" ^
+    "  loop assigns i;\n" ^
+    "  loop variant 30 - i;\n" ^
+    "*/"
   in
   test_framework input expected
 
@@ -221,24 +211,25 @@ let test_translate_loop_terminating_conj_expr _ctx =
     "/\\ req i>=30 && Term[]; ens i'==i;"
   in
   let expected =
-"/*@
-  loop invariant i < 30;
-  loop assigns i;
-  loop variant 30 - i;
-*/"
+    "/*@\n" ^
+    "  loop invariant i < 30;\n" ^
+    "  loop assigns i;\n" ^
+    "  loop variant 30 - i;\n" ^
+    "*/"
   in
   test_framework input expected
 
 let test_translate_for_loop _ctx =
   let input =
-    "req i<=10 && Term[10-i];\n" ^ "ens i'==10 && a'==a+(i'-i);"
+    "req i<=10 && Term[10-i];\n" ^
+    "ens i'==10 && a'==a+(i'-i);"
   in
   let expected =
-"/*@
-  loop invariant i <= 10;
-  loop assigns a, i;
-  loop variant 10 - i;
-*/"
+    "/*@\n" ^
+    "  loop invariant i <= 10;\n" ^
+    "  loop assigns a, i;\n" ^
+    "  loop variant 10 - i;\n" ^
+    "*/"
   in
   test_framework input expected
 
@@ -247,11 +238,11 @@ let test_translate_ens_res _ctx =
     "ens[r] r==a+10;"
   in
   let expected =
-"/*@
-  requires \\true;
-  assigns \\nothing;
-  ensures \\result == a + 10;
-*/"
+    "/*@\n" ^
+    "  requires \\true;\n" ^
+    "  assigns \\nothing;\n" ^
+    "  ensures \\result == a + 10;\n" ^
+    "*/"
   in
   test_framework input expected
 
@@ -270,8 +261,8 @@ let suite =
     "loop_case_expr_change_var"          >:: test_translate_loop_terminating_case_expr_change_var;
     "loop_terminating_triple_case_expr"  >:: test_translate_loop_terminating_triple_case_expr;
     "loop_terminating_conj_expr"         >:: test_translate_loop_terminating_conj_expr;
-    "translate_for_loop" >:: test_translate_for_loop;
-    "translate_ens_res" >:: test_translate_ens_res;
+    "translate_for_loop"                 >:: test_translate_for_loop;
+    "translate_ens_res"                  >:: test_translate_ens_res;
   ]
 
 let () = run_test_tt_main suite

@@ -1,45 +1,69 @@
 {
-open Sl_parser
+  open Sl_parser
 }
 
 let whitespace = [' ' '\t' '\r' '\n']+
-let ident = ['a'-'z' 'A'-'Z' '_']['a'-'z' 'A'-'Z' '0'-'9' '_']*
 let digits = ['0'-'9']+
+let ident_start = ['a'-'z' 'A'-'Z' '_']
+let ident_char  = ['a'-'z' 'A'-'Z' '0'-'9' '_']
+let ident = ident_start ident_char*
 
 rule token = parse
   | whitespace { token lexbuf }
-  | "req" { REQ }
-  | "ens" { ENS }
+
+  
+  | "req"  { REQ }
+  | "ens"  { ENS }
   | "case" { CASE }
   | "Term" { TERM }
+
+  
+  | "int"    { TYPE "int" }
+  | "char"   { TYPE "char" }
+  | "bool"   { TYPE "bool" }
+  | "void"   { TYPE "void" }
+  | "long"   { TYPE "long" }
+  | "short"  { TYPE "short" }
+  | "float"  { TYPE "float" }
+  | "double" { TYPE "double" }
+
+  
+  | "=>"   { IMPLIES }
+  | "->"   { ARROW }
+
+  | "/\\"  { SL_CONJ }
+  | "&&"   { AND }
+
+  | "=="   { EQEQ }
+  | "!="   { NEQ }
+  | ">="   { GTE }
+  | ">"    { GT }
+  | "<="   { LTE }
+  | "<"    { LT }
+
+  | "+"    { PLUS }
+  | "-"    { MINUS }
+  | "*"    { STAR }
+  | "/"    { DIV }
+
   | "\\old" { OLD }
-  | "->" { ARROW }
-  | "=>" { IMPLIES }
-  | "&&" { AND }
-  | "/\\" { SL_CONJ }
-  | "==" { EQEQ }
-  | "!=" { NEQ }
-  | ">=" { GTE }
-  | "<=" { LTE }
-  | "**" { STAR }          
-  | ">" { GT }
-  | "<" { LT }
-  | '\'' { PRIME }
-  | '(' { LPAREN }
-  | ')' { RPAREN }
-  | '{' { LBRACE }
-  | '}' { RBRACE }
-  | '[' { LBRACK }
-  | ']' { RBRACK }
-  | ';' { SEMICOLON }
-  | '+' { PLUS }
-  | '-' { MINUS }
-  | '*' { TIMES }          
-  | '/' { DIV }
-  | "int" { TYPE "int" }
-  | "char" { TYPE "char" }
-  | digits as d { INT (int_of_string d) }
+  | "'"     { PRIME }
+
+  | "(" { LPAREN }
+  | ")" { RPAREN }
+  | "{" { LBRACE }
+  | "}" { RBRACE }
+  | "[" { LBRACK }
+  | "]" { RBRACK }
+  | ";" { SEMICOLON }
+
+  
+  | digits as n { INT (int_of_string n) }
+
+  
   | ident as s { ID s }
+
   | eof { EOF }
+
   | _ as c
-      { failwith ("Unknown character: " ^ String.make 1 c) }
+      { failwith (Printf.sprintf "Unexpected character: %c" c) }
