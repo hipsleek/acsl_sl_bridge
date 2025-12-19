@@ -35,12 +35,12 @@ let test_parser_swap_spec_char _ctx =
 (* Sugar is now an assertion, so it must appear inside req/ens. *)
 let test_parser_swap_spec_prime_sugar _ctx =
   let input = "ens (*a)'==(*b) && (*b)'==(*a);" in
-  let expected = "ens (*a)'==(*b) && (*b)'==(*a);" in
+  let expected = "ens (*a)' == (*b) && (*b)' == (*a);" in
   test_framework input expected
 
 let test_parser_swap_spec_old_sugar _ctx =
   let input = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
-  let expected = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
+  let expected = "ens (*a) == \\old(*b) && (*b) == \\old(*a);" in
   test_framework input expected
 
 let test_parser_case_post_var _ctx =
@@ -50,7 +50,7 @@ let test_parser_case_post_var _ctx =
     "};"
   in
   let expected =
-    "case {i'==30 => req a->int*(u); ens a->int*(u);};"
+    "case {i' == 30 => req a->int*(u); ens a->int*(u);};"
   in
   test_framework input expected
 
@@ -61,7 +61,7 @@ let test_parser_case_old_var _ctx =
     "};"
   in
   let expected =
-    "case {i==\\old(i) => req a->int*(u); ens a->int*(u);};"
+    "case {i == \\old(i) => req a->int*(u); ens a->int*(u);};"
   in
   test_framework input expected
 
@@ -73,8 +73,7 @@ let test_parser_eq_neq _ctx =
     "};"
   in
   let expected =
-    "case {a==b => req a->int*(u); ens a->int*(u); " ^
-    "a!=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
+    "case {a == b => req a->int*(u); ens a->int*(u); a != b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);};"
   in
   test_framework input expected
 
@@ -85,8 +84,7 @@ let test_parser_loop_case_two_clauses _ctx =
     "req i>=30 && Term[]; ens i'==i;"
   in
   let expected =
-    "case {i<30 => req Term[30-i]; ens i'==30; " ^
-    "i>=30 => req Term[]; ens i'==i;};"
+    "case {i < 30 => req Term[30 - i]; ens i' == 30; i >= 30 => req Term[]; ens i' == i;};"
   in
   test_framework input expected
 
@@ -95,7 +93,7 @@ let test_parser_loop_case_single_clause _ctx =
     "req i<30 && Term[30-i]; ens i'==30;"
   in
   let expected =
-    "case {i<30 => req Term[30-i]; ens i'==30;};"
+    "case {i < 30 => req Term[30 - i]; ens i' == 30;};"
   in
   test_framework input expected
 
@@ -104,13 +102,13 @@ let test_parser_loop_simple_req_term_ens_conj _ctx =
     "req i<=10 && Term[10-i]; ens i'==10 && a'==a;"
   in
   let expected =
-    "case {i<=10 => req Term[10-i]; ens i'==10 && a'==a;};"
+    "case {i <= 10 => req Term[10 - i]; ens i' == 10 && a' == a;};"
   in
   test_framework input expected
 
 let test_simple_ens _ctx =
-  let input =  "ens[r] r==a+10;"  in
-  let expected = "ens[r] r==a+10;" in
+  let input =  "ens[r] r == a + 10;"  in
+  let expected = "ens[r] r == a + 10;" in
   test_framework input expected
 
 let suite =
