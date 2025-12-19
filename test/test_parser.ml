@@ -1,5 +1,3 @@
-(* test_parser.ml *)
-
 open OUnit2
 open Sl_ast_printer
 
@@ -32,8 +30,7 @@ let test_parser_swap_spec_char _ctx =
   in
   test_framework input expected
 
-(* Sugar is now an assertion, so it must appear inside req/ens. *)
-let test_parser_swap_spec_prime_sugar _ctx =
+  let test_parser_swap_spec_prime_sugar _ctx =
   let input = "ens (*a)'==(*b) && (*b)'==(*a);" in
   let expected = "ens (*a)' == (*b) && (*b)' == (*a);" in
   test_framework input expected
