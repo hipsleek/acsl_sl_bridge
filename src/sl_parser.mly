@@ -1,14 +1,15 @@
-/* sl_parser.mly */
+/* src/sl_parser.mly */
 %{
   open Sl_ast
 %}
 
 %token REQ ENS CASE TERM
+%token TERM_AND            /* NEW: produced by lexer for "&& Term" */
 %token ARROW
 %token STAR
 %token AND SL_CONJ
 %token EQEQ NEQ GTE GT LTE LT
-%token PLUS MINUS TIMES DIV
+%token PLUS MINUS DIV
 %token PRIME
 %token OLD
 %token LPAREN RPAREN
@@ -24,24 +25,18 @@
 
 %start <Sl_ast.spec> main
 
-
 %right IMPLIES
 %left AND
 %left STAR
 %left PLUS MINUS
-%left TIMES DIV
-
-
-%nonassoc PRIME_POST
-%nonassoc DEREF
-
+%left DIV
 %%
 
 main:
   | spec EOF { $1 }
 
+
 spec:
-  
   | REQ sl SEMICOLON ENS sl SEMICOLON
       {
         {
@@ -52,7 +47,6 @@ spec:
         }
       }
 
-  
   | ens_clause
       {
         let (ret_opt, post) = $1 in
@@ -64,16 +58,12 @@ spec:
         }
       }
 
-  
   | CASE LBRACE case_list RBRACE SEMICOLON
       { { ret = None; behaviors = $3 } }
 
-  
-  | loop_clause
-      { { ret = None; behaviors = [ $1 ] } }
+  | loop_clause_list
+      { { ret = None; behaviors = $1 } }
 
-  | loop_clause SL_CONJ loop_clause_list
-      { { ret = None; behaviors = $1 :: $3 } }
 
 ens_clause:
   | ENS sl SEMICOLON
@@ -112,12 +102,14 @@ sl_atom:
   | LPAREN sl RPAREN
       { $2 }
 
+
 heap_atom:
   | ID ARROW TYPE STAR LPAREN ID RPAREN
       { HPt { loc = EVar $1; ty = $3; value = EVar $6 } }
 
   | ID ARROW TYPE STAR LPAREN expr RPAREN
       { HPt { loc = EVar $1; ty = $3; value = $6 } }
+
 
 cmp_sl:
   | expr cmp_op expr
@@ -144,17 +136,13 @@ expr:
   | ID
       { if $1 = "\\result" then EResult else EVar $1 }
 
-  
   | expr PRIME
-      %prec PRIME_POST
       { EPost $1 }
 
   | OLD LPAREN expr RPAREN
       { EOld $3 }
 
-  
   | STAR expr
-      %prec DEREF
       { EDeref $2 }
 
   | INT
@@ -166,15 +154,11 @@ expr:
   | expr MINUS expr
       { EBinop (BSub, $1, $3) }
 
-  | expr TIMES expr
-      { EBinop (BMul, $1, $3) }
-
   | expr DIV expr
       { EBinop (BDiv, $1, $3) }
 
   | LPAREN expr RPAREN
       { $2 }
-
 
 case:
   | sl IMPLIES REQ sl SEMICOLON ens_clause
@@ -201,16 +185,11 @@ case_list:
   | case case_list
       { $1 :: $2 }
 
-
-loop_req:
-  | cmp_expr AND TERM LBRACK expr RBRACK
-      { (SPure $1, Some $5) }
-  | cmp_expr AND TERM LBRACK RBRACK
-      { (SPure $1, None) }
-
-cmp_expr:
-  | expr cmp_op expr
-      { EBinop ($2, $1, $3) }
+loop_clause_list:
+  | loop_clause
+      { [$1] }
+  | loop_clause SL_CONJ loop_clause_list
+      { $1 :: $3 }
 
 loop_clause:
   | REQ loop_req SEMICOLON ens_clause
@@ -220,8 +199,13 @@ loop_clause:
         { name = None; assumes = assumes_sl; body = [ CVar var_opt; CEns post ] }
       }
 
-loop_clause_list:
-  | loop_clause
-      { [$1] }
-  | loop_clause SL_CONJ loop_clause_list
-      { $1 :: $3 }
+loop_req:
+  | cmp_expr TERM_AND LBRACK expr RBRACK
+      { (SPure $1, Some $4) }
+
+  | cmp_expr TERM_AND LBRACK RBRACK
+      { (SPure $1, None) }
+
+cmp_expr:
+  | expr cmp_op expr
+      { EBinop ($2, $1, $3) }

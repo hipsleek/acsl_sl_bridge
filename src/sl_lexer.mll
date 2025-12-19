@@ -11,13 +11,12 @@ let ident = ident_start ident_char*
 rule token = parse
   | whitespace { token lexbuf }
 
-  
+  (* keywords *)
   | "req"  { REQ }
   | "ens"  { ENS }
   | "case" { CASE }
-  | "Term" { TERM }
 
-  
+  (* types *)
   | "int"    { TYPE "int" }
   | "char"   { TYPE "char" }
   | "bool"   { TYPE "bool" }
@@ -27,13 +26,22 @@ rule token = parse
   | "float"  { TYPE "float" }
   | "double" { TYPE "double" }
 
-  
+  (* IMPORTANT:
+     recognize "&&   Term" as one token to avoid parser conflicts *)
+  | "&&" [' ' '\t' '\r' '\n']* "Term" { TERM_AND }
+
+  (* standalone keyword (still needed e.g. case branches) *)
+  | "Term" { TERM }
+
+  (* arrows / implications *)
   | "=>"   { IMPLIES }
   | "->"   { ARROW }
 
+  (* SL conjunction *)
   | "/\\"  { SL_CONJ }
-  | "&&"   { AND }
 
+  (* boolean and comparison ops *)
+  | "&&"   { AND }
   | "=="   { EQEQ }
   | "!="   { NEQ }
   | ">="   { GTE }
@@ -41,14 +49,17 @@ rule token = parse
   | "<="   { LTE }
   | "<"    { LT }
 
+  (* arithmetic *)
   | "+"    { PLUS }
   | "-"    { MINUS }
   | "*"    { STAR }
   | "/"    { DIV }
 
+  (* old / prime *)
   | "\\old" { OLD }
   | "'"     { PRIME }
 
+  (* punctuation *)
   | "(" { LPAREN }
   | ")" { RPAREN }
   | "{" { LBRACE }
@@ -57,10 +68,10 @@ rule token = parse
   | "]" { RBRACK }
   | ";" { SEMICOLON }
 
-  
+  (* literals *)
   | digits as n { INT (int_of_string n) }
 
-  
+  (* identifiers *)
   | ident as s { ID s }
 
   | eof { EOF }

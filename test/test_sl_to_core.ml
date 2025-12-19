@@ -173,7 +173,7 @@ let test_sl_to_core_case_swap _ctx =
   in
   test_framework expected actual
 
-(* let test_sl_to_core_loop_case_term _ctx =
+let test_sl_to_core_loop_case_term _ctx =
   let input =
     "req i<30 && Term[30-i]; ens i'==30;\n" ^
     "/\\ req i>=30 && Term[]; ens i'==i;"
@@ -181,8 +181,22 @@ let test_sl_to_core_case_swap _ctx =
   let sl_spec = parse_spec input in
   let core_spec = Spec_to_core.sl_to_core sl_spec in
   let actual = Core_printer.string_of_spec core_spec in
-  (* Update once loop lowering is implemented *)
-  test_framework actual actual
+  let expected =
+    "kind(loop)\n" ^
+    "params()\n" ^
+    "behavior case1:\n" ^
+    "  assumes i < 30\n" ^
+    "  requires true\n" ^
+    "  ensures i' == 30\n" ^
+    "  assigns { i }\n" ^
+    "  variant 30 - i\n\n" ^
+    "behavior case2:\n" ^
+    "  assumes i >= 30\n" ^
+    "  requires true\n" ^
+    "  ensures i' == i\n" ^
+    "  assigns { i }"
+  in
+  test_framework expected actual
 
 let test_sl_to_core_loop_simple_term_and_frame _ctx =
   let input =
@@ -191,16 +205,34 @@ let test_sl_to_core_loop_simple_term_and_frame _ctx =
   let sl_spec = parse_spec input in
   let core_spec = Spec_to_core.sl_to_core sl_spec in
   let actual = Core_printer.string_of_spec core_spec in
-  (* Update once loop lowering is implemented *)
-  test_framework actual actual
+  let expected =
+    "kind(loop)\n" ^
+    "params()\n" ^
+    "behavior <anon>:\n" ^
+    "  assumes i <= 10\n" ^
+    "  requires true\n" ^
+    "  ensures i' == 10 && a' == a\n" ^
+    "  assigns { a, i }\n" ^
+    "  variant 10 - i"
+  in
+  test_framework expected actual
 
 let test_sl_to_core_ens_result _ctx =
   let input = "ens[r] r==a+10;" in
   let sl_spec = parse_spec input in
   let core_spec = Spec_to_core.sl_to_core sl_spec in
   let actual = Core_printer.string_of_spec core_spec in
-  (* Update once ens[r] -> \\result lowering is implemented *)
-  test_framework actual actual *)
+  let expected =
+    "kind(function)\n" ^
+    "params()\n" ^
+    "behavior <anon>:\n" ^
+    "  assumes true\n" ^
+    "  requires true\n" ^
+    "  ensures \\result == a + 10\n" ^
+    "  assigns {}"
+  in
+  test_framework expected actual
+
 
 let suite =
   "sl_to_core" >::: [
@@ -211,9 +243,9 @@ let suite =
     "swap_prime_sugar"   >:: test_sl_to_core_swap_prime_sugar;
     "swap_old_sugar"     >:: test_sl_to_core_swap_old_sugar;
     "case_swap"          >:: test_sl_to_core_case_swap;
-    (* "test_sl_to_core_loop_case_term" >:: test_sl_to_core_loop_case_term;
+    "test_sl_to_core_loop_case_term" >:: test_sl_to_core_loop_case_term;
     "test_sl_to_core_loop_simple_term_and_frame" >:: test_sl_to_core_loop_simple_term_and_frame;
-    "test_sl_to_core_ens_result" >:: test_sl_to_core_ens_result; *)
+    "test_sl_to_core_ens_result" >:: test_sl_to_core_ens_result;
   ]
 
 let () = run_test_tt_main suite
