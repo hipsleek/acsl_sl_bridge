@@ -1,15 +1,10 @@
-(* acsl_ast_printer.ml
-   Printer for final ACSL AST.
-   Goal: precedence-correct printing for terms/predicates + contract rendering.
-*)
-
 open Acsl_ast
 
 let join sep xs = String.concat sep xs
 let parens s = "(" ^ s ^ ")"
 let comma_list xs = join ", " xs
 
-(* ---------- Precedence ---------- *)
+
 
 type prec =
   | PTop
@@ -36,7 +31,7 @@ let prec_to_int = function
 let need_parens ctx here = prec_to_int here < prec_to_int ctx
 let with_parens_if ctx here s = if need_parens ctx here then parens s else s
 
-(* ---------- Operators ---------- *)
+
 
 let string_of_binop : binop -> string = function
   | Eq -> "=="
@@ -63,7 +58,7 @@ let prec_of_binop = function
   | Mul | Div -> PMul
   | Eq | Neq | Lt | Lte | Gt | Gte -> PRel
 
-(* ---------- Terms ---------- *)
+
 
 let rec acsl_term ?(ctx=PTop) (t : term) : string =
   let (here, s) =
@@ -85,7 +80,7 @@ let rec acsl_term ?(ctx=PTop) (t : term) : string =
   in
   with_parens_if ctx here s
 
-(* ---------- Predicates ---------- *)
+
 
 let prec_of_pred = function
   | PTrue | PFalse | PRel _ | PApp _ -> PAtom
@@ -144,7 +139,7 @@ let rec acsl_pred ?(ctx=PTop) (p : predicate) : string =
   in
   with_parens_if ctx here s
 
-(* ---------- Assigns ---------- *)
+
 
 let acsl_assigns = function
   | ANothing -> "\\nothing"
@@ -154,7 +149,7 @@ let acsl_assigns = function
       | _ -> ts |> List.map (acsl_term ~ctx:PTop) |> comma_list
       end
 
-(* ---------- Renderers (contracts) ---------- *)
+
 
 let acsl_behavior (b : behavior) : string list =
   match b.b_name with

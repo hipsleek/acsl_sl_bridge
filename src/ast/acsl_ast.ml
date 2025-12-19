@@ -1,12 +1,8 @@
-
-
 type ident = string
 
 type binop =
   | Eq | Neq | Lt | Lte | Gt | Gte
   | Add | Sub | Mul | Div
-
-
 
 type term =
   | TVar of ident
@@ -16,7 +12,6 @@ type term =
   | TResult                      
   | TApp of string * term list  
   | TBinOp of binop * term * term 
-
 
 type rel = Eq | Neq | Lt | Lte | Gt | Gte
 
@@ -31,8 +26,6 @@ type predicate =
   | PImplies of predicate * predicate
   | PForall of (ident * string option) list * predicate  
   | PExists of (ident * string option) list * predicate
-
-
 
 type assigns =
   | ANothing
