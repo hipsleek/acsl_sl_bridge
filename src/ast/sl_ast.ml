@@ -25,9 +25,10 @@ type expr =
   | EOld of expr                
   | EPost of expr                
   
- type heaplet =
-  | HPt of { loc : expr; ty : c_type; value : expr }   
-  | HPred of ident * expr list                         
+type heaplet =
+  | HPt of { loc : expr; ty : c_type; value : expr }
+  | HPred of ident * expr list
+  | HRange of { loc : expr; ty : c_type; lo : expr; hi : expr }                   
 
 type sl =
   | STrue

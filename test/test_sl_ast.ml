@@ -272,7 +272,7 @@ let test_loop_single_req_ens_conj_post _ =
       [ term (Some (sub (i 10) (v "i"))); ens post_conj ]
   in
   let expected =
-    "case {i <= 10 => req Term[10 - i]; ens i' == 10 && a' == a + (i' - i);};"
+    "case {i <= 10 => req Term[10 - i]; ens i' == 10 && a' == a + i' - i;};"
   in
   test_framework expected (string_of_spec { ret = None; behaviors = [ b ] })
  let test_ens_result_binder _ =
@@ -313,7 +313,7 @@ let test_loop_case_with_forall_index_variant _ =
       ]
   in
   test_framework
-    "case {0 <= i && i <= length && forall j:size_t. (0 <= j && j < i) => (*(array + j)) != element => req Term[length - i]; ens \\true;};"
+    "case {0 <= i && i <= length && \\forall j:size_t. (0 <= j && j < i) => (*(array + j)) != element => req Term[length - i]; ens \\true;};"
     (string_of_spec { ret = None; behaviors = [ b ] })
 
 let suite =
