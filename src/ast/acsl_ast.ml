@@ -19,6 +19,7 @@ type term =
   | TApp of string * term list
   | TBinOp of binop * term * term
   | TAt of term * label
+  | TIndex of term * term
 
 type rel = Eq | Neq | Lt | Lte | Gt | Gte
 

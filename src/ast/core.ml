@@ -20,8 +20,9 @@ type term =
   | THeap of phase * ptr          
   | TResult                         
   | TArith of arith_op * term * term
-  | TApp of string * term list   
-
+  | TApp of string * term list
+  | TIndex of phase * term * term
+  | TLoad of phase * term
 
 type rel =
   | Eq | Neq | Lt | Lte | Gt | Gte

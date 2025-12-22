@@ -66,6 +66,8 @@ let rec acsl_term ?(ctx=PTop) (t : term) : string =
     | TVar x -> (PAtom, x)
     | TInt n -> (PAtom, string_of_int n)
     | TResult -> (PAtom, "\\result")
+    | TIndex (arr, idx) ->
+      (PAtom, acsl_term ~ctx:PAtom arr ^ "[" ^ acsl_term ~ctx:PTop idx ^ "]")
     | TDeref t1 ->
         (PUnary, "*" ^ acsl_term ~ctx:PUnary t1)
     | TOld t1 ->

@@ -254,6 +254,51 @@ let test_core_spec_kind_is_printed _ =
     "Expected FunctionContract and LoopContract to print differently"
     (string_of_spec s1 <> string_of_spec s2)
 
+let test_core_string_of_spec_forall_index_loop_like _ =
+  let bhv =
+    mk_behavior
+      [
+        (* assumes 0 <= i && i <= length *)
+        C.Assumes
+          (C.PAnd
+             [
+               pred_rel C.Lte (C.TInt 0) (tvar_post "i");
+               pred_rel C.Lte (tvar_post "i") (tvar_post "length");
+             ]);
+
+        (* assumes forall size_t j. (0<=j && j<i) ==> array[j] != element *)
+        C.Assumes
+          (C.PForall
+             ( [ { C.b_name = "j"; b_ty = Some "size_t" } ],
+               C.PImplies
+                 ( C.PAnd
+                     [
+                       pred_rel C.Lte (C.TInt 0) (tvar_post "j");
+                       pred_rel C.Lt (tvar_post "j") (tvar_post "i");
+                     ],
+                   C.PAtom
+                     (C.ARel
+                        ( C.Neq,
+                          (* FIX: array is a term now, not a string *)
+                          C.TIndex (C.Post, tvar_post "array", tvar_post "j"),
+                          tvar_post "element" )) ) ));
+
+        (* variant length - i *)
+        C.Variant (C.TArith (C.Sub, tvar_post "length", tvar_post "i"));
+      ]
+  in
+  let spec = mk_spec [] [ bhv ] in
+  let expected =
+    "kind(function)\n" ^
+    "params()\n" ^
+    "behavior <anon>:\n" ^
+    "  assumes 0 <= i' && i' <= length'\n" ^
+    "  assumes forall size_t j. (0 <= j' && j' < i') ==> (array'[j'] != element')\n" ^
+    "  variant length' - i'"
+  in
+  test_framework expected (string_of_spec spec)
+
+
 let suite =
   "core printer tests" >::: [
     "term_heap_pre" >:: test_core_string_of_term_heap_pre;
@@ -289,6 +334,8 @@ let suite =
 
     "behavior_name_print" >:: test_core_behavior_name_print;
     "spec_kind_is_printed" >:: test_core_spec_kind_is_printed;
+
+    "test_core_string_of_spec_forall_index_loop_like" >:: test_core_string_of_spec_forall_index_loop_like;
   ]
 
 let () = run_test_tt_main suite
