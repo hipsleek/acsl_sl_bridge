@@ -57,18 +57,40 @@ let rec term_of_expr (default_phase : C.phase) (e : Sl_ast.expr) : C.term =
   | EConstInt n -> C.TInt n
   | EConstBool b -> C.TApp ((if b then "true" else "false"), [])
   | EResult -> C.TResult
-  | EUnop (_op, e1) -> C.TApp ("unop", [ term_of_expr default_phase e1 ])
-  | EApp (f, args) -> C.TApp (f, List.map (term_of_expr default_phase) args)
-  | EDeref (EVar p) -> C.THeap (default_phase, p)
-  | EDeref e1 -> C.TApp ("deref", [ term_of_expr default_phase e1 ])
-  | EOld e1 -> term_of_expr C.Pre e1
-  | EPost e1 -> term_of_expr C.Post e1
+
+  | EUnop (_op, e1) ->
+      C.TApp ("unop", [ term_of_expr default_phase e1 ])
+
+  | EApp (f, args) ->
+      C.TApp (f, List.map (term_of_expr default_phase) args)
+
+  | EDeref (EBinop (BAdd, base, idx)) ->
+      C.TIndex
+        ( default_phase
+        , term_of_expr default_phase base
+        , term_of_expr default_phase idx )
+
+  | EDeref e1 ->
+      C.TLoad (default_phase, term_of_expr default_phase e1)
+
+  | EOld e1 ->
+      term_of_expr C.Pre e1
+
+  | EPost e1 ->
+      term_of_expr C.Post e1
+
   | EBinop (op, e1, e2) -> (
       match arith_of_binop op with
       | Some aop ->
-          C.TArith (aop, term_of_expr default_phase e1, term_of_expr default_phase e2)
+          C.TArith
+            ( aop
+            , term_of_expr default_phase e1
+            , term_of_expr default_phase e2 )
       | None ->
-          C.TApp ("binop", [ term_of_expr default_phase e1; term_of_expr default_phase e2 ])
+          C.TApp
+            ( "binop"
+            , [ term_of_expr default_phase e1
+              ; term_of_expr default_phase e2 ] )
     )
 
 let pred_of_cmp_expr (default_phase : C.phase) (e : Sl_ast.expr) : C.predicate =
@@ -81,6 +103,14 @@ let pred_of_cmp_expr (default_phase : C.phase) (e : Sl_ast.expr) : C.predicate =
   | _ ->
       p_atom (C.APred ("bool", [ term_of_expr default_phase e ]))
 
+
+let core_ty_of_sort_opt (s : Sl_ast.sort option) : string option =
+  match s with
+  | None -> None
+  | Some SInt -> Some "int"
+  | Some SBool -> Some "bool"
+  | Some SPtr -> None
+  | Some (SUser s) -> Some s
 
 
 let rec pred_of_sl (s : Sl_ast.sl) : C.predicate =
@@ -95,18 +125,21 @@ let rec pred_of_sl (s : Sl_ast.sl) : C.predicate =
   | SOr xs -> p_or (List.map pred_of_sl xs)
   | SNot x -> C.PNot (pred_of_sl x)
   | SImplies (a, b) -> C.PImplies (pred_of_sl a, pred_of_sl b)
+  | SForall (binders, body) ->
+    let bs =
+      binders
+      |> List.map (fun (nm, tyopt) ->
+             { C.b_name = nm; b_ty = core_ty_of_sort_opt tyopt })
+    in
+    C.PForall (bs, pred_of_sl body)
   | SExists (binders, body) ->
       let bs =
         binders
-        |> List.map (fun (nm, _tyopt) -> { C.b_name = nm; b_ty = None })
+        |> List.map (fun (nm, tyopt) ->
+              { C.b_name = nm; b_ty = core_ty_of_sort_opt tyopt })
       in
       C.PExists (bs, pred_of_sl body)
-  | SForall (binders, body) ->
-      let bs =
-        binders
-        |> List.map (fun (nm, _tyopt) -> { C.b_name = nm; b_ty = None })
-      in
-      C.PForall (bs, pred_of_sl body)
+
 
 
 

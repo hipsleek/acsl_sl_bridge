@@ -69,6 +69,8 @@ let prec_of_term = function
   | TInt _ | TVar _ | TPtr _ | TResult -> PAtom
   | THeap _ -> PAtom
   | TApp _ -> PAtom
+  | TIndex _ -> PAtom
+  | TLoad _ -> PAtom
   | TArith (Mul, _, _) | TArith (Div, _, _) -> PMul
   | TArith (Add, _, _) | TArith (Sub, _, _) -> PAdd
 
@@ -94,6 +96,15 @@ let rec string_of_term ?(ctx=PTop) (t : term) : string =
         lhs ^ op_s ^ rhs
     | TApp (f, args) ->
         f ^ parens (args |> List.map (string_of_term ~ctx:PTop) |> join ", ")
+    | TLoad (Pre, t1) ->
+        "load(" ^ string_of_term ~ctx:PTop t1 ^ ")"
+    | TLoad (Post, t1) ->
+        "load'(" ^ string_of_term ~ctx:PTop t1 ^ ")"
+    | TIndex (_ph, a, idx) ->
+        string_of_term ~ctx:PAtom a ^ "[" ^ string_of_term ~ctx:PTop idx ^ "]"
+
+
+
   in
   with_parens_if ctx here s
 

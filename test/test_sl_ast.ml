@@ -279,7 +279,44 @@ let test_loop_single_req_ens_conj_post _ =
   let b = beh [ ens (SPure (eq (v "r") (add (v "a") (i 10)))) ] in
   let spec = { ret = Some "r"; behaviors = [ b ] } in
   test_framework "ens[r] r == a + 10;" (string_of_spec spec)
- let suite =
+
+let test_loop_case_with_forall_index_variant _ =
+  let b =
+    beh
+      ~assumes:
+        (SAnd
+           [
+             (* 0 <= i && i <= length *)
+             SAnd
+               [
+                 SPure (lte (i 0) (v "i"));
+                 SPure (lte (v "i") (v "length"));
+               ];
+
+             (* forall size_t j. (0<=j && j<i) ==> *(array + j) != element *)
+             SForall
+               ( [ ("j", Some (SUser "size_t")) ],
+                 SImplies
+                   ( SAnd
+                       [
+                         SPure (lte (i 0) (v "j"));
+                         SPure (lt (v "j") (v "i"));
+                       ],
+                     SPure
+                       (neq
+                          (deref (add (v "array") (v "j")))
+                          (v "element")) ) );
+           ])
+      [
+        term (Some (sub (v "length") (v "i")));
+        ens STrue;
+      ]
+  in
+  test_framework
+    "case {0 <= i && i <= length && forall j:size_t. (0 <= j && j < i) => (*(array + j)) != element => req Term[length - i]; ens \\true;};"
+    (string_of_spec { ret = None; behaviors = [ b ] })
+
+let suite =
   "sl_ast_printer tests" >::: [
     "string_of_spec_atom_int" >:: test_string_of_spec_atom_int;
     "string_of_spec_atom_char" >:: test_string_of_spec_atom_char;
@@ -308,6 +345,8 @@ let test_loop_single_req_ens_conj_post _ =
     "loop_single_req_ens_conj_post" >:: test_loop_single_req_ens_conj_post;
 
     "ens_result_binder" >:: test_ens_result_binder;
+
+    "loop_case_with_forall_index_variant" >:: test_loop_case_with_forall_index_variant;
   ]
 
 let () = run_test_tt_main suite

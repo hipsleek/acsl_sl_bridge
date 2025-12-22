@@ -233,6 +233,26 @@ let test_sl_to_core_ens_result _ctx =
   in
   test_framework expected actual
 
+let test_sl_to_core_loop_search_forall_index _ctx =
+  let input =
+    "req array->int*(0,length-i) && 0<=i<=length && Term[length-i]\n" ^
+    "&& \\forall size_t j. (0<=j<i => array[j]!=element);\n" ^
+    "ens i'==length || \\return*(array+i') && array[i']!=element && 0<=i'<length;"
+  in
+  let sl_spec = parse_spec input in
+  let core_spec = Spec_to_core.sl_to_core sl_spec in
+  let actual = Core_printer.string_of_spec core_spec in
+  let expected =
+    "kind(loop)\n" ^
+    "params()\n" ^
+    "behavior <anon>:\n" ^
+    "  assumes 0 <= i && i <= length && forall size_t j. (0 <= j && j < i) ==> (array[j] != element)\n" ^
+    "  requires true\n" ^
+    "  ensures i' == length || \\result == array[i'] && array[i'] != element && 0 <= i' && i' < length\n" ^
+    "  assigns { i }\n" ^
+    "  variant length - i"
+  in
+  test_framework expected actual
 
 let suite =
   "sl_to_core" >::: [
@@ -243,9 +263,10 @@ let suite =
     "swap_prime_sugar"   >:: test_sl_to_core_swap_prime_sugar;
     "swap_old_sugar"     >:: test_sl_to_core_swap_old_sugar;
     "case_swap"          >:: test_sl_to_core_case_swap;
-    "test_sl_to_core_loop_case_term" >:: test_sl_to_core_loop_case_term;
-    "test_sl_to_core_loop_simple_term_and_frame" >:: test_sl_to_core_loop_simple_term_and_frame;
-    "test_sl_to_core_ens_result" >:: test_sl_to_core_ens_result;
+    "loop_case_term" >:: test_sl_to_core_loop_case_term;
+    "loop_simple_term_and_frame" >:: test_sl_to_core_loop_simple_term_and_frame;
+    "ens_result" >:: test_sl_to_core_ens_result;
+    "loop_search_forall_index" >:: test_sl_to_core_loop_search_forall_index
   ]
 
 let () = run_test_tt_main suite

@@ -259,6 +259,47 @@ let test_acsl_assigns_list _ctx =
   test_framework "*a, *b"
     (acsl_assigns (AList [ TDeref (TVar "a"); TDeref (TVar "b") ]))
 
+let test_acsl_loop_contract_with_forall_and_index _ctx =
+  let lc : A.loop_contract =
+    {
+      l_invariants =
+        [
+          (* 0 <= i <= length *)
+          A.PAnd
+            [
+              A.PRel (A.Lte, A.TInt 0, A.TVar "i");
+              A.PRel (A.Lte, A.TVar "i", A.TVar "length");
+            ];
+
+          (* \forall size_t j; 0 <= j < i ==> array[j] != element *)
+          A.PForall
+            ( [ ("j", Some "size_t") ],
+              A.PImplies
+                ( A.PAnd
+                    [
+                      A.PRel (A.Lte, A.TInt 0, A.TVar "j");
+                      A.PRel (A.Lt, A.TVar "j", A.TVar "i");
+                    ],
+                  A.PRel
+                    ( A.Neq,
+                      A.TIndex (A.TVar "array", A.TVar "j"),
+                      A.TVar "element" ) ) );
+        ];
+      l_assigns = A.AList [ A.TVar "i" ];
+      l_variant = Some (A.TBinOp (A.Sub, A.TVar "length", A.TVar "i"));
+    }
+  in
+  let expected =
+    "/*@\n" ^
+    "  loop invariant 0 <= i && i <= length;\n" ^
+    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
+    "  loop assigns i;\n" ^
+    "  loop variant length - i;\n" ^
+    "*/"
+  in
+  test_framework expected (acsl_loop_contract lc)
+
+
 let suite =
   "acsl_ast" >::: [
     "acsl_term_var" >:: test_acsl_term_var;
@@ -292,6 +333,8 @@ let suite =
     "acsl_loop_contract_simple" >:: test_acsl_loop_contract_simple;
     "acsl_loop_contract_with_two_assigns_and_variant" >:: test_acsl_loop_contract_with_two_assigns_and_variant;
     "acsl_loop_contract_defaults" >:: test_acsl_loop_contract_defaults;
+
+    "acsl_loop_contract_with_forall_and_index" >:: test_acsl_loop_contract_with_forall_and_index;
 
   ]
 

@@ -108,6 +108,112 @@ let test_simple_ens _ctx =
   let expected = "ens[r] r == a + 10;" in
   test_framework input expected
 
+
+let test_parse_loop_minimal _ctx =
+  let input =
+    "req i<=10;\n" ^
+    "ens i'==10;"
+  in
+  let expected =
+    "req i <= 10; ens i' == 10;"
+  in
+  test_framework input expected
+
+
+let test_parse_loop_term_only _ctx =
+  let input =
+    "req i<=10 && Term[10-i];\n" ^
+    "ens i'==10;"
+  in
+  let expected =
+    "case {i <= 10 => req Term[10 - i]; ens i' == 10;};"
+  in
+  test_framework input expected
+
+
+let test_parse_heap_range _ctx =
+  let input =
+    "req array->int*(0,length-i) && Term[length-i];\n" ^
+    "ens i'==length;"
+  in
+  let expected =
+    "case {range(array, 0, length - i) => req Term[length - i]; ens i' == length;};"
+  in
+  test_framework input expected
+
+
+let test_parse_forall_basic _ctx =
+  let input =
+    "req \\forall size_t j. (0<=j => j<10) && Term[1];\n" ^
+    "ens i'==10;"
+  in
+  let expected =
+    "case {forall j:size_t. 0 <= j => j < 10 => req Term[1]; ens i' == 10;};"
+  in
+  test_framework input expected
+
+
+let test_parse_index_basic _ctx =
+  let input =
+    "req array[i]!=element && Term[1];\n" ^
+    "ens i'==10;"
+  in
+  let expected =
+    "case {(*(array + i)) != element => req Term[1]; ens i' == 10;};"
+  in
+  test_framework input expected
+
+
+let test_parse_forall_with_index _ctx =
+  let input =
+    "req \\forall size_t j. (0<=j => array[j]!=element) && Term[1];\n" ^
+    "ens i'==10;"
+  in
+  let expected =
+    "case {forall j:size_t. 0 <= j => (*(array + j)) != element => req Term[1]; ens i' == 10;};"
+  in
+  test_framework input expected
+
+
+let test_parse_return_expr _ctx =
+  let input =
+    "req i<=10 && Term[1];\n" ^
+    "ens \\return*(array+i');"
+  in
+  let expected =
+    "case {i <= 10 => req Term[1]; ens \\result == (*(array + i'));};"
+  in
+  test_framework input expected
+
+
+let test_parse_or _ctx =
+  let input =
+    "req i<=10 && Term[1];\n" ^
+    "ens i'==10 || i'==11;"
+  in
+  let expected =
+    "case {i <= 10 => req Term[1]; ens i' == 10 || i' == 11;};"
+  in
+  test_framework input expected
+
+
+let test_parse_target_full _ctx =
+  let input =
+    "req array->int*(0,length-i) && 0<=i<=length && Term[length-i]\n" ^
+    "&& \\forall size_t j. (0<=j => array[j]!=element);\n" ^
+    "ens i'==length || \\return*(array+i') && array[i']!=element && 0<=i'<length;"
+  in
+  let expected =
+    "case {range(array, 0, length - i) && 0 <= i && i <= length && " ^
+    "forall j:size_t. 0 <= j => (*(array + j)) != element => req Term[length - i]; " ^
+    "ens i' == length || (\\result == (*(array + i')) && (*(array + i')) != element && " ^
+    "0 <= i' && i' < length);};"
+  in
+  test_framework input expected
+
+
+
+
 let suite =
   "sl_parser" >::: [
     "swap_spec_int"                 >:: test_parser_swap_spec_int;
@@ -120,7 +226,18 @@ let suite =
     "loop_case_two_clauses"         >:: test_parser_loop_case_two_clauses;
     "loop_case_single_clause"       >:: test_parser_loop_case_single_clause;
     "loop_simple_req_term_ens_conj" >:: test_parser_loop_simple_req_term_ens_conj;
-    "simple_ens" >:: test_simple_ens;
+    "simple_ens"                    >:: test_simple_ens;
+
+    "parse_loop_minimal"            >:: test_parse_loop_minimal;
+    "parse_loop_term_only"          >:: test_parse_loop_term_only;
+    "parse_heap_range"              >:: test_parse_heap_range;
+    "parse_forall_basic"            >:: test_parse_forall_basic;
+    "parse_index_basic"             >:: test_parse_index_basic;
+    "parse_forall_with_index"       >:: test_parse_forall_with_index;
+    "parse_return_expr"             >:: test_parse_return_expr;
+    "parse_or"                      >:: test_parse_or;
+    "parse_target_full"             >:: test_parse_target_full;
   ]
+
 
 let () = run_test_tt_main suite
