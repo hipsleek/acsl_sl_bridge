@@ -89,6 +89,10 @@ let rec acsl_term ?(ctx=PTop) (t : term) : string =
         in
         let rhs = acsl_term ~ctx:rhs_ctx t2 in
         (p, lhs ^ " " ^ string_of_binop op ^ " " ^ rhs)
+    | TRange (lo, hi) ->
+        (PAtom,
+        parens (acsl_term ~ctx:PTop lo ^ " .. " ^ acsl_term ~ctx:PTop hi))
+
   in
   with_parens_if ctx here s
 

@@ -265,6 +265,35 @@ let test_translate_for_loop_search_forall_index _ctx =
   in
   test_framework input expected
 
+(* let test_translate_spec_search_exists_forall _ctx =
+  let input =
+    "req array->int*(0,length-1) && Term[];\n" ^
+    "case {\n" ^
+    "  exists size_t off . 0<=off<length && array[off]==element\n" ^
+    "    => ens[r] r>=array && r<array+length && *r==element;\n" ^
+    "  forall size_t off . 0<=off<length ==> array[off]!=element\n" ^
+    "    => ens[r] r==NULL;\n" ^
+    "};"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires \\valid_read(array + (0 .. length-1));\n" ^
+    "\n" ^
+    "  assigns \\nothing;\n" ^
+    "\n" ^
+    "  behavior in:\n" ^
+    "  assumes \\exists size_t off ; 0<=off<length && array[off]==element;\n" ^
+    "  ensures array<=\\result<array+length && *\\result==element;\n" ^
+    "\n" ^
+    "  behavior notin:\n" ^
+    "  assumes \\forall size_t off ; 0<=off<length ==> array[off]!=element;\n" ^
+    "  ensures \\result==NULL;\n" ^
+    "\n" ^
+    "  disjoint behaviors;\n" ^
+    "  complete behaviors;\n" ^
+    "*/"
+  in
+  test_framework input expected *)
 
 
 let suite =

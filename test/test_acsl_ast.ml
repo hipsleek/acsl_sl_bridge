@@ -299,6 +299,62 @@ let test_acsl_loop_contract_with_forall_and_index _ctx =
   in
   test_framework expected (acsl_loop_contract lc)
 
+let test_acsl_term_range_prints _ctx =
+  let t : A.term = A.TRange (A.TInt 0, A.TInt 10) in
+  let expected = "(0 .. 10)" in
+  test_framework expected (acsl_term t)
+
+let test_acsl_term_ptr_plus_range_prints _ctx =
+  let t : A.term =
+    A.TBinOp
+      ( A.Add,
+        A.TVar "array",
+        A.TRange (A.TInt 0, A.TBinOp (A.Sub, A.TVar "length", A.TInt 1)) )
+  in
+  let expected = "array + (0 .. length - 1)" in
+  test_framework expected (acsl_term t)
+
+let test_acsl_pred_valid_plus_range_prints _ctx =
+  let p : A.predicate =
+    A.PApp
+      ( "\\valid",
+        [
+          A.TBinOp
+            ( A.Add,
+              A.TVar "array",
+              A.TRange (A.TInt 0, A.TBinOp (A.Sub, A.TVar "length", A.TInt 1)) );
+        ] )
+  in
+  let expected = "\\valid(array + (0 .. length - 1))" in
+  test_framework expected (acsl_pred p)
+
+let test_acsl_contract_requires_valid_plus_range_prints _ctx =
+  let c : A.contract =
+    {
+      A.requires =
+        [
+          A.PApp
+            ( "\\valid",
+              [
+                A.TBinOp
+                  ( A.Add,
+                    A.TVar "array",
+                    A.TRange
+                      (A.TInt 0, A.TBinOp (A.Sub, A.TVar "length", A.TInt 1)) );
+              ] );
+        ];
+      A.assigns = A.ANothing;
+      A.behaviors = [];
+    }
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires \\valid(array + (0 .. length - 1));\n" ^
+    "  assigns \\nothing;\n" ^
+    "*/"
+  in
+  test_framework expected (acsl_contract c)
+
 
 let suite =
   "acsl_ast" >::: [
@@ -336,6 +392,10 @@ let suite =
 
     "acsl_loop_contract_with_forall_and_index" >:: test_acsl_loop_contract_with_forall_and_index;
 
+    "acsl_term_range_prints" >:: test_acsl_term_range_prints;
+    "acsl_term_ptr_plus_range_prints" >:: test_acsl_term_ptr_plus_range_prints;
+    "acsl_pred_valid_plus_range_prints" >:: test_acsl_pred_valid_plus_range_prints;
+    "acsl_contract_requires_valid_plus_range_prints" >:: test_acsl_contract_requires_valid_plus_range_prints;
   ]
 
 let () = run_test_tt_main suite
