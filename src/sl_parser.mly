@@ -1,17 +1,19 @@
-/* src/sl_parser.mly */
 %{
   open Sl_ast
 %}
 
 %token REQ ENS CASE TERM
-%token TERM_AND            /* NEW: produced by lexer for "&& Term" */
+%token TERM_AND
 %token ARROW
 %token STAR
-%token AND SL_CONJ
+%token AND OR SL_CONJ
 %token EQEQ NEQ GTE GT LTE LT
 %token PLUS MINUS DIV
 %token PRIME
 %token OLD
+%token RETURN
+%token FORALL EXISTS
+%token DOT COMMA
 %token LPAREN RPAREN
 %token LBRACE RBRACE
 %token LBRACK RBRACK
@@ -26,15 +28,16 @@
 %start <Sl_ast.spec> main
 
 %right IMPLIES
+%left OR
 %left AND
 %left STAR
 %left PLUS MINUS
 %left DIV
+
 %%
 
 main:
   | spec EOF { $1 }
-
 
 spec:
   | REQ sl SEMICOLON ENS sl SEMICOLON
@@ -64,7 +67,6 @@ spec:
   | loop_clause_list
       { { ret = None; behaviors = $1 } }
 
-
 ens_clause:
   | ENS sl SEMICOLON
       { (None, $2) }
@@ -72,44 +74,38 @@ ens_clause:
   | ENS LBRACK ID RBRACK sl SEMICOLON
       { (Some $3, $5) }
 
-
 sl:
-  | sl IMPLIES sl
-      { SImplies ($1, $3) }
-
-  | sl AND sl
-      { SAnd [$1; $3] }
-
-  | sl STAR sl
-      { SSep [$1; $3] }
-
-  | sl_atom
-      { $1 }
+  | sl IMPLIES sl      { SImplies ($1, $3) }
+  | sl OR sl           { SOr [$1; $3] }
+  | sl AND sl          { SAnd [$1; $3] }
+  | sl STAR sl         { SSep [$1; $3] }
+  | sl_atom            { $1 }
 
 sl_atom:
-  | heap_atom
-      { SHeap $1 }
-
-  | cmp_sl
-      { $1 }
-
+  | heap_atom          { SHeap $1 }
+  | cmp_sl             { $1 }
   | ID
       {
         if $1 = "emp" then SEmp
         else failwith ("Unexpected bare identifier in sl: " ^ $1)
       }
+  | LPAREN sl RPAREN   { $2 }
 
-  | LPAREN sl RPAREN
-      { $2 }
+  | FORALL ID ID DOT sl
+      { SForall ([($3, Some (SUser $2))], $5) }
 
+  | EXISTS ID ID DOT sl
+      { SExists ([($3, Some (SUser $2))], $5) }
+
+  | RETURN expr
+      { SPure (EBinop (BEq, EResult, $2)) }
 
 heap_atom:
-  | ID ARROW TYPE STAR LPAREN ID RPAREN
-      { HPt { loc = EVar $1; ty = $3; value = EVar $6 } }
-
   | ID ARROW TYPE STAR LPAREN expr RPAREN
       { HPt { loc = EVar $1; ty = $3; value = $6 } }
 
+  | ID ARROW TYPE STAR LPAREN expr COMMA expr RPAREN
+      { HPred ("range", [EVar $1; $6; $8]) }
 
 cmp_sl:
   | expr cmp_op expr
@@ -130,7 +126,6 @@ cmp_op:
   | LTE  { BLe }
   | GT   { BGt }
   | GTE  { BGe }
-
 
 expr:
   | ID
@@ -157,6 +152,9 @@ expr:
   | expr DIV expr
       { EBinop (BDiv, $1, $3) }
 
+  | expr LBRACK expr RBRACK
+      { EDeref (EBinop (BAdd, $1, $3)) }
+
   | LPAREN expr RPAREN
       { $2 }
 
@@ -180,14 +178,11 @@ case:
       }
 
 case_list:
-  | case
-      { [$1] }
-  | case case_list
-      { $1 :: $2 }
+  | case                  { [$1] }
+  | case case_list        { $1 :: $2 }
 
 loop_clause_list:
-  | loop_clause
-      { [$1] }
+  | loop_clause                   { [$1] }
   | loop_clause SL_CONJ loop_clause_list
       { $1 :: $3 }
 
@@ -200,12 +195,14 @@ loop_clause:
       }
 
 loop_req:
-  | cmp_expr TERM_AND LBRACK expr RBRACK
-      { (SPure $1, Some $4) }
+  | sl TERM_AND LBRACK expr RBRACK
+      { ($1, Some $4) }
 
-  | cmp_expr TERM_AND LBRACK RBRACK
-      { (SPure $1, None) }
+  | sl TERM_AND LBRACK expr RBRACK AND sl
+      { (SAnd [$1; $7], Some $4) }
 
-cmp_expr:
-  | expr cmp_op expr
-      { EBinop ($2, $1, $3) }
+  | sl TERM_AND LBRACK RBRACK
+      { ($1, None) }
+
+  | sl TERM_AND LBRACK RBRACK AND sl
+      { (SAnd [$1; $6], None) }

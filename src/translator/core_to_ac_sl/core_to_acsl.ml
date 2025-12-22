@@ -1,14 +1,11 @@
-
-
 open Core
 module A = Acsl_ast
 
-
 type ctx =
-  | CRequires          
-  | CEnsures           
-  | CLoop              
-  | CLoopRel           
+  | CRequires
+  | CEnsures
+  | CLoop
+  | CLoopRel
 
 let binop_of_rel : Core.rel -> A.rel = function
   | Eq -> A.Eq
@@ -25,33 +22,24 @@ let binop_of_arith : Core.arith_op -> A.binop = function
   | Div -> A.Div
 
 
-
-
-
 let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
   match t with
   | TInt n -> A.TInt n
   | TResult -> A.TResult
 
   | TPtr p ->
-      
       A.TVar p
 
   | TVar (ph, x) -> (
       match c with
-      
-      | CLoop -> A.TVar x
-
-      
+      | CLoop ->
+          A.TVar x
       | CLoopRel ->
           (match ph with
            | Pre -> A.TAt (A.TVar x, A.LoopEntry)
            | Post -> A.TVar x)
-
-      
-      | CRequires -> A.TVar x
-
-      
+      | CRequires ->
+          A.TVar x
       | CEnsures ->
           (match ph with
            | Post -> A.TVar x
@@ -61,18 +49,14 @@ let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
   | THeap (ph, p) -> (
       let deref = A.TDeref (A.TVar p) in
       match c with
-      
-      | CLoop -> deref
-
-      
+      | CLoop ->
+          deref
       | CLoopRel ->
           (match ph with
            | Pre -> A.TAt (deref, A.LoopEntry)
            | Post -> deref)
-
-      
-      | CRequires -> deref
-
+      | CRequires ->
+          deref
       | CEnsures ->
           (match ph with
            | Post -> deref
@@ -85,8 +69,24 @@ let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
   | TApp (f, args) ->
       A.TApp (f, List.map (aterm_of_core c) args)
 
+  | TIndex (_ph, a, idx) ->
+      A.TIndex (aterm_of_core c a, aterm_of_core c idx)
 
-
+  | TLoad (ph, addr) -> (
+      let at = aterm_of_core c addr in
+      match c with
+      | CEnsures ->
+          (match ph with
+           | Post -> A.TDeref at
+           | Pre -> A.TOld (A.TDeref at))
+      | CLoopRel ->
+          (match ph with
+           | Post -> A.TDeref at
+           | Pre -> A.TAt (A.TDeref at, A.LoopEntry))
+      | CLoop
+      | CRequires ->
+          A.TDeref at
+    )
 
 
 let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
@@ -98,7 +98,6 @@ let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
       A.PRel (binop_of_rel r, aterm_of_core c t1, aterm_of_core c t2)
 
   | PAtom (APred (name, args)) ->
-      
       if name = "valid" then
         match args with
         | [ TPtr p ] -> A.PApp ("\\valid", [ A.TVar p ])
@@ -121,26 +120,18 @@ let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
       A.PExists (bs', apred_of_core c body)
 
 
-
-
-
 let aterm_of_assignable (a : Core.assignable) : A.term option =
   match a with
   | AsVar v -> Some (A.TVar v)
   | AsHeap p -> Some (A.TDeref (A.TVar p))
   | AsTerm t -> Some (aterm_of_core CEnsures t)
-  | AsRange (_p, _lo, _hi) ->
-      
-      None
+  | AsRange (_p, _lo, _hi) -> None
 
 let assigns_of_core (xs : Core.assignable list) : A.assigns =
   let ts = xs |> List.filter_map aterm_of_assignable in
   match ts with
   | [] -> A.ANothing
   | _ -> A.AList ts
-
-
-
 
 
 let find_first (f : 'a -> 'b option) (xs : 'a list) : 'b option =
@@ -154,18 +145,38 @@ let all_of (f : 'a -> 'b option) (xs : 'a list) : 'b list =
   xs |> List.filter_map f
 
 let clause_assumes = function Assumes p -> Some p | _ -> None
-let clause_requires = function Requires p -> Some p | _ -> None
 let clause_ensures = function Ensures p -> Some p | _ -> None
 let clause_assigns = function Assigns xs -> Some xs | _ -> None
 let clause_variant = function Variant t -> Some t | _ -> None
 
 let normalize_pred_list (ps : A.predicate list) : A.predicate list =
-  
   ps |> List.filter (fun p -> p <> A.PTrue)
 
+let rec split_top_and (p : Core.predicate) : Core.predicate list =
+  match p with
+  | Core.PAnd ps -> List.concat_map split_top_and ps
+  | _ -> [p]
+let rec term_mentions_result (t : Core.term) : bool =
+  match t with
+  | Core.TResult -> true
+  | Core.TInt _ -> false
+  | Core.TPtr _ -> false
+  | Core.TVar _ -> false
+  | Core.THeap _ -> false
+  | Core.TArith (_, a, b) -> term_mentions_result a || term_mentions_result b
+  | Core.TApp (_, args) -> List.exists term_mentions_result args
+  | Core.TIndex (_, a, idx) -> term_mentions_result a || term_mentions_result idx
+  | Core.TLoad (_, addr) -> term_mentions_result addr
 
-
-
+let rec pred_mentions_result (p : Core.predicate) : bool =
+  match p with
+  | Core.PTrue | Core.PFalse -> false
+  | Core.PAtom (Core.ARel (_, t1, t2)) -> term_mentions_result t1 || term_mentions_result t2
+  | Core.PAtom (Core.APred (_, args)) -> List.exists term_mentions_result args
+  | Core.PNot q -> pred_mentions_result q
+  | Core.PAnd qs | Core.POr qs -> List.exists pred_mentions_result qs
+  | Core.PImplies (a, b) -> pred_mentions_result a || pred_mentions_result b
+  | Core.PForall (_, body) | Core.PExists (_, body) -> pred_mentions_result body
 
 let rec term_has_phase (want : Core.phase) (t : Core.term) : bool =
   match t with
@@ -176,14 +187,14 @@ let rec term_has_phase (want : Core.phase) (t : Core.term) : bool =
   | Core.THeap (ph, _) -> ph = want
   | Core.TArith (_, t1, t2) -> term_has_phase want t1 || term_has_phase want t2
   | Core.TApp (_, args) -> List.exists (term_has_phase want) args
+  | Core.TIndex (ph, a, idx) -> ph = want || term_has_phase want a || term_has_phase want idx
+  | Core.TLoad (ph, addr) -> ph = want || term_has_phase want addr
 
 let rec pred_has_phase (want : Core.phase) (p : Core.predicate) : bool =
   match p with
   | Core.PTrue | Core.PFalse -> false
-  | Core.PAtom (Core.ARel (_, t1, t2)) ->
-      term_has_phase want t1 || term_has_phase want t2
-  | Core.PAtom (Core.APred (_, args)) ->
-      List.exists (term_has_phase want) args
+  | Core.PAtom (Core.ARel (_, t1, t2)) -> term_has_phase want t1 || term_has_phase want t2
+  | Core.PAtom (Core.APred (_, args)) -> List.exists (term_has_phase want) args
   | Core.PNot p1 -> pred_has_phase want p1
   | Core.PAnd ps | Core.POr ps -> List.exists (pred_has_phase want) ps
   | Core.PImplies (p1, p2) -> pred_has_phase want p1 || pred_has_phase want p2
@@ -192,36 +203,25 @@ let rec pred_has_phase (want : Core.phase) (p : Core.predicate) : bool =
 let pred_is_relational_pre_post (p : Core.predicate) : bool =
   pred_has_phase Core.Pre p && pred_has_phase Core.Post p
 
-let rec relational_conjuncts (p : Core.predicate) : Core.predicate list =
+let is_liftable_relational (p : Core.predicate) : bool =
   match p with
-  | Core.PAnd ps ->
-      ps |> List.concat_map relational_conjuncts
+  | Core.PAtom (Core.ARel (Core.Eq, _t1, _t2)) ->
+      pred_is_relational_pre_post p && not (pred_mentions_result p)
   | _ ->
-      if pred_is_relational_pre_post p then [ p ] else []
-
-
-
+      false
 
 
 let contract_of_core (s : Core.spec) : A.contract =
   let all_clauses = s.behaviors |> List.concat_map (fun b -> b.clauses) in
 
   let req_pred =
-    match
-      find_first
-        (fun c -> match c with Requires p -> Some p | _ -> None)
-        all_clauses
-    with
+    match find_first (function Requires p -> Some p | _ -> None) all_clauses with
     | None -> Core.PTrue
     | Some p -> p
   in
 
   let assigns_list =
-    match
-      find_first
-        (fun c -> match c with Assigns xs -> Some xs | _ -> None)
-        all_clauses
-    with
+    match find_first (function Assigns xs -> Some xs | _ -> None) all_clauses with
     | None -> []
     | Some xs -> xs
   in
@@ -233,16 +233,10 @@ let contract_of_core (s : Core.spec) : A.contract =
     s.behaviors
     |> List.map (fun b ->
          let assumes =
-           b.clauses
-           |> all_of clause_assumes
-           |> List.map (apred_of_core CRequires)
-           |> normalize_pred_list
+           b.clauses |> all_of clause_assumes |> List.map (apred_of_core CRequires) |> normalize_pred_list
          in
          let ensures =
-           b.clauses
-           |> all_of clause_ensures
-           |> List.map (apred_of_core CEnsures)
-           |> normalize_pred_list
+           b.clauses |> all_of clause_ensures |> List.map (apred_of_core CEnsures) |> normalize_pred_list
          in
          { A.b_name = b.b_name; b_assumes = assumes; b_ensures = ensures })
   in
@@ -253,8 +247,7 @@ let loop_contract_of_core (s : Core.spec) : A.loop_contract =
   let chosen =
     match
       s.behaviors
-      |> List.find_opt (fun b ->
-             List.exists (function Variant _ -> true | _ -> false) b.clauses)
+      |> List.find_opt (fun b -> List.exists (function Variant _ -> true | _ -> false) b.clauses)
     with
     | Some b -> b
     | None ->
@@ -263,19 +256,21 @@ let loop_contract_of_core (s : Core.spec) : A.loop_contract =
          | [] -> failwith "empty loop spec")
   in
 
-  
   let assumes_invs =
     chosen.clauses
     |> all_of clause_assumes
+    |> List.concat_map split_top_and
     |> List.map (apred_of_core CLoop)
     |> normalize_pred_list
   in
-
-
   let relational_ensures_invs =
     chosen.clauses
     |> all_of clause_ensures
-    |> List.concat_map relational_conjuncts
+    |> List.concat_map (fun p ->
+         match p with
+         | Core.PAnd ps -> ps
+         | _ -> [])
+    |> List.filter is_liftable_relational
     |> List.map (apred_of_core CLoopRel)
     |> normalize_pred_list
   in
@@ -283,35 +278,19 @@ let loop_contract_of_core (s : Core.spec) : A.loop_contract =
   let invs = assumes_invs @ relational_ensures_invs in
 
   let assigns_list =
-    match
-      find_first
-        (fun c -> match c with Assigns xs -> Some xs | _ -> None)
-        chosen.clauses
-    with
+    match find_first (function Assigns xs -> Some xs | _ -> None) chosen.clauses with
     | None -> []
     | Some xs -> xs
   in
   let l_assigns = assigns_of_core assigns_list in
 
   let l_variant =
-    match
-      find_first
-        (fun c -> match c with Variant t -> Some t | _ -> None)
-        chosen.clauses
-    with
+    match find_first (function Variant t -> Some t | _ -> None) chosen.clauses with
     | None -> None
     | Some t -> Some (aterm_of_core CLoop t)
   in
 
   { A.l_invariants = invs; l_assigns; l_variant }
-
-
-
-
-
-type out =
-  | Contract of A.contract
-  | LoopContract of A.loop_contract
 
 let spec_to_acsl (s : Core.spec) : string =
   match s.kind with

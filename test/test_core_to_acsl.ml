@@ -308,6 +308,101 @@ let test_core_to_acsl_result_ens _ctx =
   in
   test_framework expected actual
 
+(* ---- local helpers (put near the top of test_core_to_acsl.ml, or just above the test) ---- *)
+let mk_int (n:int) : C.term = C.TInt n
+let mk_ptr (p:string) : C.term = C.TPtr p
+let mk_var (ph:C.phase) (x:string) : C.term = C.TVar (ph, x)
+
+let mk_rel (r:C.rel) (t1:C.term) (t2:C.term) : C.predicate =
+  C.PAtom (C.ARel (r, t1, t2))
+
+let mk_and (ps:C.predicate list) : C.predicate =
+  match ps with
+  | [] -> C.PTrue
+  | [p] -> p
+  | _ -> C.PAnd ps
+
+let mk_or (ps:C.predicate list) : C.predicate =
+  match ps with
+  | [] -> C.PFalse
+  | [p] -> p
+  | _ -> C.POr ps
+
+
+let test_core_to_acsl_loop_search_forall_index _ctx =
+  let core_spec : C.spec =
+    {
+      kind = C.LoopContract;
+      params = [];
+      behaviors =
+        [
+          {
+            b_name = None;
+            clauses =
+              [
+                C.Assumes
+                  (mk_and
+                     [
+                       mk_rel C.Lte (mk_int 0) (mk_var C.Pre "i");
+                       mk_rel C.Lte (mk_var C.Pre "i") (mk_var C.Pre "length");
+                       C.PForall
+                         ( [ { C.b_name = "j"; b_ty = Some "size_t" } ],
+                           C.PImplies
+                             ( mk_and
+                                 [
+                                   mk_rel C.Lte (mk_int 0) (mk_var C.Pre "j");
+                                   mk_rel C.Lt (mk_var C.Pre "j") (mk_var C.Pre "i");
+                                 ],
+                               mk_rel C.Neq
+                                 (C.TIndex (C.Pre, mk_var C.Pre "array", mk_var C.Pre "j"))
+                                 (mk_var C.Pre "element") ) );
+                     ]);
+
+                C.Requires C.PTrue;
+                C.Assigns [ C.AsVar "i" ];
+
+                C.Ensures
+                  (mk_or
+                     [
+                       mk_rel C.Eq (mk_var C.Post "i") (mk_var C.Post "length");
+                       mk_and
+                         [
+                           C.PAtom
+                             (C.APred
+                                ( "\\return",
+                                  [
+                                    C.TLoad
+                                      ( C.Post,
+                                        C.TArith (C.Add, mk_ptr "array", mk_var C.Post "i") );
+                                  ] ));
+                           mk_rel C.Neq
+                             (C.TIndex (C.Post, mk_var C.Post "array", mk_var C.Post "i"))
+                             (mk_var C.Post "element");
+                           mk_rel C.Lte (mk_int 0) (mk_var C.Post "i");
+                           mk_rel C.Lt (mk_var C.Post "i") (mk_var C.Post "length");
+                         ];
+                     ]);
+
+                C.Variant (C.TArith (C.Sub, mk_var C.Pre "length", mk_var C.Pre "i"));
+              ];
+          };
+        ];
+    }
+  in
+  let actual = Core_to_acsl.spec_to_acsl core_spec in
+  let expected =
+    "/*@\n" ^
+    "  loop invariant 0 <= i;\n" ^
+    "  loop invariant i <= length;\n" ^
+    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
+    "  loop assigns i;\n" ^
+    "  loop variant length - i;\n" ^
+    "*/"
+  in
+  test_framework expected actual
+
+
+
 let suite =
   "core_to_acsl tests" >::: [
     "core_to_acsl_swap"               >:: test_core_to_acsl_swap;
@@ -317,6 +412,7 @@ let suite =
     "core_to_acsl_loop_simple"        >:: test_core_to_acsl_loop_simple;
     "core_to_acsl_loop_term_and_effects" >:: test_core_to_acsl_loop_term_and_effects;
     "core_to_acsl_result_ens"         >:: test_core_to_acsl_result_ens;
+    "core_to_acsl_loop_search_forall_index" >:: test_core_to_acsl_loop_search_forall_index;
   ]
 
 let () = run_test_tt_main suite

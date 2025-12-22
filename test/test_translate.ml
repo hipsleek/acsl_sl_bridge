@@ -198,7 +198,8 @@ let test_translate_loop_terminating_triple_case_expr _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  loop invariant 20 <= i && i < 30;\n" ^
+    "  loop invariant 20 <= i;\n" ^
+    "  loop invariant i < 30;\n" ^
     "  loop assigns i;\n" ^
     "  loop variant 30 - i;\n" ^
     "*/"
@@ -247,6 +248,25 @@ let test_translate_ens_res _ctx =
   in
   test_framework input expected
 
+let test_translate_for_loop_search_forall_index _ctx =
+  let input =
+    "req array->int*(0,length-i) && 0<=i<=length && Term[length-i]\n" ^
+    "&& \\forall size_t j. (0<=j<i => array[j]!=element);\n" ^
+    "ens i'==length || \\return*(array+i') && array[i']!=element && 0<=i'<length;"
+  in
+  let expected =
+    "/*@\n" ^
+    "  loop invariant 0 <= i;\n" ^
+    "  loop invariant i <= length;\n" ^
+    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
+    "  loop assigns i;\n" ^
+    "  loop variant length - i;\n" ^
+    "*/"
+  in
+  test_framework input expected
+
+
+
 let suite =
   "translate" >::: [
     "swap"                               >:: test_translate_swap;
@@ -264,6 +284,7 @@ let suite =
     "loop_terminating_conj_expr"         >:: test_translate_loop_terminating_conj_expr;
     "translate_for_loop"                 >:: test_translate_for_loop;
     "translate_ens_res"                  >:: test_translate_ens_res;
+    "translate_for_loop_search_forall_index" >:: test_translate_for_loop_search_forall_index;
   ]
 
 let () = run_test_tt_main suite
