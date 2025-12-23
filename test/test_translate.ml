@@ -243,7 +243,7 @@ let test_translate_ens_res _ctx =
     "/*@\n" ^
     "  requires \\true;\n" ^
     "  assigns \\nothing;\n" ^
-    "  ensures \\result == \\old(a) + 10;\n" ^
+    "  ensures \\result == a + 10;\n" ^
     "*/"
   in
   test_framework input expected
@@ -265,36 +265,29 @@ let test_translate_for_loop_search_forall_index _ctx =
   in
   test_framework input expected
 
-(* let test_translate_spec_search_exists_forall _ctx =
+let test_sl_to_acsl_spec_search _ctx =
   let input =
-    "req array->int*(0,length-1) && Term[];\n" ^
+    "req array->int*(0,length-1);\n" ^
     "case {\n" ^
-    "  exists size_t off . 0<=off<length && array[off]==element\n" ^
+    "  (\\exists size_t off . 0<=off<length && array[off]==element)\n" ^
     "    => ens[r] r>=array && r<array+length && *r==element;\n" ^
-    "  forall size_t off . 0<=off<length ==> array[off]!=element\n" ^
+    "  (\\forall size_t off . (0<=off<length ==> array[off]!=element))\n" ^
     "    => ens[r] r==NULL;\n" ^
     "};"
   in
   let expected =
     "/*@\n" ^
-    "  requires \\valid_read(array + (0 .. length-1));\n" ^
-    "\n" ^
+    "  requires \\valid_read(array + (0 .. length - 1));\n" ^
     "  assigns \\nothing;\n" ^
-    "\n" ^
-    "  behavior in:\n" ^
-    "  assumes \\exists size_t off ; 0<=off<length && array[off]==element;\n" ^
-    "  ensures array<=\\result<array+length && *\\result==element;\n" ^
-    "\n" ^
-    "  behavior notin:\n" ^
-    "  assumes \\forall size_t off ; 0<=off<length ==> array[off]!=element;\n" ^
-    "  ensures \\result==NULL;\n" ^
-    "\n" ^
-    "  disjoint behaviors;\n" ^
-    "  complete behaviors;\n" ^
+    "  behavior case2:\n" ^
+    "    assumes \\exists size_t off; 0 <= off && off < length && array[off] == element;\n" ^
+    "    ensures \\result >= array && \\result < array + length && *\\result == element;\n" ^
+    "  behavior case3:\n" ^
+    "    assumes \\forall size_t off; (0 <= off && off < length) ==> (array[off] != element);\n" ^
+    "    ensures \\result == NULL;\n" ^
     "*/"
   in
-  test_framework input expected *)
-
+  test_framework input expected
 
 let suite =
   "translate" >::: [
@@ -314,6 +307,7 @@ let suite =
     "translate_for_loop"                 >:: test_translate_for_loop;
     "translate_ens_res"                  >:: test_translate_ens_res;
     "translate_for_loop_search_forall_index" >:: test_translate_for_loop_search_forall_index;
+    "spec_search" >:: test_sl_to_acsl_spec_search;
   ]
 
 let () = run_test_tt_main suite

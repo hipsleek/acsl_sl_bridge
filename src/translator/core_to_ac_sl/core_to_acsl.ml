@@ -1,3 +1,5 @@
+(* core_to_acsl.ml *)
+
 open Core
 module A = Acsl_ast
 
@@ -41,9 +43,8 @@ let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
       | CRequires ->
           A.TVar x
       | CEnsures ->
-          (match ph with
-           | Post -> A.TVar x
-           | Pre -> A.TOld (A.TVar x))
+          (* CHANGE: do NOT \old(plain-var) *)
+          A.TVar x
     )
 
   | THeap (ph, p) -> (
@@ -76,9 +77,7 @@ let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
       let at = aterm_of_core c addr in
       match c with
       | CEnsures ->
-          (match ph with
-           | Post -> A.TDeref at
-           | Pre -> A.TOld (A.TDeref at))
+          A.TDeref at
       | CLoopRel ->
           (match ph with
            | Post -> A.TDeref at
@@ -88,7 +87,9 @@ let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
           A.TDeref at
     )
 
-
+(* ------------------------------------------------------------ *)
+(* Core.predicate -> Acsl.predicate                              *)
+(* ------------------------------------------------------------ *)
 let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
   match p with
   | PTrue -> A.PTrue
@@ -103,6 +104,16 @@ let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
         | [ TPtr p ] -> A.PApp ("\\valid", [ A.TVar p ])
         | [ t ] -> A.PApp ("\\valid", [ aterm_of_core c t ])
         | _ -> A.PApp ("\\valid", List.map (aterm_of_core c) args)
+      else if name = "valid_read_range" then
+        match args with
+        | [ base; lo; hi ] ->
+            let base' = aterm_of_core c base in
+            let lo' = aterm_of_core c lo in
+            let hi' = aterm_of_core c hi in
+            let ptr_expr = A.TBinOp (A.Add, base', A.TRange (lo', hi')) in
+            A.PApp ("\\valid_read", [ ptr_expr ])
+        | _ ->
+            A.PApp ("\\valid_read", List.map (aterm_of_core c) args)
       else
         A.PApp (name, List.map (aterm_of_core c) args)
 
@@ -119,7 +130,9 @@ let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
       let bs' = List.map (fun (b : Core.binder) -> (b.b_name, b.b_ty)) bs in
       A.PExists (bs', apred_of_core c body)
 
-
+(* ------------------------------------------------------------ *)
+(* Assigns                                                       *)
+(* ------------------------------------------------------------ *)
 let aterm_of_assignable (a : Core.assignable) : A.term option =
   match a with
   | AsVar v -> Some (A.TVar v)
@@ -133,7 +146,9 @@ let assigns_of_core (xs : Core.assignable list) : A.assigns =
   | [] -> A.ANothing
   | _ -> A.AList ts
 
-
+(* ------------------------------------------------------------ *)
+(* Small list helpers                                            *)
+(* ------------------------------------------------------------ *)
 let find_first (f : 'a -> 'b option) (xs : 'a list) : 'b option =
   let rec go = function
     | [] -> None
@@ -145,17 +160,89 @@ let all_of (f : 'a -> 'b option) (xs : 'a list) : 'b list =
   xs |> List.filter_map f
 
 let clause_assumes = function Assumes p -> Some p | _ -> None
+let clause_requires = function Requires p -> Some p | _ -> None
 let clause_ensures = function Ensures p -> Some p | _ -> None
 let clause_assigns = function Assigns xs -> Some xs | _ -> None
-let clause_variant = function Variant t -> Some t | _ -> None
 
 let normalize_pred_list (ps : A.predicate list) : A.predicate list =
   ps |> List.filter (fun p -> p <> A.PTrue)
 
+(* ------------------------------------------------------------ *)
+(* NEW: drop "global req only" behavior in ACSL rendering         *)
+(* This is exactly your redundant 'case1': assumes true; ensures true;
+   requires (non-true); assigns []                                 *)
+(* ------------------------------------------------------------ *)
+let is_global_req_only_behavior (b : Core.behavior) : bool =
+  let assumes_ps = b.clauses |> all_of clause_assumes in
+  let ensures_ps = b.clauses |> all_of clause_ensures in
+  let requires_p = b.clauses |> find_first clause_requires |> Option.value ~default:Core.PTrue in
+  let assigns_xs = b.clauses |> find_first clause_assigns |> Option.value ~default:[] in
+  let assumes_is_true =
+    match assumes_ps with
+    | [] -> true
+    | [Core.PTrue] -> true
+    | _ -> false
+  in
+  let ensures_is_true =
+    match ensures_ps with
+    | [] -> true
+    | [Core.PTrue] -> true
+    | _ -> false
+  in
+  let requires_is_nontrivial = (requires_p <> Core.PTrue) in
+  let assigns_is_empty = (assigns_xs = []) in
+  assumes_is_true && ensures_is_true && requires_is_nontrivial && assigns_is_empty
+
+(* ------------------------------------------------------------ *)
+(* Core.spec -> Acsl.contract                                     *)
+(* ------------------------------------------------------------ *)
+let contract_of_core (s : Core.spec) : A.contract =
+  let all_clauses = s.behaviors |> List.concat_map (fun b -> b.clauses) in
+
+  let req_pred =
+    match find_first (function Requires p -> Some p | _ -> None) all_clauses with
+    | None -> Core.PTrue
+    | Some p -> p
+  in
+
+  let assigns_list =
+    match find_first (function Assigns xs -> Some xs | _ -> None) all_clauses with
+    | None -> []
+    | Some xs -> xs
+  in
+
+  let requires = [ apred_of_core CRequires req_pred ] |> normalize_pred_list in
+  let assigns = assigns_of_core assigns_list in
+
+  let behaviors =
+    s.behaviors
+    |> List.filter (fun b -> not (is_global_req_only_behavior b))
+    |> List.map (fun b ->
+         let assumes =
+           b.clauses
+           |> all_of clause_assumes
+           |> List.map (apred_of_core CRequires)
+           |> normalize_pred_list
+         in
+         let ensures =
+           b.clauses
+           |> all_of clause_ensures
+           |> List.map (apred_of_core CEnsures)
+           |> normalize_pred_list
+         in
+         { A.b_name = b.b_name; b_assumes = assumes; b_ensures = ensures })
+  in
+
+  { A.requires = requires; assigns; behaviors }
+
+(* ------------------------------------------------------------ *)
+(* Loop contract (unchanged from your version)                    *)
+(* ------------------------------------------------------------ *)
 let rec split_top_and (p : Core.predicate) : Core.predicate list =
   match p with
   | Core.PAnd ps -> List.concat_map split_top_and ps
   | _ -> [p]
+
 let rec term_mentions_result (t : Core.term) : bool =
   match t with
   | Core.TResult -> true
@@ -210,39 +297,6 @@ let is_liftable_relational (p : Core.predicate) : bool =
   | _ ->
       false
 
-
-let contract_of_core (s : Core.spec) : A.contract =
-  let all_clauses = s.behaviors |> List.concat_map (fun b -> b.clauses) in
-
-  let req_pred =
-    match find_first (function Requires p -> Some p | _ -> None) all_clauses with
-    | None -> Core.PTrue
-    | Some p -> p
-  in
-
-  let assigns_list =
-    match find_first (function Assigns xs -> Some xs | _ -> None) all_clauses with
-    | None -> []
-    | Some xs -> xs
-  in
-
-  let requires = [ apred_of_core CRequires req_pred ] |> normalize_pred_list in
-  let assigns = assigns_of_core assigns_list in
-
-  let behaviors =
-    s.behaviors
-    |> List.map (fun b ->
-         let assumes =
-           b.clauses |> all_of clause_assumes |> List.map (apred_of_core CRequires) |> normalize_pred_list
-         in
-         let ensures =
-           b.clauses |> all_of clause_ensures |> List.map (apred_of_core CEnsures) |> normalize_pred_list
-         in
-         { A.b_name = b.b_name; b_assumes = assumes; b_ensures = ensures })
-  in
-
-  { A.requires = requires; assigns; behaviors }
-
 let loop_contract_of_core (s : Core.spec) : A.loop_contract =
   let chosen =
     match
@@ -263,6 +317,7 @@ let loop_contract_of_core (s : Core.spec) : A.loop_contract =
     |> List.map (apred_of_core CLoop)
     |> normalize_pred_list
   in
+
   let relational_ensures_invs =
     chosen.clauses
     |> all_of clause_ensures

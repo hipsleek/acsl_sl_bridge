@@ -254,6 +254,42 @@ let test_sl_to_core_loop_search_forall_index _ctx =
   in
   test_framework expected actual
 
+let test_sl_to_core_spec_search _ctx =
+  let input =
+    "req array->int*(0,length-1);\n" ^
+    "case {\n" ^
+    "  (\\exists size_t off . 0<=off<length && array[off]==element)\n" ^
+    "    => ens[r] r>=array && r<array+length && *r==element;\n" ^
+    "  (\\forall size_t off . (0<=off<length ==> array[off]!=element))\n" ^
+    "    => ens[r] r==NULL;\n" ^
+    "};"
+  in
+  let sl_spec = parse_spec input in
+  let core_spec = Spec_to_core.sl_to_core sl_spec in
+  let actual = Core_printer.string_of_spec core_spec in
+  let expected =
+    "kind(function)\n" ^
+    "params()\n" ^
+    "behavior case1:\n" ^
+    "  assumes true\n" ^
+    "  requires valid_read_range(array, 0, length - 1)\n" ^
+    "  ensures true\n" ^
+    "  assigns {}\n" ^
+    "\n" ^
+    "behavior case2:\n" ^
+    "  assumes exists size_t off. 0 <= off && off < length && array[off] == element\n" ^
+    "  requires true\n" ^
+    "  ensures \\result >= array && \\result < array + length && load(\\result) == element\n" ^
+    "  assigns {}\n" ^
+    "\n" ^
+    "behavior case3:\n" ^
+    "  assumes forall size_t off. (0 <= off && off < length) ==> (array[off] != element)\n" ^
+    "  requires true\n" ^
+    "  ensures \\result == NULL\n" ^
+    "  assigns {}"
+  in
+  test_framework expected actual
+
 let suite =
   "sl_to_core" >::: [
     "swap"               >:: test_sl_to_core_swap;
@@ -266,7 +302,8 @@ let suite =
     "loop_case_term" >:: test_sl_to_core_loop_case_term;
     "loop_simple_term_and_frame" >:: test_sl_to_core_loop_simple_term_and_frame;
     "ens_result" >:: test_sl_to_core_ens_result;
-    "loop_search_forall_index" >:: test_sl_to_core_loop_search_forall_index
+    "loop_search_forall_index" >:: test_sl_to_core_loop_search_forall_index;
+    "search" >:: test_sl_to_core_spec_search;
   ]
 
 let () = run_test_tt_main suite
