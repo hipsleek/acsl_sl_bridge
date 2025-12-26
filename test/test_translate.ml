@@ -337,6 +337,22 @@ let test_sl_to_acsl_search_replace _ctx =
   in
   test_framework input expected
 
+let test_sl_to_acsl_search_replace_loop _ctx =
+  let input =
+    "req array->int*(0,length-1) && Term[length - i]\n" ^
+    "&& \\forall size_t j. (0<=j<length && arr[j]==old => array[j]'==new)" ^
+    "&& \\forall size_t j. (0<=j<length && arr[j]!=old => array[j]'==array[j]);" ^
+    "ens i'==length;"
+  in
+  let expected =
+    "/*@\n" ^
+    "  loop invariant \\forall size_t j; ((0 <= j && j < length && arr[j] == old) ==> (array[j] == new)) && \\forall size_t j; (0 <= j && j < length && arr[j] != old) ==> (array[j] == array[j]);\n" ^
+    "  loop assigns i, array[(0 .. length - 1)];\n" ^
+    "  loop variant length - i;\n" ^
+    "*/"
+  in
+  test_framework input expected
+
 let suite =
   "translate" >::: [
     "swap"                               >:: test_translate_swap;
@@ -359,6 +375,7 @@ let suite =
     "mutable_arr" >:: test_sl_to_acsl_mutable_arr;
     "mutable_arr_loop" >:: test_sl_to_acsl_mutable_arr_loop;
     "search_replace" >:: test_sl_to_acsl_search_replace;
+    "search_replace_loop" >:: test_sl_to_acsl_search_replace_loop;
   ]
 
 let () = run_test_tt_main suite
