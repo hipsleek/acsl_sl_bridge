@@ -1,11 +1,44 @@
 (***)
-(*core_term *)
+(* spec_to_core.ml *)
 (***)
 
 open Sl_ast
 module C = Core
+
 module StringSet = Set.Make (String)
 module StringMap = Map.Make (String)
+
+(***)
+(* Core-term / Core-predicate basics *)
+(***)
+
+let p_atom (a : C.atom) : C.predicate = C.PAtom a
+
+let p_and (ps : C.predicate list) : C.predicate =
+  let ps = ps |> List.filter (fun p -> p <> C.PTrue) in
+  match ps with
+  | [] -> C.PTrue
+  | [ p ] -> p
+  | _ -> C.PAnd ps
+
+let p_or (ps : C.predicate list) : C.predicate =
+  let ps = ps |> List.filter (fun p -> p <> C.PFalse) in
+  match ps with
+  | [] -> C.PFalse
+  | [ p ] -> p
+  | _ -> C.POr ps
+
+let mk_rel (r : C.rel) (t1 : C.term) (t2 : C.term) : C.predicate =
+  p_atom (C.ARel (r, t1, t2))
+
+let mk_eq (t1 : C.term) (t2 : C.term) : C.predicate =
+  p_atom (C.ARel (C.Eq, t1, t2))
+
+let mk_valid (x : string) : C.predicate =
+  p_atom (C.APred ("valid", [ C.TPtr x ]))
+
+let mk_valid_read_range (base : C.term) (lo : C.term) (hi : C.term) : C.predicate =
+  p_atom (C.APred ("valid_read_range", [ base; lo; hi ]))
 
 let arith_of_binop = function
   | BAdd -> Some C.Add
@@ -30,11 +63,6 @@ let core_ty_of_sort_opt (s : Sl_ast.sort option) : string option =
   | Some SBool -> Some "bool"
   | Some SPtr -> None
   | Some (SUser s) -> Some s
-
-let p_atom (a : C.atom) : C.predicate = C.PAtom a
-
-let mk_rel (r : C.rel) (t1 : C.term) (t2 : C.term) : C.predicate =
-  p_atom (C.ARel (r, t1, t2))
 
 let rec term_of_expr (default_phase : C.phase) (e : Sl_ast.expr) : C.term =
   match e with
@@ -83,10 +111,8 @@ let pred_of_cmp_expr (default_phase : C.phase) (e : Sl_ast.expr) : C.predicate =
   match e with
   | EBinop (op, e1, e2) -> (
       match rel_of_binop op with
-      | Some r ->
-          mk_rel r (term_of_expr default_phase e1) (term_of_expr default_phase e2)
-      | None ->
-          p_atom (C.APred ("bool", [ term_of_expr default_phase e ]))
+      | Some r -> mk_rel r (term_of_expr default_phase e1) (term_of_expr default_phase e2)
+      | None -> p_atom (C.APred ("bool", [ term_of_expr default_phase e ]))
     )
   | _ ->
       p_atom (C.APred ("bool", [ term_of_expr default_phase e ]))
@@ -98,32 +124,36 @@ let rec pred_of_sl (s : Sl_ast.sl) : C.predicate =
   | SEmp -> C.PTrue
   | SHeap _ -> C.PTrue
   | SPure e -> pred_of_cmp_expr C.Pre e
+
   | SSep xs | SAnd xs ->
-      let ps = List.map pred_of_sl xs in
-      C.PAnd (List.filter ((<>) C.PTrue) ps |> fun ps -> if ps = [] then [C.PTrue] else ps)
-      |> (function C.PAnd [p] -> p | p -> p)
+      p_and (List.map pred_of_sl xs)
+
   | SOr xs ->
-      let ps = List.map pred_of_sl xs in
-      C.POr (List.filter ((<>) C.PFalse) ps |> fun ps -> if ps = [] then [C.PFalse] else ps)
-      |> (function C.POr [p] -> p | p -> p)
+      p_or (List.map pred_of_sl xs)
+
   | SNot x -> C.PNot (pred_of_sl x)
   | SImplies (a, b) -> C.PImplies (pred_of_sl a, pred_of_sl b)
+
   | SForall (binders, body) ->
       let bs =
         binders
         |> List.map (fun (nm, tyopt) ->
-                { C.b_name = nm; b_ty = core_ty_of_sort_opt tyopt })
+               { C.b_name = nm; b_ty = core_ty_of_sort_opt tyopt })
       in
       C.PForall (bs, pred_of_sl body)
+
   | SExists (binders, body) ->
       let bs =
         binders
         |> List.map (fun (nm, tyopt) ->
-                { C.b_name = nm; b_ty = core_ty_of_sort_opt tyopt })
+               { C.b_name = nm; b_ty = core_ty_of_sort_opt tyopt })
       in
       C.PExists (bs, pred_of_sl body)
 
+(***)
 (* rewrite a named return variable into Core.TResult *)
+(***)
+
 let rewrite_result (ret : string) (s : Sl_ast.sl) : Sl_ast.sl =
   let rec re = function
     | EVar x when x = ret -> EResult
@@ -149,12 +179,9 @@ let rewrite_result (ret : string) (s : Sl_ast.sl) : Sl_ast.sl =
   in
   gs s
 
-
 (***)
-(* extract*)
+(* extract req / ens / var *)
 (***)
-
-(* req / ens / var extraction *)
 
 let extract_req_ens_var (body : Sl_ast.block)
   : Sl_ast.sl option * Sl_ast.sl option * Sl_ast.expr option
@@ -170,7 +197,9 @@ let extract_req_ens_var (body : Sl_ast.block)
     body;
   (!req, !ens, !var)
 
-(* heaplet collection  *)
+(***)
+(* heaplet collection *)
+(***)
 
 type pt_atom = { loc : string; value : string }
 
@@ -194,7 +223,9 @@ let rec collect_range_atoms (s : Sl_ast.sl) : range_atom list =
   | SExists (_, body) | SForall (_, body) -> collect_range_atoms body
   | _ -> []
 
-(* detect "heap equalities" from pure ensures sugar *)
+(***)
+(* detect heap equalities from pure ensures sugar *)
+(***)
 
 let rec collect_heap_equalities_from_pure (s : Sl_ast.sl) : (string * string) list =
   let go_expr (e : Sl_ast.expr) : (string * string) option =
@@ -203,29 +234,25 @@ let rec collect_heap_equalities_from_pure (s : Sl_ast.sl) : (string * string) li
         match (lhs, rhs) with
         | (EPost (EDeref (EVar a)), EDeref (EVar b)) -> Some (a, b)
         | (EDeref (EVar b), EPost (EDeref (EVar a))) -> Some (a, b)
-
         | (EDeref (EVar a), EOld (EDeref (EVar b))) -> Some (a, b)
         | (EOld (EDeref (EVar b)), EDeref (EVar a)) -> Some (a, b)
-
         | (EPost (EDeref (EVar a)), EOld (EDeref (EVar b))) -> Some (a, b)
         | (EOld (EDeref (EVar b)), EPost (EDeref (EVar a))) -> Some (a, b)
-
         | _ -> None
       )
     | _ -> None
   in
   match s with
-  | SPure e ->
-      (match go_expr e with None -> [] | Some x -> [ x ])
-  | SAnd xs | SSep xs | SOr xs ->
-      List.concat_map collect_heap_equalities_from_pure xs
-  | SImplies (a, b) ->
-      collect_heap_equalities_from_pure a @ collect_heap_equalities_from_pure b
+  | SPure e -> (match go_expr e with None -> [] | Some x -> [ x ])
+  | SAnd xs | SSep xs | SOr xs -> List.concat_map collect_heap_equalities_from_pure xs
+  | SImplies (a, b) -> collect_heap_equalities_from_pure a @ collect_heap_equalities_from_pure b
   | SNot x -> collect_heap_equalities_from_pure x
   | SExists (_, body) | SForall (_, body) -> collect_heap_equalities_from_pure body
   | _ -> []
 
-(* pre map (value -> location) for swap-like heaplets *)
+(***)
+(* pre map (value -> location) *)
+(***)
 
 let pre_value_to_loc_map (pre_atoms : pt_atom list) : string StringMap.t =
   List.fold_left
@@ -233,14 +260,15 @@ let pre_value_to_loc_map (pre_atoms : pt_atom list) : string StringMap.t =
     StringMap.empty
     pre_atoms
 
+(***)
 (* loop assigns inference: collect vars appearing as x' *)
+(***)
 
 let rec collect_post_vars_in_expr (e : Sl_ast.expr) : StringSet.t =
   match e with
   | EPost (EVar x) -> StringSet.singleton x
   | EPost e1 -> collect_post_vars_in_expr e1
-  | EBinop (_op, a, b) ->
-      StringSet.union (collect_post_vars_in_expr a) (collect_post_vars_in_expr b)
+  | EBinop (_op, a, b) -> StringSet.union (collect_post_vars_in_expr a) (collect_post_vars_in_expr b)
   | EUnop (_op, e1) -> collect_post_vars_in_expr e1
   | EApp (_f, es) ->
       List.fold_left
@@ -259,13 +287,20 @@ let rec collect_post_vars_in_sl (s : Sl_ast.sl) : StringSet.t =
         (fun acc x -> StringSet.union acc (collect_post_vars_in_sl x))
         StringSet.empty
         xs
-  | SImplies (a, b) ->
-      StringSet.union (collect_post_vars_in_sl a) (collect_post_vars_in_sl b)
+  | SImplies (a, b) -> StringSet.union (collect_post_vars_in_sl a) (collect_post_vars_in_sl b)
   | SNot x -> collect_post_vars_in_sl x
   | SExists (_, body) | SForall (_, body) -> collect_post_vars_in_sl body
   | _ -> StringSet.empty
 
+let assigns_from_post_vars (post_sl : Sl_ast.sl) : C.assignable list =
+  post_sl
+  |> collect_post_vars_in_sl
+  |> StringSet.elements
+  |> List.map (fun v -> C.AsVar v)
+
+(***)
 (* ptr discovery *)
+(***)
 
 let ptrs_from_atoms (atoms : pt_atom list) : StringSet.t =
   List.fold_left
@@ -294,37 +329,8 @@ let global_ptrs_of_spec (spec : Sl_ast.spec) : StringSet.t =
     spec.behaviors
 
 (***)
-(*build *)
-(***)
-
-(*predicate combinators helpers *)
-
-let p_and (ps : C.predicate list) : C.predicate =
-  let ps = ps |> List.filter (fun p -> p <> C.PTrue) in
-  match ps with
-  | [] -> C.PTrue
-  | [ p ] -> p
-  | _ -> C.PAnd ps
-
-let p_or (ps : C.predicate list) : C.predicate =
-  let ps = ps |> List.filter (fun p -> p <> C.PFalse) in
-  match ps with
-  | [] -> C.PFalse
-  | [ p ] -> p
-  | _ -> C.POr ps
-
-let p_atom (a : C.atom) : C.predicate = C.PAtom a
-
-let mk_valid (x : string) : C.predicate =
-  p_atom (C.APred ("valid", [ C.TPtr x ]))
-
-let mk_valid_read_range (base : C.term) (lo : C.term) (hi : C.term) : C.predicate =
-  p_atom (C.APred ("valid_read_range", [ base; lo; hi ]))
-
-let mk_eq (t1 : C.term) (t2 : C.term) : C.predicate =
-  p_atom (C.ARel (C.Eq, t1, t2))
-
 (* requires / assigns builders *)
+(***)
 
 let assigns_from_ptrs (ptrs : StringSet.t) : C.assignable list =
   ptrs |> StringSet.elements |> List.map (fun p -> C.AsHeap p)
@@ -335,19 +341,20 @@ let requires_from_ptrs (ptrs : StringSet.t) : C.predicate =
 let requires_from_ranges (ranges : range_atom list) : C.predicate =
   ranges
   |> List.map (fun { base; lo; hi } ->
-          mk_valid_read_range
-            (C.TVar (C.Pre, base))
-            (term_of_expr C.Pre lo)
-            (term_of_expr C.Pre hi))
+         mk_valid_read_range
+           (C.TVar (C.Pre, base))
+           (term_of_expr C.Pre lo)
+           (term_of_expr C.Pre hi))
   |> p_and
 
-let assigns_from_post_vars (post_sl : Sl_ast.sl) : C.assignable list =
-  post_sl
-  |> collect_post_vars_in_sl
-  |> StringSet.elements
-  |> List.map (fun v -> C.AsVar v)
+let assigns_from_ranges (ranges : range_atom list) : C.assignable list =
+  ranges
+  |> List.map (fun { base; lo; hi } ->
+         C.AsRange (base, term_of_expr C.Pre lo, term_of_expr C.Pre hi))
 
-(* ensures builders  *)
+(***)
+(* ensures builders *)
+(***)
 
 let ensures_from_heaplets
     ~(pre_map : string StringMap.t)
@@ -357,10 +364,9 @@ let ensures_from_heaplets
   let eqs =
     post_atoms
     |> List.filter_map (fun { loc = a; value = v } ->
-            match StringMap.find_opt v pre_map with
-            | Some pre_loc ->
-                Some (mk_eq (C.THeap (C.Post, a)) (C.THeap (C.Pre, pre_loc)))
-            | None -> None)
+           match StringMap.find_opt v pre_map with
+           | Some pre_loc -> Some (mk_eq (C.THeap (C.Post, a)) (C.THeap (C.Pre, pre_loc)))
+           | None -> None)
   in
   p_and eqs
 
@@ -377,32 +383,23 @@ let build_ensures ~(pre_map : string StringMap.t) ~(post_sl : Sl_ast.sl) : C.pre
   let pure_heap_eqs = collect_heap_equalities_from_pure post_sl in
 
   let heaplet_part =
-    if post_heap_atoms <> [] then
-      ensures_from_heaplets ~pre_map ~post_atoms:post_heap_atoms
-    else
-      C.PTrue
+    if post_heap_atoms <> [] then ensures_from_heaplets ~pre_map ~post_atoms:post_heap_atoms
+    else C.PTrue
   in
   let pure_part =
-    if pure_heap_eqs <> [] then
-      ensures_from_pure_heap_eqs pure_heap_eqs
-    else
-      C.PTrue
+    if pure_heap_eqs <> [] then ensures_from_pure_heap_eqs pure_heap_eqs
+    else C.PTrue
   in
 
-  (* If neither special-case applied, fall back to general predicate conversion *)
   let need_general = (post_heap_atoms = []) && (pure_heap_eqs = []) in
-  let general_part =
-    if need_general then
-      ensures_from_sl_pred post_sl
-    else
-      C.PTrue
-  in
+  let general_part = if need_general then ensures_from_sl_pred post_sl else C.PTrue in
 
   p_and [ heaplet_part; pure_part; general_part ]
 
 (****)
-(*Spec_to_core orchestration*)
+(* Spec_to_core orchestration *)
 (****)
+
 type ptrs_choice =
   | LocalPerBehavior
   | GlobalShared of StringSet.t
@@ -412,14 +409,12 @@ let ptrs_for (choice : ptrs_choice) (b : Sl_ast.behavior) : StringSet.t =
   | LocalPerBehavior -> ptrs_of_behavior b
   | GlobalShared g -> g
 
-(* kind and naming  *)
-
 let kind_of_spec (spec : Sl_ast.spec) : C.spec_kind =
   let has_variant =
     List.exists
       (fun (b : Sl_ast.behavior) ->
-          let (_req, _ens, v) = extract_req_ens_var b.body in
-          v <> None)
+         let (_req, _ens, v) = extract_req_ens_var b.body in
+         v <> None)
       spec.behaviors
   in
   if has_variant then C.LoopContract else C.FunctionContract
@@ -431,27 +426,27 @@ let normalize_behavior_names (bs : Sl_ast.behavior list) : string option list =
   | _ ->
       bs
       |> List.mapi (fun i b ->
-              match b.name with
-              | Some nm -> Some nm
-              | None -> Some (Printf.sprintf "case%d" (i + 1)))
-
-(* behavior analysis record  *)
+             match b.name with
+             | Some nm -> Some nm
+             | None -> Some (Printf.sprintf "case%d" (i + 1)))
 
 type beh_analysis = {
-  req_sl: Sl_ast.sl option;
+  req_sl : Sl_ast.sl option;
   ens_sl : Sl_ast.sl option;
   var_expr : Sl_ast.expr option;
 
-  assumes_p: C.predicate;
+  assumes_p : C.predicate;
 
-  pre_atoms: pt_atom list;
-  pre_map: string StringMap.t;
-  req_ranges: range_atom list;
+  pre_atoms : pt_atom list;
+  pre_map : string StringMap.t;
+  req_ranges : range_atom list;
 
-  post_sl_opt: Sl_ast.sl option;
+  post_sl_opt : Sl_ast.sl option;
   ensures_p : C.predicate;
 
   ptrs : StringSet.t;
+
+  allow_range_assigns : bool;
 }
 
 let analyze_behavior
@@ -470,7 +465,7 @@ let analyze_behavior
   let assumes_p = pred_of_sl b.assumes in
 
   let post_sl_opt =
-    match ens_opt, spec_ret with
+    match (ens_opt, spec_ret) with
     | None, _ -> None
     | Some post, None -> Some post
     | Some post, Some r -> Some (rewrite_result r post)
@@ -488,28 +483,51 @@ let analyze_behavior
     | C.LoopContract -> ptrs_for ptrs_choice b
   in
 
-  { req_sl = req_opt; ens_sl = ens_opt; var_expr = var_opt;
-    assumes_p; pre_atoms; pre_map; req_ranges; post_sl_opt; ensures_p; ptrs }
+  let allow_range_assigns =
+    match ptrs_choice with
+    | LocalPerBehavior -> true
+    | GlobalShared _ -> false
+  in
 
-(* clause constructors  *)
+  {
+    req_sl = req_opt;
+    ens_sl = ens_opt;
+    var_expr = var_opt;
+    assumes_p;
+    pre_atoms;
+    pre_map;
+    req_ranges;
+    post_sl_opt;
+    ensures_p;
+    ptrs;
+    allow_range_assigns;
+  }
 
 let mk_requires ~(ptrs : StringSet.t) ~(ranges : range_atom list) : C.clause =
   let p_valid = requires_from_ptrs ptrs in
-  let p_read  = requires_from_ranges ranges in
+  let p_read = requires_from_ranges ranges in
   C.Requires (p_and [ p_valid; p_read ])
 
-let mk_assigns ~(kind : C.spec_kind) ~(ptrs : StringSet.t) ~(post_sl_opt : Sl_ast.sl option)
+let mk_assigns
+    ~(kind : C.spec_kind)
+    ~(ptrs : StringSet.t)
+    ~(ranges : range_atom list)
+    ~(allow_range_assigns : bool)
+    ~(post_sl_opt : Sl_ast.sl option)
   : C.clause
   =
   match kind with
   | C.FunctionContract ->
-      C.Assigns (assigns_from_ptrs ptrs)
+      let base = assigns_from_ptrs ptrs in
+      let range =
+        if allow_range_assigns then assigns_from_ranges ranges else []
+      in
+      C.Assigns (base @ range)
   | C.LoopContract ->
-      C.Assigns (
-        match post_sl_opt with
-        | None -> []
-        | Some post_sl -> assigns_from_post_vars post_sl
-      )
+      C.Assigns
+        (match post_sl_opt with
+         | None -> []
+         | Some post_sl -> assigns_from_post_vars post_sl)
 
 let mk_variant (vopt : Sl_ast.expr option) : C.clause list =
   match vopt with
@@ -526,7 +544,12 @@ let build_core_behavior
     [ C.Assumes a.assumes_p
     ; mk_requires ~ptrs:a.ptrs ~ranges:a.req_ranges
     ; C.Ensures a.ensures_p
-    ; mk_assigns ~kind ~ptrs:a.ptrs ~post_sl_opt:a.post_sl_opt
+    ; mk_assigns
+        ~kind
+        ~ptrs:a.ptrs
+        ~ranges:a.req_ranges
+        ~allow_range_assigns:a.allow_range_assigns
+        ~post_sl_opt:a.post_sl_opt
     ]
     @ mk_variant a.var_expr
   in
@@ -543,8 +566,6 @@ let behavior_of_sl
   let a = analyze_behavior ~kind ~spec_ret ~ptrs_choice b in
   build_core_behavior ~kind ~b_name a
 
-(* main entry *)
-
 let sl_to_core (spec : Sl_ast.spec) : C.spec =
   let kind = kind_of_spec spec in
   let names = normalize_behavior_names spec.behaviors in
@@ -558,12 +579,12 @@ let sl_to_core (spec : Sl_ast.spec) : C.spec =
   let behaviors =
     List.map2
       (fun nm b ->
-          behavior_of_sl
-            ~kind
-            ~spec_ret:spec.ret
-            ~b_name:nm
-            ~ptrs_choice
-            b)
+         behavior_of_sl
+           ~kind
+           ~spec_ret:spec.ret
+           ~b_name:nm
+           ~ptrs_choice
+           b)
       names
       spec.behaviors
   in

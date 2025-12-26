@@ -281,10 +281,24 @@ let test_sl_to_acsl_spec_search _ctx =
     "  assigns \\nothing;\n" ^
     "  behavior case2:\n" ^
     "    assumes \\exists size_t off; 0 <= off && off < length && array[off] == element;\n" ^
-    "    ensures \\result >= array && \\result < array + length && *\\result == element;\n" ^
+    "    ensures \\result >= array && \\result < array + length && \\old(*\\result) == element;\n" ^
     "  behavior case3:\n" ^
     "    assumes \\forall size_t off; (0 <= off && off < length) ==> (array[off] != element);\n" ^
     "    ensures \\result == NULL;\n" ^
+    "*/"
+  in
+  test_framework input expected
+
+let test_sl_to_acsl_mutable_arr _ctx =
+  let input =
+    "req array->int*(0,length-1);\n" ^
+    "ens \\forall size_t j. (0<=j<length => array[j]'==0);"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires \\valid_read(array + (0 .. length - 1));\n" ^
+    "  assigns array[(0 .. length - 1)];\n" ^
+    "  ensures \\forall size_t j; (0 <= j && j < length) ==> (array[j] == 0);\n" ^
     "*/"
   in
   test_framework input expected
@@ -308,6 +322,7 @@ let suite =
     "translate_ens_res"                  >:: test_translate_ens_res;
     "translate_for_loop_search_forall_index" >:: test_translate_for_loop_search_forall_index;
     "spec_search" >:: test_sl_to_acsl_spec_search;
+    "mutable_arr" >:: test_sl_to_acsl_mutable_arr;
   ]
 
 let () = run_test_tt_main suite
