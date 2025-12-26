@@ -143,21 +143,22 @@ let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
       let bs' = List.map (fun (b : Core.binder) -> (b.b_name, b.b_ty)) bs in
       A.PExists (bs', apred_of_core c body)
 
-(* ------------------------- *)
-(* Assigns *)
-(* ------------------------- *)
-
+(* ----*)
+(* Assigns*)
+(* ----*)
 let aterm_of_assignable (a : Core.assignable) : A.term option =
   match a with
   | AsVar v -> Some (A.TVar v)
   | AsHeap p -> Some (A.TDeref (A.TVar p))
   | AsTerm t -> Some (aterm_of_core CEnsures t)
 
-  (* NEW: translate Core range assigns to ACSL array slice assigns:
-     assigns array[lo .. hi]; *)
   | AsRange (p, lo, hi) ->
-      let lo' = aterm_of_core CRequires lo in
-      let hi' = aterm_of_core CRequires hi in
+      (* prints as: p[(lo .. hi)] because:
+         - TRange prints "(lo .. hi)"
+         - TIndex prints "p[ ... ]"
+       *)
+      let lo' = aterm_of_core CLoop lo in
+      let hi' = aterm_of_core CLoop hi in
       Some (A.TIndex (A.TVar p, A.TRange (lo', hi')))
 
 let assigns_of_core (xs : Core.assignable list) : A.assigns =
@@ -165,6 +166,7 @@ let assigns_of_core (xs : Core.assignable list) : A.assigns =
   match ts with
   | [] -> A.ANothing
   | _ -> A.AList ts
+
 
 (* ------------------------- *)
 (* Small list helpers *)

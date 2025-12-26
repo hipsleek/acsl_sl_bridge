@@ -247,7 +247,7 @@ let test_sl_to_core_loop_search_forall_index _ctx =
     "params()\n" ^
     "behavior <anon>:\n" ^
     "  assumes 0 <= i && i <= length && forall size_t j. (0 <= j && j < i) ==> (array[j] != element)\n" ^
-    "  requires true\n" ^
+    "  requires valid_read_range(array, 0, length - i)\n" ^
     "  ensures i' == length || \\result == array[i'] && array[i'] != element && 0 <= i' && i' < length\n" ^
     "  assigns { i }\n" ^
     "  variant length - i"

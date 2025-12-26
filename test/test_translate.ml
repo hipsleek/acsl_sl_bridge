@@ -248,6 +248,7 @@ let test_translate_ens_res _ctx =
   in
   test_framework input expected
 
+(* No observed difference*)
 let test_translate_for_loop_search_forall_index _ctx =
   let input =
     "req array->int*(0,length-i) && 0<=i<=length && Term[length-i]\n" ^
@@ -265,6 +266,7 @@ let test_translate_for_loop_search_forall_index _ctx =
   in
   test_framework input expected
 
+(* No observed difference*)
 let test_sl_to_acsl_spec_search _ctx =
   let input =
     "req array->int*(0,length-1);\n" ^
@@ -312,8 +314,8 @@ let test_sl_to_acsl_mutable_arr_loop _ctx =
   let expected =
     "/*@\n" ^
     "  loop invariant i <= length;\n" ^
-    "  loop invariant \\forall size_t j; (i <= j && j < length) ==> (array[j] == 0);\n" ^
-    "  loop assigns i;\n" ^
+    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] == 0);\n" ^
+    "  loop assigns i, array[(0 .. length - 1)];\n" ^
     "  loop variant length - i;\n" ^
     "*/"
   in
