@@ -67,15 +67,26 @@ let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
   | TApp (f, args) ->
       A.TApp (f, List.map (aterm_of_core c) args)
 
-  | TIndex (_ph, a, idx) ->
-      A.TIndex (aterm_of_core c a, aterm_of_core c idx)
+    | TIndex (ph, a, idx) ->
+      let t = A.TIndex (aterm_of_core c a, aterm_of_core c idx) in
+      (match c with
+       | CEnsures ->
+           (match ph with
+            | Pre -> A.TOld t
+            | Post -> t)
+       | CLoopRel ->
+           (match ph with
+            | Pre -> A.TAt (t, A.LoopEntry)
+            | Post -> t)
+       | CRequires
+       | CLoop ->
+           t)
+
 
   | TLoad (ph, addr) -> (
       let at = aterm_of_core c addr in
       match c with
       | CEnsures ->
-          (* ensures are about post-state unless wrapped as TOld by the Core term itself;
-             Spec_to_core should emit Pre-phase explicitly when needed. *)
           (match ph with
            | Post -> A.TDeref at
            | Pre -> A.TOld (A.TDeref at))

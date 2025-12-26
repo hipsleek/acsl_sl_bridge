@@ -319,6 +319,22 @@ let test_sl_to_acsl_mutable_arr_loop _ctx =
   in
   test_framework input expected
 
+let test_sl_to_acsl_search_replace _ctx =
+  let input =
+    "req array->int*(0,length-1);\n" ^
+    "ens \\forall size_t j. (0<=j<length && arr[j]==old => array[j]'==new)" ^
+    "&& \\forall size_t j. (0<=j<length && arr[j]!=old => array[j]'==array[j]);"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires \\valid_read(array + (0 .. length - 1));\n" ^
+    "  assigns array[(0 .. length - 1)];\n" ^
+    "  ensures \\forall size_t j; ((0 <= j && j < length && \\old(arr[j]) == old) ==> (array[j] == new))" ^
+    " && \\forall size_t j; (0 <= j && j < length && \\old(arr[j]) != old) ==> (array[j] == \\old(array[j]));\n" ^
+    "*/"
+  in
+  test_framework input expected
+
 let suite =
   "translate" >::: [
     "swap"                               >:: test_translate_swap;
@@ -340,6 +356,7 @@ let suite =
     "spec_search" >:: test_sl_to_acsl_spec_search;
     "mutable_arr" >:: test_sl_to_acsl_mutable_arr;
     "mutable_arr_loop" >:: test_sl_to_acsl_mutable_arr_loop;
+    "search_replace" >:: test_sl_to_acsl_search_replace;
   ]
 
 let () = run_test_tt_main suite
