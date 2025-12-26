@@ -1,5 +1,3 @@
-(* core_to_acsl.ml *)
-
 open Core
 module A = Acsl_ast
 
@@ -43,7 +41,6 @@ let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
       | CRequires ->
           A.TVar x
       | CEnsures ->
-          (* CHANGE: do NOT \old(plain-var) *)
           A.TVar x
     )
 
@@ -87,9 +84,9 @@ let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
           A.TDeref at
     )
 
-(* ------------------------------------------------------------ *)
-(* Core.predicate -> Acsl.predicate                              *)
-(* ------------------------------------------------------------ *)
+(* -- *)
+(* Core.predicate -> Acsl.predicate*)
+(* ---*)
 let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
   match p with
   | PTrue -> A.PTrue
@@ -130,9 +127,9 @@ let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
       let bs' = List.map (fun (b : Core.binder) -> (b.b_name, b.b_ty)) bs in
       A.PExists (bs', apred_of_core c body)
 
-(* ------------------------------------------------------------ *)
-(* Assigns                                                       *)
-(* ------------------------------------------------------------ *)
+(* ----*)
+(* Assigns*)
+(* ----*)
 let aterm_of_assignable (a : Core.assignable) : A.term option =
   match a with
   | AsVar v -> Some (A.TVar v)
@@ -146,9 +143,9 @@ let assigns_of_core (xs : Core.assignable list) : A.assigns =
   | [] -> A.ANothing
   | _ -> A.AList ts
 
-(* ------------------------------------------------------------ *)
-(* Small list helpers                                            *)
-(* ------------------------------------------------------------ *)
+(* ----*)
+(* Small list helpers *)
+(* ----*)
 let find_first (f : 'a -> 'b option) (xs : 'a list) : 'b option =
   let rec go = function
     | [] -> None
@@ -167,11 +164,6 @@ let clause_assigns = function Assigns xs -> Some xs | _ -> None
 let normalize_pred_list (ps : A.predicate list) : A.predicate list =
   ps |> List.filter (fun p -> p <> A.PTrue)
 
-(* ------------------------------------------------------------ *)
-(* NEW: drop "global req only" behavior in ACSL rendering         *)
-(* This is exactly your redundant 'case1': assumes true; ensures true;
-   requires (non-true); assigns []                                 *)
-(* ------------------------------------------------------------ *)
 let is_global_req_only_behavior (b : Core.behavior) : bool =
   let assumes_ps = b.clauses |> all_of clause_assumes in
   let ensures_ps = b.clauses |> all_of clause_ensures in
@@ -193,9 +185,9 @@ let is_global_req_only_behavior (b : Core.behavior) : bool =
   let assigns_is_empty = (assigns_xs = []) in
   assumes_is_true && ensures_is_true && requires_is_nontrivial && assigns_is_empty
 
-(* ------------------------------------------------------------ *)
-(* Core.spec -> Acsl.contract                                     *)
-(* ------------------------------------------------------------ *)
+(* ----*)
+(* Core.spec -> Acsl.contract*)
+(* ---*)
 let contract_of_core (s : Core.spec) : A.contract =
   let all_clauses = s.behaviors |> List.concat_map (fun b -> b.clauses) in
 
@@ -235,9 +227,9 @@ let contract_of_core (s : Core.spec) : A.contract =
 
   { A.requires = requires; assigns; behaviors }
 
-(* ------------------------------------------------------------ *)
-(* Loop contract (unchanged from your version)                    *)
-(* ------------------------------------------------------------ *)
+(* -----*)
+(*Loop contract*)
+(* ----*)
 let rec split_top_and (p : Core.predicate) : Core.predicate list =
   match p with
   | Core.PAnd ps -> List.concat_map split_top_and ps
