@@ -13,7 +13,7 @@
 %token OLD
 %token RETURN
 %token FORALL EXISTS
-%token DOT COMMA
+%token DOT COMMA COLON
 %token LPAREN RPAREN
 %token LBRACE RBRACE
 %token LBRACK RBRACK
@@ -40,6 +40,7 @@ main:
   | spec EOF { $1 }
 
 spec:
+  (* Standard function contract: req ...; ens ...; *)
   | REQ sl SEMICOLON ENS sl SEMICOLON
       {
         {
@@ -50,6 +51,29 @@ spec:
         }
       }
 
+  (* New: global req + case split: req ...; case { ... }; *)
+  | REQ sl SEMICOLON CASE LBRACE case_list RBRACE SEMICOLON
+  {
+    let cases = $6 in
+    let ret_opt =
+      cases |> List.find_map (fun (_b, r) -> r)
+    in
+    let global_req = $2 in
+
+    (* Push global req into each branch behavior body. *)
+    let behaviors =
+      cases
+      |> List.map (fun ((b : Sl_ast.behavior), r) ->
+           let b' = { b with body = (CReq global_req) :: b.body } in
+           (b', r))
+      |> List.map fst
+    in
+    { ret = ret_opt; behaviors }
+  }
+
+
+
+  (* Only ensures clause *)
   | ens_clause
       {
         let (ret_opt, post) = $1 in
@@ -61,9 +85,20 @@ spec:
         }
       }
 
+  (* Pure case split *)
   | CASE LBRACE case_list RBRACE SEMICOLON
-      { { ret = None; behaviors = $3 } }
+    {
+      let cases = $3 in
+      let ret_opt =
+        cases
+        |> List.find_map (fun (_b, r) -> r)
+      in
+      let behaviors = cases |> List.map fst in
+      { ret = ret_opt; behaviors }
+    }
 
+
+  (* Loop spec (your existing "req ... && Term[...] ..." form) *)
   | loop_clause_list
       { { ret = None; behaviors = $1 } }
 
@@ -74,6 +109,8 @@ ens_clause:
   | ENS LBRACK ID RBRACK sl SEMICOLON
       { (Some $3, $5) }
 
+(* ---------- Separation-Logic formula layer ---------- *)
+
 sl:
   | sl IMPLIES sl      { SImplies ($1, $3) }
   | sl OR sl           { SOr [$1; $3] }
@@ -81,21 +118,32 @@ sl:
   | sl STAR sl         { SSep [$1; $3] }
   | sl_atom            { $1 }
 
+binder:
+  (* printed form: j:size_t *)
+  | ID COLON ID
+      { ($1, Some (SUser $3)) }
+
+  (* input form: size_t j *)
+  | ID ID
+      { ($2, Some (SUser $1)) }
+
 sl_atom:
   | heap_atom          { SHeap $1 }
   | cmp_sl             { $1 }
+
   | ID
       {
         if $1 = "emp" then SEmp
         else failwith ("Unexpected bare identifier in sl: " ^ $1)
       }
+
   | LPAREN sl RPAREN   { $2 }
 
-  | FORALL ID ID DOT sl
-      { SForall ([($3, Some (SUser $2))], $5) }
+  | FORALL binder DOT sl
+      { SForall ([$2], $4) }
 
-  | EXISTS ID ID DOT sl
-      { SExists ([($3, Some (SUser $2))], $5) }
+  | EXISTS binder DOT sl
+      { SExists ([$2], $4) }
 
   | RETURN expr
       { SPure (EBinop (BEq, EResult, $2)) }
@@ -105,7 +153,7 @@ heap_atom:
       { HPt { loc = EVar $1; ty = $3; value = $6 } }
 
   | ID ARROW TYPE STAR LPAREN expr COMMA expr RPAREN
-      { HPred ("range", [EVar $1; $6; $8]) }
+      { HRange { loc = EVar $1; ty = $3; lo = $6; hi = $8 } }
 
 cmp_sl:
   | expr cmp_op expr
@@ -126,6 +174,8 @@ cmp_op:
   | LTE  { BLe }
   | GT   { BGt }
   | GTE  { BGe }
+
+(* ---------- Expression layer ---------- *)
 
 expr:
   | ID
@@ -158,28 +208,42 @@ expr:
   | LPAREN expr RPAREN
       { $2 }
 
+(* ---------- Case branches ---------- *)
+
 case:
+  | sl IMPLIES ens_clause
+      {
+        let (ret_opt, post) = $3 in
+        ( { name = None; assumes = $1; body = [ CEns post ] }
+        , ret_opt )
+      }
+
   | sl IMPLIES REQ sl SEMICOLON ens_clause
       {
-        let (_ret_opt, post) = $6 in
-        { name = None; assumes = $1; body = [ CReq $4; CEns post ] }
+        let (ret_opt, post) = $6 in
+        ( { name = None; assumes = $1; body = [ CReq $4; CEns post ] }
+        , ret_opt )
       }
 
   | sl IMPLIES REQ TERM LBRACK expr RBRACK SEMICOLON ens_clause
       {
-        let (_ret_opt, post) = $9 in
-        { name = None; assumes = $1; body = [ CVar (Some $6); CEns post ] }
+        let (ret_opt, post) = $9 in
+        ( { name = None; assumes = $1; body = [ CVar (Some $6); CEns post ] }
+        , ret_opt )
       }
 
   | sl IMPLIES REQ TERM LBRACK RBRACK SEMICOLON ens_clause
       {
-        let (_ret_opt, post) = $8 in
-        { name = None; assumes = $1; body = [ CVar None; CEns post ] }
+        let (ret_opt, post) = $8 in
+        ( { name = None; assumes = $1; body = [ CVar None; CEns post ] }
+        , ret_opt )
       }
 
 case_list:
   | case                  { [$1] }
   | case case_list        { $1 :: $2 }
+
+(* ---------- Loop clauses (unchanged) ---------- *)
 
 loop_clause_list:
   | loop_clause                   { [$1] }

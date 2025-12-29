@@ -137,7 +137,7 @@ let test_parse_heap_range _ctx =
     "ens i'==length;"
   in
   let expected =
-    "case {range(array, 0, length - i) => req Term[length - i]; ens i' == length;};"
+    "case {array->int*(0,length - i) => req Term[length - i]; ens i' == length;};"
   in
   test_framework input expected
 
@@ -148,7 +148,7 @@ let test_parse_forall_basic _ctx =
     "ens i'==10;"
   in
   let expected =
-    "case {forall j:size_t. 0 <= j => j < 10 => req Term[1]; ens i' == 10;};"
+    "case {\\forall j:size_t. 0 <= j => j < 10 => req Term[1]; ens i' == 10;};"
   in
   test_framework input expected
 
@@ -170,7 +170,7 @@ let test_parse_forall_with_index _ctx =
     "ens i'==10;"
   in
   let expected =
-    "case {forall j:size_t. 0 <= j => (*(array + j)) != element => req Term[1]; ens i' == 10;};"
+    "case {\\forall j:size_t. 0 <= j => (*(array + j)) != element => req Term[1]; ens i' == 10;};"
   in
   test_framework input expected
 
@@ -204,15 +204,88 @@ let test_parse_target_full _ctx =
     "ens i'==length || \\return*(array+i') && array[i']!=element && 0<=i'<length;"
   in
   let expected =
-    "case {range(array, 0, length - i) && 0 <= i && i <= length && " ^
-    "forall j:size_t. 0 <= j => (*(array + j)) != element => req Term[length - i]; " ^
+    "case {array->int*(0,length - i) && 0 <= i && i <= length && " ^
+    "\\forall j:size_t. 0 <= j => (*(array + j)) != element => req Term[length - i]; " ^
     "ens i' == length || (\\result == (*(array + i')) && (*(array + i')) != element && " ^
     "0 <= i' && i' < length);};"
   in
   test_framework input expected
 
+(* ---------- Incremental parser tests for the new (search) specification ---------- *)
 
+let test_parse_req_heap_range_minimal _ctx =
+  let input =
+    "req array->int*(0,length-1);\n" ^
+    "ens \\result==\\result;"
+  in
+  let expected =
+    "req array->int*(0,length - 1); ens \\result == \\result;"
+  in
+  test_framework input expected
 
+let test_parse_ens_ret_named_minimal _ctx =
+  let input =
+    "ens[r] r==NULL;"
+  in
+  let expected =
+    "ens[r] r == NULL;"
+  in
+  test_framework input expected
+
+let test_parse_case_two_branches_minimal _ctx =
+  let input =
+    "case {\n" ^
+    "  i<0 => req Term[]; ens i'==i;\n" ^
+    "  i>=0 => req Term[]; ens i'==0;\n" ^
+    "};"
+  in
+  let expected =
+    "case {i < 0 => req Term[]; ens i' == i; i >= 0 => req Term[]; ens i' == 0;};"
+  in
+  test_framework input expected
+
+let test_parse_exists_assumes _ctx =
+  let input =
+    "case {\n" ^
+    "  (\\exists size_t off . 0<=off<length) => req Term[]; ens off==off;\n" ^
+    "};"
+  in
+  let expected =
+    "case {\\exists off:size_t. 0 <= off && off < length => req Term[]; ens off == off;};"
+  in
+  test_framework input expected
+
+let test_parse_forall_implies_assumes _ctx =
+  let input =
+    "case {\n" ^
+    "  (\\forall size_t off . (0<=off<length ==> array[off]!=element))\n" ^
+    "    => req Term[]; ens off==off;\n" ^
+    "};"
+  in
+  let expected =
+    "case {\\forall off:size_t. (0 <= off && off < length) => (*(array + off)) != element => req Term[]; ens off == off;};"
+  in
+  test_framework input expected
+
+let test_parse_search_spec_full _ctx =
+  let input =
+    "req array->int*(0,length-1);\n" ^
+    "case {\n" ^
+    "  (\\exists size_t off . 0<=off<length && array[off]==element)\n" ^
+    "    => ens[r] r>=array && r<array+length && *r==element;\n" ^
+    "  (\\forall size_t off . (0<=off<length ==> array[off]!=element))\n" ^
+    "    => ens[r] r==NULL;\n" ^
+    "};"
+  in
+  let expected =
+    (* "req array->int*(0,length - 1);" ^ *)
+    "case {" ^
+    "\\exists off:size_t. 0 <= off && off < length && (*(array + off)) == element => " ^
+    "req array->int*(0,length - 1); ens[r] r >= array && r < array + length && (*r) == element; " ^
+    "\\forall off:size_t. (0 <= off && off < length) => (*(array + off)) != element => " ^
+    "req array->int*(0,length - 1); ens[r] r == NULL;};"
+  in
+  test_framework input expected
 
 let suite =
   "sl_parser" >::: [
@@ -237,6 +310,13 @@ let suite =
     "parse_return_expr"             >:: test_parse_return_expr;
     "parse_or"                      >:: test_parse_or;
     "parse_target_full"             >:: test_parse_target_full;
+
+    "parse_req_heap_range_minimal"      >:: test_parse_req_heap_range_minimal;
+    "parse_ens_ret_named_minimal"       >:: test_parse_ens_ret_named_minimal;
+    "parse_case_two_branches_minimal"   >:: test_parse_case_two_branches_minimal;
+    "parse_exists_assumes"              >:: test_parse_exists_assumes;
+    "parse_forall_implies_assumes"      >:: test_parse_forall_implies_assumes;
+    "parse_search_spec_full"            >:: test_parse_search_spec_full;
   ]
 
 

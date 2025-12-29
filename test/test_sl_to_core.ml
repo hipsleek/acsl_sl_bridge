@@ -23,7 +23,7 @@ let test_sl_to_core_swap _ctx =
     "behavior <anon>:\n" ^
     "  assumes true\n" ^
     "  requires valid(a) && valid(b)\n" ^
-    "  ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "  ensures H'(a) == load(b) && H'(b) == load(a)\n" ^
     "  assigns { *a, *b }"
   in
   test_framework expected actual
@@ -42,7 +42,7 @@ let test_sl_to_core_no_swap _ctx =
     "behavior <anon>:\n" ^
     "  assumes true\n" ^
     "  requires valid(a)\n" ^
-    "  ensures H'(a) == H(a)\n" ^
+    "  ensures H'(a) == load(a)\n" ^
     "  assigns { *a }"
   in
   test_framework expected actual
@@ -61,7 +61,7 @@ let test_sl_to_core_triple_swap _ctx =
     "behavior <anon>:\n" ^
     "  assumes true\n" ^
     "  requires valid(a) && valid(b) && valid(c)\n" ^
-    "  ensures H'(a) == H(c) && H'(b) == H(a) && H'(c) == H(b)\n" ^
+    "  ensures H'(a) == load(c) && H'(b) == load(a) && H'(c) == load(b)\n" ^
     "  assigns { *a, *b, *c }"
   in
   test_framework expected actual
@@ -80,7 +80,7 @@ let test_sl_to_core_swap_type_mismatch _ctx =
     "behavior <anon>:\n" ^
     "  assumes true\n" ^
     "  requires valid(a) && valid(b)\n" ^
-    "  ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "  ensures H'(a) == load(b) && H'(b) == load(a)\n" ^
     "  assigns { *a, *b }"
   in
   test_framework expected actual
@@ -138,37 +138,37 @@ let test_sl_to_core_case_swap _ctx =
     "behavior case1:\n" ^
     "  assumes a == b\n" ^
     "  requires valid(a) && valid(b)\n" ^
-    "  ensures H'(a) == H(a)\n" ^
+    "  ensures H'(a) == load(a)\n" ^
     "  assigns { *a, *b }\n\n" ^
 
     "behavior case2:\n" ^
     "  assumes a != b\n" ^
     "  requires valid(a) && valid(b)\n" ^
-    "  ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "  ensures H'(a) == load(b) && H'(b) == load(a)\n" ^
     "  assigns { *a, *b }\n\n" ^
 
     "behavior case3:\n" ^
     "  assumes a <= b\n" ^
     "  requires valid(a) && valid(b)\n" ^
-    "  ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "  ensures H'(a) == load(b) && H'(b) == load(a)\n" ^
     "  assigns { *a, *b }\n\n" ^
 
     "behavior case4:\n" ^
     "  assumes a < b\n" ^
     "  requires valid(a) && valid(b)\n" ^
-    "  ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "  ensures H'(a) == load(b) && H'(b) == load(a)\n" ^
     "  assigns { *a, *b }\n\n" ^
 
     "behavior case5:\n" ^
     "  assumes a >= b\n" ^
     "  requires valid(a) && valid(b)\n" ^
-    "  ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "  ensures H'(a) == load(b) && H'(b) == load(a)\n" ^
     "  assigns { *a, *b }\n\n" ^
 
     "behavior case6:\n" ^
     "  assumes a > b\n" ^
     "  requires valid(a) && valid(b)\n" ^
-    "  ensures H'(a) == H(b) && H'(b) == H(a)\n" ^
+    "  ensures H'(a) == load(b) && H'(b) == load(a)\n" ^
     "  assigns { *a, *b }"
   in
   test_framework expected actual
@@ -247,10 +247,40 @@ let test_sl_to_core_loop_search_forall_index _ctx =
     "params()\n" ^
     "behavior <anon>:\n" ^
     "  assumes 0 <= i && i <= length && forall size_t j. (0 <= j && j < i) ==> (array[j] != element)\n" ^
-    "  requires true\n" ^
+    "  requires valid_read_range(array, 0, length - i)\n" ^
     "  ensures i' == length || \\result == array[i'] && array[i'] != element && 0 <= i' && i' < length\n" ^
     "  assigns { i }\n" ^
     "  variant length - i"
+  in
+  test_framework expected actual
+
+let test_sl_to_core_spec_search _ctx =
+  let input =
+    "req array->int*(0,length-1);\n" ^
+    "case {\n" ^
+    "  (\\exists size_t off . 0<=off<length && array[off]==element)\n" ^
+    "    => ens[r] r>=array && r<array+length && *r==element;\n" ^
+    "  (\\forall size_t off . (0<=off<length ==> array[off]!=element))\n" ^
+    "    => ens[r] r==NULL;\n" ^
+    "};"
+  in
+  let sl_spec = parse_spec input in
+  let core_spec = Spec_to_core.sl_to_core sl_spec in
+  let actual = Core_printer.string_of_spec core_spec in
+  let expected =
+    "kind(function)\n" ^
+    "params()\n" ^
+    "behavior case1:\n" ^
+    "  assumes exists size_t off. 0 <= off && off < length && array[off] == element\n" ^
+    "  requires valid_read_range(array, 0, length - 1)\n" ^
+    "  ensures \\result >= array && \\result < array + length && load(\\result) == element\n" ^
+    "  assigns {}\n" ^
+    "\n" ^
+    "behavior case2:\n" ^
+    "  assumes forall size_t off. (0 <= off && off < length) ==> (array[off] != element)\n" ^
+    "  requires valid_read_range(array, 0, length - 1)\n" ^
+    "  ensures \\result == NULL\n" ^
+    "  assigns {}"
   in
   test_framework expected actual
 
@@ -266,7 +296,8 @@ let suite =
     "loop_case_term" >:: test_sl_to_core_loop_case_term;
     "loop_simple_term_and_frame" >:: test_sl_to_core_loop_simple_term_and_frame;
     "ens_result" >:: test_sl_to_core_ens_result;
-    "loop_search_forall_index" >:: test_sl_to_core_loop_search_forall_index
+    "loop_search_forall_index" >:: test_sl_to_core_loop_search_forall_index;
+    "search" >:: test_sl_to_core_spec_search;
   ]
 
 let () = run_test_tt_main suite

@@ -20,6 +20,7 @@ type term =
   | TBinOp of binop * term * term
   | TAt of term * label
   | TIndex of term * term
+  | TRange of term * term
 
 type rel = Eq | Neq | Lt | Lte | Gt | Gte
 

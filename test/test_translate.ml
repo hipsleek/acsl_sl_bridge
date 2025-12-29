@@ -198,8 +198,8 @@ let test_translate_loop_terminating_triple_case_expr _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  loop invariant 20 <= i;\n" ^
     "  loop invariant i < 30;\n" ^
+    "  loop invariant 20 <= i;\n" ^
     "  loop assigns i;\n" ^
     "  loop variant 30 - i;\n" ^
     "*/"
@@ -243,11 +243,12 @@ let test_translate_ens_res _ctx =
     "/*@\n" ^
     "  requires \\true;\n" ^
     "  assigns \\nothing;\n" ^
-    "  ensures \\result == \\old(a) + 10;\n" ^
+    "  ensures \\result == a + 10;\n" ^
     "*/"
   in
   test_framework input expected
 
+(* No observed difference*)
 let test_translate_for_loop_search_forall_index _ctx =
   let input =
     "req array->int*(0,length-i) && 0<=i<=length && Term[length-i]\n" ^
@@ -256,8 +257,8 @@ let test_translate_for_loop_search_forall_index _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  loop invariant 0 <= i;\n" ^
     "  loop invariant i <= length;\n" ^
+    "  loop invariant 0 <= i;\n" ^
     "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
     "  loop assigns i;\n" ^
     "  loop variant length - i;\n" ^
@@ -265,6 +266,136 @@ let test_translate_for_loop_search_forall_index _ctx =
   in
   test_framework input expected
 
+(* No observed difference*)
+let test_sl_to_acsl_spec_search _ctx =
+  let input =
+    "req array->int*(0,length-1);\n" ^
+    "case {\n" ^
+    "  (\\exists size_t off . 0<=off<length && array[off]==element)\n" ^
+    "    => ens[r] r>=array && r<array+length && *r==element;\n" ^
+    "  (\\forall size_t off . (0<=off<length ==> array[off]!=element))\n" ^
+    "    => ens[r] r==NULL;\n" ^
+    "};"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires \\valid_read(array + (0 .. length - 1));\n" ^
+    "  assigns \\nothing;\n" ^
+    "  behavior case1:\n" ^
+    "    assumes \\exists size_t off; 0 <= off && off < length && array[off] == element;\n" ^
+    "    ensures \\result >= array && \\result < array + length && \\old(*\\result) == element;\n" ^
+    "  behavior case2:\n" ^
+    "    assumes \\forall size_t off; (0 <= off && off < length) ==> (array[off] != element);\n" ^
+    "    ensures \\result == NULL;\n" ^
+    "*/"
+  in
+  test_framework input expected
+
+let test_sl_to_acsl_mutable_arr _ctx =
+  let input =
+    "req array->int*(0,length-1);\n" ^
+    "ens \\forall size_t j. (0<=j<length => array[j]'==0);"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires \\valid_read(array + (0 .. length - 1));\n" ^
+    "  assigns array[(0 .. length - 1)];\n" ^
+    "  ensures \\forall size_t j; (0 <= j && j < length) ==> (array[j] == 0);\n" ^
+    "*/"
+  in
+  test_framework input expected
+
+let test_sl_to_acsl_mutable_arr_loop _ctx =
+  let input =
+    "req array->int*(i,length-i) && i<=length && Term[length-i]\n" ^
+    "&& \\forall size_t j. (i<=j<length => array[j]'==0);\n" ^
+    "ens i'==length;"
+  in
+  let expected =
+    "/*@\n" ^
+    "  loop invariant i <= length;\n" ^
+    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] == 0);\n" ^
+    "  loop assigns i, array[(0 .. length - 1)];\n" ^
+    "  loop variant length - i;\n" ^
+    "*/"
+  in
+  test_framework input expected
+
+let test_sl_to_acsl_search_replace _ctx =
+  let input =
+    "req array->int*(0,length-1);\n" ^
+    "ens \\forall size_t j. (0<=j<length && arr[j]==old => array[j]'==new)" ^
+    "&& \\forall size_t j. (0<=j<length && arr[j]!=old => array[j]'==array[j]);"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires \\valid_read(array + (0 .. length - 1));\n" ^
+    "  assigns array[(0 .. length - 1)];\n" ^
+    "  ensures \\forall size_t j; ((0 <= j && j < length && \\old(arr[j]) == old) ==> (array[j] == new))" ^
+    " && \\forall size_t j; (0 <= j && j < length && \\old(arr[j]) != old) ==> (array[j] == \\old(array[j]));\n" ^
+    "*/"
+  in
+  test_framework input expected
+
+let test_sl_to_acsl_search_replace_loop _ctx =
+  let input =
+    "req array->int*(0,length-1) && Term[length - i]\n" ^
+    "&& \\forall size_t j. (0<=j<length && arr[j]==old => array[j]'==new)" ^
+    "&& \\forall size_t j. (0<=j<length && arr[j]!=old => array[j]'==array[j]);" ^
+    "ens i'==length;"
+  in
+  let expected =
+    "/*@\n" ^
+    "  loop invariant \\forall size_t j; ((0 <= j && j < length && arr[j] == old) ==> (array[j] == new)) && \\forall size_t j; (0 <= j && j < length && arr[j] != old) ==> (array[j] == array[j]);\n" ^
+    "  loop assigns i, array[(0 .. length - 1)];\n" ^
+    "  loop variant length - i;\n" ^
+    "*/"
+  in
+  test_framework input expected
+
+let test_translate_incr_max _ctx =
+  let input =
+    "req p!=q && p->int*(a) && q->int*(b);\n" ^
+    "case {\n" ^
+    "  a>=b => ens p->int*(a+1) && q->int*(b);\n" ^
+    "  a<b  => ens p->int*(a) && q->int*(b+1);\n" ^
+    "};"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires p != q && \\valid(p) && \\valid(q);\n" ^
+    "  assigns *p, *q;\n" ^
+    "  behavior case1:\n" ^
+    "    assumes *p >= *q;\n" ^
+    "    ensures *p == \\old(*p) + 1 && *q == \\old(*q);\n" ^
+    "  behavior case2:\n" ^
+    "    assumes *p < *q;\n" ^
+    "    ensures *p == \\old(*p) && *q == \\old(*q) + 1;\n" ^
+    "*/"
+  in
+  test_framework input expected
+
+(* let test_translate_incr_max_spatial_notation _ctx =
+  let input =
+    "req p->int*(a) ** q->int*(b);\n" ^
+    "case {\n" ^
+    "  a>=b => ens p->int*(a+1) && q->int*(b);\n" ^
+    "  a<b  => ens p->int*(a) && q->int*(b+1);\n" ^
+    "};"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires p != q && \\valid(p) && \\valid(q);\n" ^
+    "  assigns *p, *q;\n" ^
+    "  behavior case1:\n" ^
+    "    assumes *p >= *q;\n" ^
+    "    ensures *p == \\old(*p) + 1 && *q == \\old(*q);\n" ^
+    "  behavior case2:\n" ^
+    "    assumes *p < *q;\n" ^
+    "    ensures *p == \\old(*p) && *q == \\old(*q) + 1;\n" ^
+    "*/"
+  in
+  test_framework input expected *)
 
 
 let suite =
@@ -285,6 +416,12 @@ let suite =
     "translate_for_loop"                 >:: test_translate_for_loop;
     "translate_ens_res"                  >:: test_translate_ens_res;
     "translate_for_loop_search_forall_index" >:: test_translate_for_loop_search_forall_index;
+    "spec_search" >:: test_sl_to_acsl_spec_search;
+    "mutable_arr" >:: test_sl_to_acsl_mutable_arr;
+    "mutable_arr_loop" >:: test_sl_to_acsl_mutable_arr_loop;
+    "search_replace" >:: test_sl_to_acsl_search_replace;
+    "search_replace_loop" >:: test_sl_to_acsl_search_replace_loop;
+    "incr_max" >:: test_translate_incr_max;
   ]
 
 let () = run_test_tt_main suite

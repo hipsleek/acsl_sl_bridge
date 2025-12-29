@@ -1,3 +1,5 @@
+(* core_to_acsl.ml *)
+
 open Core
 module A = Acsl_ast
 
@@ -21,47 +23,38 @@ let binop_of_arith : Core.arith_op -> A.binop = function
   | Mul -> A.Mul
   | Div -> A.Div
 
-
 let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
   match t with
   | TInt n -> A.TInt n
   | TResult -> A.TResult
 
-  | TPtr p ->
-      A.TVar p
+  | TPtr p -> A.TVar p
 
   | TVar (ph, x) -> (
       match c with
-      | CLoop ->
-          A.TVar x
+      | CLoop -> A.TVar x
       | CLoopRel ->
           (match ph with
            | Pre -> A.TAt (A.TVar x, A.LoopEntry)
            | Post -> A.TVar x)
-      | CRequires ->
-          A.TVar x
+      | CRequires -> A.TVar x
       | CEnsures ->
-          (match ph with
-           | Post -> A.TVar x
-           | Pre -> A.TOld (A.TVar x))
-    )
+          (* variables are unlabelled in ensures; only heap terms use \old *)
+          A.TVar x)
 
   | THeap (ph, p) -> (
       let deref = A.TDeref (A.TVar p) in
       match c with
-      | CLoop ->
-          deref
+      | CLoop -> deref
       | CLoopRel ->
           (match ph with
            | Pre -> A.TAt (deref, A.LoopEntry)
            | Post -> deref)
-      | CRequires ->
-          deref
+      | CRequires -> deref
       | CEnsures ->
           (match ph with
            | Post -> deref
-           | Pre -> A.TOld deref)
-    )
+           | Pre -> A.TOld deref))
 
   | TArith (op, t1, t2) ->
       A.TBinOp (binop_of_arith op, aterm_of_core c t1, aterm_of_core c t2)
@@ -69,8 +62,20 @@ let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
   | TApp (f, args) ->
       A.TApp (f, List.map (aterm_of_core c) args)
 
-  | TIndex (_ph, a, idx) ->
-      A.TIndex (aterm_of_core c a, aterm_of_core c idx)
+  | TIndex (ph, a, idx) ->
+      let t = A.TIndex (aterm_of_core c a, aterm_of_core c idx) in
+      (match c with
+       | CEnsures ->
+           (match ph with
+            | Pre -> A.TOld t
+            | Post -> t)
+       | CLoopRel ->
+           (match ph with
+            | Pre -> A.TAt (t, A.LoopEntry)
+            | Post -> t)
+       | CRequires
+       | CLoop ->
+           t)
 
   | TLoad (ph, addr) -> (
       let at = aterm_of_core c addr in
@@ -85,9 +90,11 @@ let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
            | Pre -> A.TAt (A.TDeref at, A.LoopEntry))
       | CLoop
       | CRequires ->
-          A.TDeref at
-    )
+          A.TDeref at)
 
+(* ------------------------- *)
+(* Core.predicate -> ACSL.predicate *)
+(* ------------------------- *)
 
 let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
   match p with
@@ -103,6 +110,16 @@ let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
         | [ TPtr p ] -> A.PApp ("\\valid", [ A.TVar p ])
         | [ t ] -> A.PApp ("\\valid", [ aterm_of_core c t ])
         | _ -> A.PApp ("\\valid", List.map (aterm_of_core c) args)
+      else if name = "valid_read_range" then
+        match args with
+        | [ base; lo; hi ] ->
+            let base' = aterm_of_core c base in
+            let lo' = aterm_of_core c lo in
+            let hi' = aterm_of_core c hi in
+            let ptr_expr = A.TBinOp (A.Add, base', A.TRange (lo', hi')) in
+            A.PApp ("\\valid_read", [ ptr_expr ])
+        | _ ->
+            A.PApp ("\\valid_read", List.map (aterm_of_core c) args)
       else
         A.PApp (name, List.map (aterm_of_core c) args)
 
@@ -119,13 +136,19 @@ let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
       let bs' = List.map (fun (b : Core.binder) -> (b.b_name, b.b_ty)) bs in
       A.PExists (bs', apred_of_core c body)
 
+(* ------------------------- *)
+(* Assigns *)
+(* ------------------------- *)
 
 let aterm_of_assignable (a : Core.assignable) : A.term option =
   match a with
   | AsVar v -> Some (A.TVar v)
   | AsHeap p -> Some (A.TDeref (A.TVar p))
   | AsTerm t -> Some (aterm_of_core CEnsures t)
-  | AsRange (_p, _lo, _hi) -> None
+  | AsRange (p, lo, hi) ->
+      let lo' = aterm_of_core CLoop lo in
+      let hi' = aterm_of_core CLoop hi in
+      Some (A.TIndex (A.TVar p, A.TRange (lo', hi')))
 
 let assigns_of_core (xs : Core.assignable list) : A.assigns =
   let ts = xs |> List.filter_map aterm_of_assignable in
@@ -133,6 +156,9 @@ let assigns_of_core (xs : Core.assignable list) : A.assigns =
   | [] -> A.ANothing
   | _ -> A.AList ts
 
+(* ------------------------- *)
+(* Helpers *)
+(* ------------------------- *)
 
 let find_first (f : 'a -> 'b option) (xs : 'a list) : 'b option =
   let rec go = function
@@ -145,17 +171,139 @@ let all_of (f : 'a -> 'b option) (xs : 'a list) : 'b list =
   xs |> List.filter_map f
 
 let clause_assumes = function Assumes p -> Some p | _ -> None
+let clause_requires = function Requires p -> Some p | _ -> None
 let clause_ensures = function Ensures p -> Some p | _ -> None
 let clause_assigns = function Assigns xs -> Some xs | _ -> None
-let clause_variant = function Variant t -> Some t | _ -> None
 
 let normalize_pred_list (ps : A.predicate list) : A.predicate list =
-  ps |> List.filter (fun p -> p <> A.PTrue)
+  (* remove trivial truths and duplicates *)
+  ps
+  |> List.filter (fun p -> p <> A.PTrue)
+  |> List.sort_uniq Stdlib.compare
+
+(* ------------------------- *)
+(* NEW: robust global requires aggregation *)
+(* ------------------------- *)
+
+let rec split_top_and_core (p : Core.predicate) : Core.predicate list =
+  match p with
+  | Core.PAnd ps -> List.concat_map split_top_and_core ps
+  | _ -> [ p ]
+
+let uniq_core_preds (ps : Core.predicate list) : Core.predicate list =
+  ps |> List.sort_uniq Stdlib.compare
+
+let pred_and_core (ps : Core.predicate list) : Core.predicate =
+  let atoms =
+    ps
+    |> List.concat_map split_top_and_core
+    |> List.filter (fun p -> p <> Core.PTrue)
+    |> uniq_core_preds
+  in
+  match atoms with
+  | [] -> Core.PTrue
+  | [p] -> p
+  | _ -> Core.PAnd atoms
+
+let uniq_assignables (xs : Core.assignable list) : Core.assignable list =
+  let key_of = function
+    | AsVar v -> "V:" ^ v
+    | AsHeap p -> "H:" ^ p
+    | AsRange (p, _lo, _hi) -> "R:" ^ p
+    | AsTerm t -> "T:" ^ string_of_int (Stdlib.Hashtbl.hash t)
+  in
+  let module S = Set.Make (String) in
+  let rec go seen acc = function
+    | [] -> List.rev acc
+    | x :: tl ->
+        let k = key_of x in
+        if S.mem k seen then go seen acc tl
+        else go (S.add k seen) (x :: acc) tl
+  in
+  go S.empty [] xs
+
+(* detect "global req only" behavior to omit it in ACSL output *)
+let is_global_req_only_behavior (b : Core.behavior) : bool =
+  let assumes_ps = b.clauses |> all_of clause_assumes in
+  let ensures_ps = b.clauses |> all_of clause_ensures in
+  let requires_p =
+    b.clauses |> find_first clause_requires |> Option.value ~default:Core.PTrue
+  in
+  let assigns_xs =
+    b.clauses |> find_first clause_assigns |> Option.value ~default:[]
+  in
+  let assumes_is_true =
+    match assumes_ps with
+    | [] -> true
+    | [ Core.PTrue ] -> true
+    | _ -> false
+  in
+  let ensures_is_true =
+    match ensures_ps with
+    | [] -> true
+    | [ Core.PTrue ] -> true
+    | _ -> false
+  in
+  let requires_is_nontrivial = (requires_p <> Core.PTrue) in
+  let assigns_is_empty = (assigns_xs = []) in
+  assumes_is_true && ensures_is_true && requires_is_nontrivial && assigns_is_empty
+
+(* ------------------------- *)
+(* Core.spec -> ACSL contract *)
+(* ------------------------- *)
+
+let contract_of_core (s : Core.spec) : A.contract =
+  let all_clauses = s.behaviors |> List.concat_map (fun b -> b.clauses) in
+
+  (* Global requires = conjunction of all requires clauses (deduped). *)
+  let reqs =
+    all_clauses |> List.filter_map (function Requires p -> Some p | _ -> None)
+  in
+  let req_pred = pred_and_core reqs in
+
+  (* Global assigns = union of all assigns clauses (conservative). *)
+  let assigns_list =
+    all_clauses
+    |> List.filter_map (function Assigns xs -> Some xs | _ -> None)
+    |> List.concat
+    |> uniq_assignables
+  in
+
+  let requires =
+    [ apred_of_core CRequires req_pred ] |> normalize_pred_list
+  in
+  let assigns = assigns_of_core assigns_list in
+
+  let behaviors =
+    s.behaviors
+    |> List.filter (fun b -> not (is_global_req_only_behavior b))
+    |> List.map (fun b ->
+         let assumes =
+           b.clauses
+           |> all_of clause_assumes
+           |> List.map (apred_of_core CRequires)
+           |> normalize_pred_list
+         in
+         let ensures =
+           b.clauses
+           |> all_of clause_ensures
+           |> List.map (apred_of_core CEnsures)
+           |> normalize_pred_list
+         in
+         { A.b_name = b.b_name; b_assumes = assumes; b_ensures = ensures })
+  in
+
+  { A.requires = requires; assigns; behaviors }
+
+(* ------------------------- *)
+(* Loop contract (unchanged) *)
+(* ------------------------- *)
 
 let rec split_top_and (p : Core.predicate) : Core.predicate list =
   match p with
   | Core.PAnd ps -> List.concat_map split_top_and ps
-  | _ -> [p]
+  | _ -> [ p ]
+
 let rec term_mentions_result (t : Core.term) : bool =
   match t with
   | Core.TResult -> true
@@ -210,39 +358,6 @@ let is_liftable_relational (p : Core.predicate) : bool =
   | _ ->
       false
 
-
-let contract_of_core (s : Core.spec) : A.contract =
-  let all_clauses = s.behaviors |> List.concat_map (fun b -> b.clauses) in
-
-  let req_pred =
-    match find_first (function Requires p -> Some p | _ -> None) all_clauses with
-    | None -> Core.PTrue
-    | Some p -> p
-  in
-
-  let assigns_list =
-    match find_first (function Assigns xs -> Some xs | _ -> None) all_clauses with
-    | None -> []
-    | Some xs -> xs
-  in
-
-  let requires = [ apred_of_core CRequires req_pred ] |> normalize_pred_list in
-  let assigns = assigns_of_core assigns_list in
-
-  let behaviors =
-    s.behaviors
-    |> List.map (fun b ->
-         let assumes =
-           b.clauses |> all_of clause_assumes |> List.map (apred_of_core CRequires) |> normalize_pred_list
-         in
-         let ensures =
-           b.clauses |> all_of clause_ensures |> List.map (apred_of_core CEnsures) |> normalize_pred_list
-         in
-         { A.b_name = b.b_name; b_assumes = assumes; b_ensures = ensures })
-  in
-
-  { A.requires = requires; assigns; behaviors }
-
 let loop_contract_of_core (s : Core.spec) : A.loop_contract =
   let chosen =
     match
@@ -263,6 +378,7 @@ let loop_contract_of_core (s : Core.spec) : A.loop_contract =
     |> List.map (apred_of_core CLoop)
     |> normalize_pred_list
   in
+
   let relational_ensures_invs =
     chosen.clauses
     |> all_of clause_ensures

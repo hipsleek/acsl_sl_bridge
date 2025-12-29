@@ -8,6 +8,20 @@ let test_framework (expected : string) (actual : string) : unit =
   assert_equal ~printer:(fun s -> "\n" ^ s ^ "\n") expected actual
 
 
+(* local helpers *)
+let mk_var (ph:C.phase) (x:string) : C.term = C.TVar (ph, x)
+
+let mk_and (ps:C.predicate list) : C.predicate =
+  match ps with
+  | [] -> C.PTrue
+  | [p] -> p
+  | _ -> C.PAnd ps
+
+let mk_or (ps:C.predicate list) : C.predicate =
+  match ps with
+  | [] -> C.PFalse
+  | [p] -> p
+  | _ -> C.POr ps
 
 let mk_inout_param (name : string) : C.param =
   { C.name; mode = C.InOut }
@@ -303,31 +317,10 @@ let test_core_to_acsl_result_ens _ctx =
     "/*@\n" ^
     "  requires \\true;\n" ^
     "  assigns \\nothing;\n" ^
-    "  ensures \\result == \\old(a) + 10;\n" ^
+    "  ensures \\result == a + 10;\n" ^
     "*/"
   in
   test_framework expected actual
-
-(* ---- local helpers (put near the top of test_core_to_acsl.ml, or just above the test) ---- *)
-let mk_int (n:int) : C.term = C.TInt n
-let mk_ptr (p:string) : C.term = C.TPtr p
-let mk_var (ph:C.phase) (x:string) : C.term = C.TVar (ph, x)
-
-let mk_rel (r:C.rel) (t1:C.term) (t2:C.term) : C.predicate =
-  C.PAtom (C.ARel (r, t1, t2))
-
-let mk_and (ps:C.predicate list) : C.predicate =
-  match ps with
-  | [] -> C.PTrue
-  | [p] -> p
-  | _ -> C.PAnd ps
-
-let mk_or (ps:C.predicate list) : C.predicate =
-  match ps with
-  | [] -> C.PFalse
-  | [p] -> p
-  | _ -> C.POr ps
-
 
 let test_core_to_acsl_loop_search_forall_index _ctx =
   let core_spec : C.spec =
@@ -392,8 +385,8 @@ let test_core_to_acsl_loop_search_forall_index _ctx =
   let actual = Core_to_acsl.spec_to_acsl core_spec in
   let expected =
     "/*@\n" ^
-    "  loop invariant 0 <= i;\n" ^
     "  loop invariant i <= length;\n" ^
+    "  loop invariant 0 <= i;\n" ^
     "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
     "  loop assigns i;\n" ^
     "  loop variant length - i;\n" ^
@@ -401,6 +394,7 @@ let test_core_to_acsl_loop_search_forall_index _ctx =
   in
   test_framework expected actual
 
+  
 
 
 let suite =
