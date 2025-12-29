@@ -24,19 +24,15 @@ rule token = parse
   | "float"  { TYPE "float" }
   | "double" { TYPE "double" }
 
-  (* Allow the sugar used in loop_req: "... && Term[...]" *)
   | "&&" [' ' '\t' '\r' '\n']* "Term" { TERM_AND }
   | "Term" { TERM }
 
-  (* ---------- Backslash keywords / atoms ---------- *)
-  | "\\old"    { OLD }
+  | "\\old"  { OLD }
   | "\\forall" { FORALL }
   | "\\exists" { EXISTS }
   | "\\return" { RETURN }
-  (* IMPORTANT: treat \result as an ID so parser's expr rule can map it to EResult *)
   | "\\result" { ID "\\result" }
 
-  (* Accept both implication spellings: => and ==> *)
   | "==>"  { IMPLIES }
   | "=>"   { IMPLIES }
 
@@ -46,7 +42,7 @@ rule token = parse
   | "&&"   { AND }
   | "||"   { OR }
 
-  | "=="   { EQEQ }
+  | "=="  { EQEQ }
   | "!="   { NEQ }
   | ">="   { GTE }
   | ">"    { GT }
@@ -57,11 +53,11 @@ rule token = parse
   | "-"    { MINUS }
   | "**" { SEPSTAR }
   | "*"  { STAR }
-  | "/"    { DIV }
+  | "/" { DIV }
 
-  | "'"    { PRIME }
-  | "."    { DOT }
-  | ","    { COMMA }
+  | "'"  { PRIME }
+  | "."  { DOT }
+  | ","  { COMMA }
 
   | "(" { LPAREN }
   | ")" { RPAREN }

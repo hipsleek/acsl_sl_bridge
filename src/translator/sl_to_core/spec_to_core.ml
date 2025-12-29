@@ -1,13 +1,3 @@
-(* spec_to_core.ml
-   SL AST -> Core IR translation.
-
-   Additions for spatial notation (**):
-   - Parse "**" as SSep.
-   - Infer non-aliasing constraints from SSep heaplets:
-       req (p->... ** q->...)  ==>  Requires includes (p != q).
-   - Avoid duplicating disequalities if already present as pure constraints.
-*)
-
 open Sl_ast
 module C = Core
 
@@ -292,9 +282,6 @@ let pre_value_to_loc_map (pre_atoms : pt_atom list) : string StringMap.t =
     StringMap.empty
     pre_atoms
 
-(***)
-(* Rewrite value variables via pre_map: a ↦ *p *)
-(***) 
 
 let rewrite_value_vars_with_pre_map (pre_map : string StringMap.t) (s : Sl_ast.sl) : Sl_ast.sl =
   let rec map_expr = function
@@ -519,14 +506,10 @@ let requires_from_ranges (ranges : range_atom list) : C.predicate =
            (term_of_expr C.Pre hi))
   |> p_and
 
-(***)
-(* NEW: infer disequalities from SSep *)
-(***) 
 
 let canon_pair (a : string) (b : string) : string * string =
   if String.compare a b <= 0 then (a, b) else (b, a)
 
-(* Collect explicit pure "x != y" present anywhere. *)
 let collect_explicit_neq_pairs (s : Sl_ast.sl) : PairSet.t =
   let f_sl acc = function
     | SPure (EBinop (BNeq, EVar a, EVar b)) ->
@@ -535,7 +518,6 @@ let collect_explicit_neq_pairs (s : Sl_ast.sl) : PairSet.t =
   in
   fold_sl ~f_sl ~f_expr:(fun a _ -> a) PairSet.empty s
 
-(* Flatten an SSep list, keeping only heaplet base locations that are variables. *)
 let rec collect_sep_loc_vars_in (s : Sl_ast.sl) : StringSet.t list =
   match s with
   | SSep xs ->
@@ -591,7 +573,6 @@ let neq_predicate_from_pairs (pairs : PairSet.t) : C.predicate =
   in
   p_and ps
 
-(* Infer non-aliasing from SSep, skipping any explicit pure x!=y already present. *)
 let infer_sep_neqs (req_sl : Sl_ast.sl) : C.predicate =
   let explicit = collect_explicit_neq_pairs req_sl in
   let sep_groups = collect_sep_loc_vars_in req_sl in
@@ -682,10 +663,7 @@ type beh_analysis = {
   assumes_sl : Sl_ast.sl;
   assumes_p : C.predicate;
 
-  (* pure(req) always contributes to Requires *)
   req_pure : C.predicate;
-
-  (* NEW: inferred non-aliasing from SSep in req *)
   req_sep_neqs : C.predicate;
 
   pre_atoms : pt_atom list;
@@ -729,7 +707,6 @@ let analyze_behavior
   let assumes_sl = rewrite_value_vars_with_pre_map pre_map assumes_sl_raw in
   let assumes_p = pred_of_sl assumes_sl in
 
-  (* req: (1) infer sep neq from original req; (2) rewrite value vars for pure translation *)
   let req_sep_neqs =
     match req_opt with
     | None -> C.PTrue
@@ -789,12 +766,6 @@ let analyze_behavior
 (***)
 (* Clause builders *)
 (***) 
-
-(* IMPORTANT: order here matters for your golden outputs.
-   For spatial notation you want:
-     requires p != q && \valid(p) && \valid(q) [&& ...]
-   So put sep-neqs first.
-*)
 let mk_requires
     ~(ptrs : StringSet.t)
     ~(ranges : range_atom list)

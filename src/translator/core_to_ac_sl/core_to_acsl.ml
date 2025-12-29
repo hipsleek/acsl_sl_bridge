@@ -1,5 +1,3 @@
-(* core_to_acsl.ml *)
-
 open Core
 module A = Acsl_ast
 
@@ -39,7 +37,6 @@ let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
            | Post -> A.TVar x)
       | CRequires -> A.TVar x
       | CEnsures ->
-          (* variables are unlabelled in ensures; only heap terms use \old *)
           A.TVar x)
 
   | THeap (ph, p) -> (
@@ -92,9 +89,6 @@ let rec aterm_of_core (c : ctx) (t : Core.term) : A.term =
       | CRequires ->
           A.TDeref at)
 
-(* ------------------------- *)
-(* Core.predicate -> ACSL.predicate *)
-(* ------------------------- *)
 
 let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
   match p with
@@ -136,9 +130,6 @@ let rec apred_of_core (c : ctx) (p : Core.predicate) : A.predicate =
       let bs' = List.map (fun (b : Core.binder) -> (b.b_name, b.b_ty)) bs in
       A.PExists (bs', apred_of_core c body)
 
-(* ------------------------- *)
-(* Assigns *)
-(* ------------------------- *)
 
 let aterm_of_assignable (a : Core.assignable) : A.term option =
   match a with
@@ -156,10 +147,6 @@ let assigns_of_core (xs : Core.assignable list) : A.assigns =
   | [] -> A.ANothing
   | _ -> A.AList ts
 
-(* ------------------------- *)
-(* Helpers *)
-(* ------------------------- *)
-
 let find_first (f : 'a -> 'b option) (xs : 'a list) : 'b option =
   let rec go = function
     | [] -> None
@@ -176,14 +163,9 @@ let clause_ensures = function Ensures p -> Some p | _ -> None
 let clause_assigns = function Assigns xs -> Some xs | _ -> None
 
 let normalize_pred_list (ps : A.predicate list) : A.predicate list =
-  (* remove trivial truths and duplicates *)
   ps
   |> List.filter (fun p -> p <> A.PTrue)
   |> List.sort_uniq Stdlib.compare
-
-(* ------------------------- *)
-(* NEW: robust global requires aggregation *)
-(* ------------------------- *)
 
 let rec split_top_and_core (p : Core.predicate) : Core.predicate list =
   match p with
@@ -222,7 +204,6 @@ let uniq_assignables (xs : Core.assignable list) : Core.assignable list =
   in
   go S.empty [] xs
 
-(* detect "global req only" behavior to omit it in ACSL output *)
 let is_global_req_only_behavior (b : Core.behavior) : bool =
   let assumes_ps = b.clauses |> all_of clause_assumes in
   let ensures_ps = b.clauses |> all_of clause_ensures in
@@ -248,20 +229,14 @@ let is_global_req_only_behavior (b : Core.behavior) : bool =
   let assigns_is_empty = (assigns_xs = []) in
   assumes_is_true && ensures_is_true && requires_is_nontrivial && assigns_is_empty
 
-(* ------------------------- *)
-(* Core.spec -> ACSL contract *)
-(* ------------------------- *)
-
 let contract_of_core (s : Core.spec) : A.contract =
   let all_clauses = s.behaviors |> List.concat_map (fun b -> b.clauses) in
 
-  (* Global requires = conjunction of all requires clauses (deduped). *)
   let reqs =
     all_clauses |> List.filter_map (function Requires p -> Some p | _ -> None)
   in
   let req_pred = pred_and_core reqs in
 
-  (* Global assigns = union of all assigns clauses (conservative). *)
   let assigns_list =
     all_clauses
     |> List.filter_map (function Assigns xs -> Some xs | _ -> None)
@@ -295,9 +270,6 @@ let contract_of_core (s : Core.spec) : A.contract =
 
   { A.requires = requires; assigns; behaviors }
 
-(* ------------------------- *)
-(* Loop contract (unchanged) *)
-(* ------------------------- *)
 
 let rec split_top_and (p : Core.predicate) : Core.predicate list =
   match p with
