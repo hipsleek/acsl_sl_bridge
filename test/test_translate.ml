@@ -375,7 +375,7 @@ let test_translate_incr_max _ctx =
   in
   test_framework input expected
 
-(* let test_translate_incr_max_spatial_notation _ctx =
+let test_translate_incr_max_spatial_notation _ctx =
   let input =
     "req p->int*(a) ** q->int*(b);\n" ^
     "case {\n" ^
@@ -395,7 +395,7 @@ let test_translate_incr_max _ctx =
     "    ensures *p == \\old(*p) && *q == \\old(*q) + 1;\n" ^
     "*/"
   in
-  test_framework input expected *)
+  test_framework input expected
 
 
 let suite =
@@ -422,6 +422,7 @@ let suite =
     "search_replace" >:: test_sl_to_acsl_search_replace;
     "search_replace_loop" >:: test_sl_to_acsl_search_replace_loop;
     "incr_max" >:: test_translate_incr_max;
+    "incr_max_spatial_notation" >:: test_translate_incr_max_spatial_notation;
   ]
 
 let () = run_test_tt_main suite

@@ -6,6 +6,7 @@
 %token TERM_AND
 %token ARROW
 %token STAR
+%token SEPSTAR
 %token AND OR SL_CONJ
 %token EQEQ NEQ GTE GT LTE LT
 %token PLUS MINUS DIV
@@ -28,6 +29,7 @@
 %start <Sl_ast.spec> main
 
 %right IMPLIES
+%left SEPSTAR
 %left OR
 %left AND
 %left STAR
@@ -116,6 +118,7 @@ sl:
   | sl OR sl           { SOr [$1; $3] }
   | sl AND sl          { SAnd [$1; $3] }
   | sl STAR sl         { SSep [$1; $3] }
+  | sl SEPSTAR sl      { SSep [$1; $3] }
   | sl_atom            { $1 }
 
 binder:
