@@ -1,21 +1,17 @@
-(* spec_to_core.ml
-   SL AST -> Core IR translation.
-
-   Refactor goals:
-   1) Never “drop” already-supported pure sub-expressions (e.g. p!=q) just because
-      the rest of req is heap-shaped. We always include the *pure remainder* of req
-      into Core.Requires.
-   2) Make “value variables” (e.g. a,b in p->a, q->b) usable in case conditions
-      and post heaplets by rewriting them to *p / *q consistently.
-   3) Keep heap/range discovery for validity + assigns inference, while composing
-      cleanly with the pure pipeline (no overfitting).
-*)
-
 open Sl_ast
 module C = Core
 
 module StringSet = Set.Make (String)
 module StringMap = Map.Make (String)
+
+module PairOrd = struct
+  type t = string * string
+  let compare (a1, b1) (a2, b2) =
+    let c = String.compare a1 a2 in
+    if c <> 0 then c else String.compare b1 b2
+end
+
+module PairSet = Set.Make (PairOrd)
 
 (***)
 (* Small utilities *)
@@ -23,7 +19,6 @@ module StringMap = Map.Make (String)
 
 let ( let* ) x f = match x with None -> None | Some v -> f v
 
-(* helper function to extract if a pattern found and drop otherwise *)
 let list_filter_map f xs =
   let rec go acc = function
     | [] -> List.rev acc
@@ -112,7 +107,6 @@ let rel_of_binop = function
 (* Abstract traversals *)
 (***) 
 
-(* abstract expression traversal *)
 let rec fold_expr ~(f : 'a -> Sl_ast.expr -> 'a) (acc : 'a) (e : Sl_ast.expr) : 'a =
   let acc = f acc e in
   match e with
@@ -124,7 +118,6 @@ let rec fold_expr ~(f : 'a -> Sl_ast.expr -> 'a) (acc : 'a) (e : Sl_ast.expr) : 
   | EOld e1 -> fold_expr ~f acc e1
   | EPost e1 -> fold_expr ~f acc e1
 
-(* abstract sl traversal *)
 let rec fold_sl
     ~(f_sl : 'a -> Sl_ast.sl -> 'a)
     ~(f_expr : 'a -> Sl_ast.expr -> 'a)
@@ -156,7 +149,7 @@ let rec fold_sl
       fold_sl ~f_sl ~f_expr acc body
 
 (***)
-(* Expr -> Core.term, centralized phase handling *)
+(* Expr -> Core.term *)
 (***) 
 
 let rec term_of_expr (default_phase : C.phase) (e : Sl_ast.expr) : C.term =
@@ -167,17 +160,11 @@ let rec term_of_expr (default_phase : C.phase) (e : Sl_ast.expr) : C.term =
   | EResult -> C.TResult
   | EApp (f, args) -> C.TApp (f, List.map (term_of_expr default_phase) args)
   | EUnop (_op, e1) -> C.TApp ("unop", [ term_of_expr default_phase e1 ])
-
-  (* sugar: *(base + idx) -> index(base, idx) *)
   | EDeref (EBinop (BAdd, base, idx)) ->
       C.TIndex (default_phase, term_of_expr default_phase base, term_of_expr default_phase idx)
-  | EDeref e1 ->
-      C.TLoad (default_phase, term_of_expr default_phase e1)
-
-  (* phase switch *)
+  | EDeref e1 -> C.TLoad (default_phase, term_of_expr default_phase e1)
   | EOld e1 -> term_of_expr C.Pre e1
   | EPost e1 -> term_of_expr C.Post e1
-
   | EBinop (op, e1, e2) -> (
       match arith_of_binop op with
       | Some aop ->
@@ -186,7 +173,7 @@ let rec term_of_expr (default_phase : C.phase) (e : Sl_ast.expr) : C.term =
           C.TApp ("binop", [ term_of_expr default_phase e1; term_of_expr default_phase e2 ]) )
 
 (***)
-(* SL -> Core.predicate, “pure-only” (heap ignored) *)
+(* SL -> Core.predicate (heap ignored) *)
 (***) 
 
 let pred_of_cmp_expr (default_phase : C.phase) (e : Sl_ast.expr) : C.predicate =
@@ -232,7 +219,7 @@ let extract_req_ens_var
   (!req, !ens, !var)
 
 (***)
-(* Result rewriting: named return var -> EResult *)
+(* Result rewriting *)
 (***) 
 
 let rewrite_result (ret : string) (s : Sl_ast.sl) : Sl_ast.sl =
@@ -268,7 +255,6 @@ type pt_atom = { loc : string; value : string }
 type pt_atom_any = { loc : string; value_e : Sl_ast.expr }
 type range_atom = { base : string; lo : Sl_ast.expr; hi : Sl_ast.expr }
 
-(* pre: only collect p->v where v is a variable, used to build pre_map v -> p *)
 let collect_pt_atoms (s : Sl_ast.sl) : pt_atom list =
   let f_sl acc = function
     | SHeap (HPt { loc = EVar p; value = EVar v; _ }) -> { loc = p; value = v } :: acc
@@ -276,7 +262,6 @@ let collect_pt_atoms (s : Sl_ast.sl) : pt_atom list =
   in
   fold_sl ~f_sl ~f_expr:(fun a _ -> a) [] s |> List.rev
 
-(* post: collect p->(any expr), needed for incr_max where value is a+1 *)
 let collect_pt_atoms_any (s : Sl_ast.sl) : pt_atom_any list =
   let f_sl acc = function
     | SHeap (HPt { loc = EVar p; value; _ }) -> { loc = p; value_e = value } :: acc
@@ -297,9 +282,6 @@ let pre_value_to_loc_map (pre_atoms : pt_atom list) : string StringMap.t =
     StringMap.empty
     pre_atoms
 
-(***)
-(* Key generalization: rewrite “value variables” via pre_map (a ↦ *p, b ↦ *q). *)
-(***) 
 
 let rewrite_value_vars_with_pre_map (pre_map : string StringMap.t) (s : Sl_ast.sl) : Sl_ast.sl =
   let rec map_expr = function
@@ -335,7 +317,7 @@ let rewrite_value_vars_with_pre_map (pre_map : string StringMap.t) (s : Sl_ast.s
   map_sl s
 
 (***)
-(* “Pure ensures sugar”: recognize heap equalities encoded as comparisons *)
+(* Pure ensures sugar *)
 (***) 
 
 let collect_heap_equalities_from_pure (s : Sl_ast.sl) : (string * string) list =
@@ -345,10 +327,8 @@ let collect_heap_equalities_from_pure (s : Sl_ast.sl) : (string * string) list =
         match (lhs, rhs) with
         | (EPost (EDeref (EVar a)), EDeref (EVar b)) -> Some (a, b)
         | (EDeref (EVar b), EPost (EDeref (EVar a))) -> Some (a, b)
-
         | (EDeref (EVar a), EOld (EDeref (EVar b))) -> Some (a, b)
         | (EOld (EDeref (EVar b)), EDeref (EVar a)) -> Some (a, b)
-
         | (EPost (EDeref (EVar a)), EOld (EDeref (EVar b))) -> Some (a, b)
         | (EOld (EDeref (EVar b)), EPost (EDeref (EVar a))) -> Some (a, b)
         | _ -> None )
@@ -364,7 +344,7 @@ let collect_heap_equalities_from_pure (s : Sl_ast.sl) : (string * string) list =
   fold_sl ~f_sl ~f_expr:(fun a _ -> a) [] s |> List.rev
 
 (***)
-(* Loop normalization (keep your existing rule) *)
+(* Loop normalization (unchanged) *)
 (***) 
 
 let try_rewrite_loop_suffix_write_to_prefix (s : Sl_ast.sl) : Sl_ast.sl option =
@@ -445,7 +425,6 @@ let collect_post_write_bases_in_sl (s : Sl_ast.sl) : StringSet.t =
   in
   fold_sl ~f_sl:(fun a _ -> a) ~f_expr StringSet.empty s
 
-(* widening policy for loops: infer a "length" name if it appears; otherwise degenerate to 0..0 *)
 let expr_mentions_var (x : string) (e : Sl_ast.expr) : bool =
   let found = ref false in
   let f _acc = function
@@ -527,6 +506,85 @@ let requires_from_ranges (ranges : range_atom list) : C.predicate =
            (term_of_expr C.Pre hi))
   |> p_and
 
+
+let canon_pair (a : string) (b : string) : string * string =
+  if String.compare a b <= 0 then (a, b) else (b, a)
+
+let collect_explicit_neq_pairs (s : Sl_ast.sl) : PairSet.t =
+  let f_sl acc = function
+    | SPure (EBinop (BNeq, EVar a, EVar b)) ->
+        PairSet.add (canon_pair a b) acc
+    | _ -> acc
+  in
+  fold_sl ~f_sl ~f_expr:(fun a _ -> a) PairSet.empty s
+
+let rec collect_sep_loc_vars_in (s : Sl_ast.sl) : StringSet.t list =
+  match s with
+  | SSep xs ->
+      let rec flatten xs =
+        List.concat_map
+          (fun x ->
+             match x with
+             | SSep ys -> flatten ys
+             | _ -> [ x ])
+          xs
+      in
+      let xs = flatten xs in
+      let vars =
+        xs
+        |> list_filter_map (function
+             | SHeap (HPt { loc = EVar p; _ }) -> Some p
+             | SHeap (HRange { loc = EVar p; _ }) -> Some p
+             | _ -> None)
+        |> List.fold_left (fun acc p -> StringSet.add p acc) StringSet.empty
+      in
+      [ vars ]
+  | SAnd xs | SOr xs ->
+      List.concat_map collect_sep_loc_vars_in xs
+  | SNot x ->
+      collect_sep_loc_vars_in x
+  | SImplies (a, b) ->
+      collect_sep_loc_vars_in a @ collect_sep_loc_vars_in b
+  | SForall (_, body) | SExists (_, body) ->
+      collect_sep_loc_vars_in body
+  | _ ->
+      []
+
+let pairwise_neq_pairs (vars : StringSet.t) : PairSet.t =
+  let vs = StringSet.elements vars in
+  let rec all_pairs acc = function
+    | [] -> acc
+    | x :: tl ->
+        let acc =
+          List.fold_left
+            (fun a y -> PairSet.add (canon_pair x y) a)
+            acc
+            tl
+        in
+        all_pairs acc tl
+  in
+  all_pairs PairSet.empty vs
+
+let neq_predicate_from_pairs (pairs : PairSet.t) : C.predicate =
+  let ps =
+    pairs
+    |> PairSet.elements
+    |> List.map (fun (a, b) -> mk_rel C.Neq (C.TPtr a) (C.TPtr b))
+  in
+  p_and ps
+
+let infer_sep_neqs (req_sl : Sl_ast.sl) : C.predicate =
+  let explicit = collect_explicit_neq_pairs req_sl in
+  let sep_groups = collect_sep_loc_vars_in req_sl in
+  let inferred =
+    sep_groups
+    |> List.fold_left
+         (fun acc group -> PairSet.union acc (pairwise_neq_pairs group))
+         PairSet.empty
+  in
+  let inferred = PairSet.diff inferred explicit in
+  neq_predicate_from_pairs inferred
+
 (***)
 (* Ensures builders *)
 (***) 
@@ -534,7 +592,6 @@ let requires_from_ranges (ranges : range_atom list) : C.predicate =
 let mk_eq (t1 : C.term) (t2 : C.term) : C.predicate =
   p_atom (C.ARel (C.Eq, t1, t2))
 
-(* From post heaplets p->expr, emit: heap_post(p) == expr(pre) *)
 let ensures_from_post_heaplets (post_atoms : pt_atom_any list) : C.predicate =
   post_atoms
   |> List.map (fun { loc = p; value_e } ->
@@ -549,15 +606,12 @@ let ensures_from_pure_heap_eqs (eqs : (string * string) list) : C.predicate =
 let build_ensures ~(post_sl : Sl_ast.sl) : C.predicate =
   let post_heap_atoms = collect_pt_atoms_any post_sl in
   let pure_heap_eqs = collect_heap_equalities_from_pure post_sl in
-
   let heaplet_part =
     if post_heap_atoms <> [] then ensures_from_post_heaplets post_heap_atoms else C.PTrue
   in
   let pure_part =
     if pure_heap_eqs <> [] then ensures_from_pure_heap_eqs pure_heap_eqs else C.PTrue
   in
-
-  (* If no recognized heap sugar present, fall back to predicate translation. *)
   let general_part =
     if post_heap_atoms = [] && pure_heap_eqs = [] then pred_of_sl post_sl else C.PTrue
   in
@@ -609,8 +663,8 @@ type beh_analysis = {
   assumes_sl : Sl_ast.sl;
   assumes_p : C.predicate;
 
-  (* The key generalization: pure(req) always contributes to Requires. *)
   req_pure : C.predicate;
+  req_sep_neqs : C.predicate;
 
   pre_atoms : pt_atom list;
   pre_map : string StringMap.t;
@@ -623,7 +677,7 @@ type beh_analysis = {
 }
 
 (***)
-(* Behavior analysis: slice + rewrite + compose *)
+(* Behavior analysis *)
 (***) 
 
 let analyze_behavior
@@ -635,7 +689,6 @@ let analyze_behavior
   =
   let (req_opt, ens_opt, var_opt) = extract_req_ens_var b.body in
 
-  (* For loops, the “pre footprint” comes from assumes; for functions it comes from req. *)
   let pre_source =
     match kind with
     | C.FunctionContract -> req_opt
@@ -646,7 +699,6 @@ let analyze_behavior
   let pre_map = pre_value_to_loc_map pre_atoms in
   let req_ranges = match pre_source with None -> [] | Some s -> collect_range_atoms s in
 
-  (* Normalize loop assumes, then rewrite value-vars using pre_map (a↦*p). *)
   let assumes_sl_raw =
     match kind with
     | C.LoopContract -> normalize_loop_assumes b.assumes
@@ -655,7 +707,12 @@ let analyze_behavior
   let assumes_sl = rewrite_value_vars_with_pre_map pre_map assumes_sl_raw in
   let assumes_p = pred_of_sl assumes_sl in
 
-  (* req_pure: translate pure(req) and keep it (this fixes the “p!=q dropped” issue). *)
+  let req_sep_neqs =
+    match req_opt with
+    | None -> C.PTrue
+    | Some req_sl -> infer_sep_neqs req_sl
+  in
+
   let req_pure =
     match req_opt with
     | None -> C.PTrue
@@ -664,7 +721,6 @@ let analyze_behavior
         pred_of_sl req_sl'
   in
 
-  (* post: rewrite \result, then rewrite value-vars (a↦*p), then build ensures. *)
   let post_sl_opt =
     match ens_opt with
     | None -> None
@@ -695,6 +751,7 @@ let analyze_behavior
     assumes_p;
 
     req_pure;
+    req_sep_neqs;
 
     pre_atoms;
     pre_map;
@@ -709,16 +766,16 @@ let analyze_behavior
 (***)
 (* Clause builders *)
 (***) 
-
 let mk_requires
     ~(ptrs : StringSet.t)
     ~(ranges : range_atom list)
+    ~(sep_neqs : C.predicate)
     ~(pure : C.predicate)
   : C.clause
   =
   let p_valid = requires_from_ptrs ptrs in
   let p_read  = requires_from_ranges ranges in
-  C.Requires (p_and [ p_valid; p_read; pure ])
+  C.Requires (p_and [ sep_neqs; p_valid; p_read; pure ])
 
 let mk_assigns
     ~(kind : C.spec_kind)
@@ -738,8 +795,6 @@ let mk_assigns
       let range_assigns =
         assigns_from_ranges_if_written ~ranges:req_ranges ~written_bases ~widen_to_full:false
       in
-
-      (* Avoid duplicate heap assigns if range assigns exist for the same base. *)
       let range_bases =
         List.fold_left
           (fun acc -> function
@@ -783,7 +838,7 @@ let build_core_behavior
   let clauses =
     [
       C.Assumes a.assumes_p;
-      mk_requires ~ptrs:a.ptrs ~ranges:a.req_ranges ~pure:a.req_pure;
+      mk_requires ~ptrs:a.ptrs ~ranges:a.req_ranges ~sep_neqs:a.req_sep_neqs ~pure:a.req_pure;
       C.Ensures a.ensures_p;
       mk_assigns
         ~kind
@@ -804,7 +859,6 @@ let behavior_of_sl
     (b : Sl_ast.behavior)
   : C.behavior
   =
-  (* keep as-is: loops use assumes for write inference; functions typically ignore assumes for assigns *)
   let assumes_sl_for_writes = b.assumes in
   let a = analyze_behavior ~kind ~spec_ret ~ptrs_choice b in
   build_core_behavior ~kind ~b_name ~assumes_sl_for_writes a
@@ -817,7 +871,6 @@ let sl_to_core (spec : Sl_ast.spec) : C.spec =
   let kind = kind_of_spec spec in
   let names = normalize_behavior_names spec.behaviors in
 
-  (* If multiple behaviors exist, share ptr-set to keep requires stable across cases. *)
   let ptrs_choice =
     match spec.behaviors with
     | [] | [ _ ] -> LocalPerBehavior

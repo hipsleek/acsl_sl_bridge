@@ -6,6 +6,7 @@
 %token TERM_AND
 %token ARROW
 %token STAR
+%token SEPSTAR
 %token AND OR SL_CONJ
 %token EQEQ NEQ GTE GT LTE LT
 %token PLUS MINUS DIV
@@ -28,6 +29,7 @@
 %start <Sl_ast.spec> main
 
 %right IMPLIES
+%left SEPSTAR
 %left OR
 %left AND
 %left STAR
@@ -40,7 +42,6 @@ main:
   | spec EOF { $1 }
 
 spec:
-  (* Standard function contract: req ...; ens ...; *)
   | REQ sl SEMICOLON ENS sl SEMICOLON
       {
         {
@@ -51,7 +52,6 @@ spec:
         }
       }
 
-  (* New: global req + case split: req ...; case { ... }; *)
   | REQ sl SEMICOLON CASE LBRACE case_list RBRACE SEMICOLON
   {
     let cases = $6 in
@@ -60,7 +60,6 @@ spec:
     in
     let global_req = $2 in
 
-    (* Push global req into each branch behavior body. *)
     let behaviors =
       cases
       |> List.map (fun ((b : Sl_ast.behavior), r) ->
@@ -73,7 +72,6 @@ spec:
 
 
 
-  (* Only ensures clause *)
   | ens_clause
       {
         let (ret_opt, post) = $1 in
@@ -85,7 +83,6 @@ spec:
         }
       }
 
-  (* Pure case split *)
   | CASE LBRACE case_list RBRACE SEMICOLON
     {
       let cases = $3 in
@@ -98,7 +95,6 @@ spec:
     }
 
 
-  (* Loop spec (your existing "req ... && Term[...] ..." form) *)
   | loop_clause_list
       { { ret = None; behaviors = $1 } }
 
@@ -109,21 +105,19 @@ ens_clause:
   | ENS LBRACK ID RBRACK sl SEMICOLON
       { (Some $3, $5) }
 
-(* ---------- Separation-Logic formula layer ---------- *)
 
 sl:
   | sl IMPLIES sl      { SImplies ($1, $3) }
   | sl OR sl           { SOr [$1; $3] }
   | sl AND sl          { SAnd [$1; $3] }
   | sl STAR sl         { SSep [$1; $3] }
+  | sl SEPSTAR sl      { SSep [$1; $3] }
   | sl_atom            { $1 }
 
 binder:
-  (* printed form: j:size_t *)
   | ID COLON ID
       { ($1, Some (SUser $3)) }
 
-  (* input form: size_t j *)
   | ID ID
       { ($2, Some (SUser $1)) }
 
@@ -175,8 +169,6 @@ cmp_op:
   | GT   { BGt }
   | GTE  { BGe }
 
-(* ---------- Expression layer ---------- *)
-
 expr:
   | ID
       { if $1 = "\\result" then EResult else EVar $1 }
@@ -208,7 +200,6 @@ expr:
   | LPAREN expr RPAREN
       { $2 }
 
-(* ---------- Case branches ---------- *)
 
 case:
   | sl IMPLIES ens_clause
@@ -243,7 +234,6 @@ case_list:
   | case                  { [$1] }
   | case case_list        { $1 :: $2 }
 
-(* ---------- Loop clauses (unchanged) ---------- *)
 
 loop_clause_list:
   | loop_clause                   { [$1] }
