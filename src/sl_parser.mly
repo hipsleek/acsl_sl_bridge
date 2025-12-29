@@ -53,18 +53,23 @@ spec:
 
   (* New: global req + case split: req ...; case { ... }; *)
   | REQ sl SEMICOLON CASE LBRACE case_list RBRACE SEMICOLON
-    {
-      let cases = $6 in
-      let ret_opt =
-        cases
-        |> List.find_map (fun (_b, r) -> r)
-      in
-      let global_req_b =
-        { name = None; assumes = STrue; body = [ CReq $2 ] }
-      in
-      let behaviors = global_req_b :: (cases |> List.map fst) in
-      { ret = ret_opt; behaviors }
-    }
+  {
+    let cases = $6 in
+    let ret_opt =
+      cases |> List.find_map (fun (_b, r) -> r)
+    in
+    let global_req = $2 in
+
+    (* Push global req into each branch behavior body. *)
+    let behaviors =
+      cases
+      |> List.map (fun ((b : Sl_ast.behavior), r) ->
+           let b' = { b with body = (CReq global_req) :: b.body } in
+           (b', r))
+      |> List.map fst
+    in
+    { ret = ret_opt; behaviors }
+  }
 
 
 

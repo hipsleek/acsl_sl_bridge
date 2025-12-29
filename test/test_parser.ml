@@ -278,12 +278,12 @@ let test_parse_search_spec_full _ctx =
     "};"
   in
   let expected =
-    "req array->int*(0,length - 1);" ^
+    (* "req array->int*(0,length - 1);" ^ *)
     "case {" ^
     "\\exists off:size_t. 0 <= off && off < length && (*(array + off)) == element => " ^
-    "ens[r] r >= array && r < array + length && (*r) == element; " ^
+    "req array->int*(0,length - 1); ens[r] r >= array && r < array + length && (*r) == element; " ^
     "\\forall off:size_t. (0 <= off && off < length) => (*(array + off)) != element => " ^
-    "ens[r] r == NULL;};"
+    "req array->int*(0,length - 1); ens[r] r == NULL;};"
   in
   test_framework input expected
 

@@ -198,8 +198,8 @@ let test_translate_loop_terminating_triple_case_expr _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  loop invariant 20 <= i;\n" ^
     "  loop invariant i < 30;\n" ^
+    "  loop invariant 20 <= i;\n" ^
     "  loop assigns i;\n" ^
     "  loop variant 30 - i;\n" ^
     "*/"
@@ -257,8 +257,8 @@ let test_translate_for_loop_search_forall_index _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  loop invariant 0 <= i;\n" ^
     "  loop invariant i <= length;\n" ^
+    "  loop invariant 0 <= i;\n" ^
     "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
     "  loop assigns i;\n" ^
     "  loop variant length - i;\n" ^
@@ -281,10 +281,10 @@ let test_sl_to_acsl_spec_search _ctx =
     "/*@\n" ^
     "  requires \\valid_read(array + (0 .. length - 1));\n" ^
     "  assigns \\nothing;\n" ^
-    "  behavior case2:\n" ^
+    "  behavior case1:\n" ^
     "    assumes \\exists size_t off; 0 <= off && off < length && array[off] == element;\n" ^
     "    ensures \\result >= array && \\result < array + length && \\old(*\\result) == element;\n" ^
-    "  behavior case3:\n" ^
+    "  behavior case2:\n" ^
     "    assumes \\forall size_t off; (0 <= off && off < length) ==> (array[off] != element);\n" ^
     "    ensures \\result == NULL;\n" ^
     "*/"
@@ -353,6 +353,51 @@ let test_sl_to_acsl_search_replace_loop _ctx =
   in
   test_framework input expected
 
+let test_translate_incr_max _ctx =
+  let input =
+    "req p!=q && p->int*(a) && q->int*(b);\n" ^
+    "case {\n" ^
+    "  a>=b => ens p->int*(a+1) && q->int*(b);\n" ^
+    "  a<b  => ens p->int*(a) && q->int*(b+1);\n" ^
+    "};"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires p != q && \\valid(p) && \\valid(q);\n" ^
+    "  assigns *p, *q;\n" ^
+    "  behavior case1:\n" ^
+    "    assumes *p >= *q;\n" ^
+    "    ensures *p == \\old(*p) + 1 && *q == \\old(*q);\n" ^
+    "  behavior case2:\n" ^
+    "    assumes *p < *q;\n" ^
+    "    ensures *p == \\old(*p) && *q == \\old(*q) + 1;\n" ^
+    "*/"
+  in
+  test_framework input expected
+
+(* let test_translate_incr_max_spatial_notation _ctx =
+  let input =
+    "req p->int*(a) ** q->int*(b);\n" ^
+    "case {\n" ^
+    "  a>=b => ens p->int*(a+1) && q->int*(b);\n" ^
+    "  a<b  => ens p->int*(a) && q->int*(b+1);\n" ^
+    "};"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires p != q && \\valid(p) && \\valid(q);\n" ^
+    "  assigns *p, *q;\n" ^
+    "  behavior case1:\n" ^
+    "    assumes *p >= *q;\n" ^
+    "    ensures *p == \\old(*p) + 1 && *q == \\old(*q);\n" ^
+    "  behavior case2:\n" ^
+    "    assumes *p < *q;\n" ^
+    "    ensures *p == \\old(*p) && *q == \\old(*q) + 1;\n" ^
+    "*/"
+  in
+  test_framework input expected *)
+
+
 let suite =
   "translate" >::: [
     "swap"                               >:: test_translate_swap;
@@ -376,6 +421,7 @@ let suite =
     "mutable_arr_loop" >:: test_sl_to_acsl_mutable_arr_loop;
     "search_replace" >:: test_sl_to_acsl_search_replace;
     "search_replace_loop" >:: test_sl_to_acsl_search_replace_loop;
+    "incr_max" >:: test_translate_incr_max;
   ]
 
 let () = run_test_tt_main suite
