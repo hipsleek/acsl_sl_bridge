@@ -14,8 +14,6 @@ let core_of (input : string) : string =
   let core_spec = Spec_to_core.sl_to_core sl_spec in
   Core_printer.string_of_spec core_spec
 
-(*** Existing tests (kept) ***)
-
 let test_sl_to_core_swap _ctx =
   let input =
     "req a->int*(u) && b->int*(v);\n" ^
@@ -111,8 +109,6 @@ let test_sl_to_core_swap_old_sugar _ctx =
     "  assigns { *a, *b }"
   in
   test_framework expected actual
-
-(*** New tests mirroring test_translate.ml ***)
 
 let test_sl_to_core_case_single _ctx =
   let input =
@@ -250,7 +246,6 @@ let test_sl_to_core_loop_terminating_triple_case_expr _ctx =
     "};"
   in
   let actual = core_of input in
-  (* core keeps cases; translate later derives invariants *)
   let expected =
     "kind(loop)\n" ^
     "params()\n" ^
