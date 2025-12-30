@@ -11,6 +11,8 @@
  (modules sl_lexer))
 
 (executable
- (name acsl_sl_orchestrator)
- (modules acsl_sl_orchestrator)
+ (name main)
+ ; (public_name main)
+ (modules main)
  (libraries sl_to_acsl_lib))
+
