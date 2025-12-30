@@ -107,16 +107,17 @@ let () =
   let segments = split_all_on_sl file_text in
 
   try
-    for idx = 0 to Array.length segments - 1 do
-        if idx mod 2 = 0 then (
-            let sl_text = segments.(idx) in
-            let lexbuf = Lexing.from_string sl_text in
-            let spec = Sl_parser.main Sl_lexer.token lexbuf in
-            let acsl = Translate.sl_to_acsl spec in
-            segments.(idx) <- acsl
-        )
-    done;
-
+    let segments =
+        Array.mapi
+            (fun idx segment ->
+            if idx mod 2 = 0 then
+                let lexbuf = Lexing.from_string segment in
+                let spec = Sl_parser.main Sl_lexer.token lexbuf in
+                Translate.sl_to_acsl spec
+            else
+                segment)
+            segments
+    in
     let output_text = String.concat "" (Array.to_list segments) in
     let output_filename = make_output_filename filename in
     write_to_file output_filename output_text;
