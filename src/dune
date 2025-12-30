@@ -12,5 +12,7 @@
 
 (executable
  (name main)
+ ; (public_name main)
  (modules main)
  (libraries sl_to_acsl_lib))
+
