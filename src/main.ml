@@ -58,18 +58,35 @@ let split_once_on_sl (text : string) : string array =
   (* For now: exactly one SL block, file begins with SL then code *)
   [| sl_inside; code_after |]
 
+let make_output_filename (filename : string) : string =
+  if not (Filename.check_suffix filename ".c") then
+    filename ^ "_acsl"
+  else
+    let base =
+      String.sub filename 0 (String.length filename - 2)
+    in
+    base ^ "_acsl.c"
+
+let write_to_file (filename : string) (content : string) : unit =
+  let oc = open_out filename in
+  output_string oc content;
+  close_out oc
 
 let () =
   let filename = user_input_handler () in
   let file_text = read_all_from_file filename in
   let segments = split_once_on_sl file_text in
-  let sl_text = segments.(0) in
 
+  let sl_text = segments.(0) in
   let lexbuf = Lexing.from_string sl_text in
   try
     let spec = Sl_parser.main Sl_lexer.token lexbuf in
     let acsl = Translate.sl_to_acsl spec in
-    Printf.printf "%s\n" acsl
+    segments.(0) <- acsl;
+    let output_text = String.concat "" (Array.to_list segments) in
+    let output_filename = make_output_filename filename in
+    write_to_file output_filename output_text;
+    Printf.printf "%s\n" output_text
   with
   | Sl_parser.Error ->
       Printf.eprintf "Parse error.\n";
@@ -80,4 +97,6 @@ let () =
   | Failure msg ->
       Printf.eprintf "Failure: %s\n" msg;
       exit 1
+
+
 
