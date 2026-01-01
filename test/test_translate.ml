@@ -399,14 +399,14 @@ let test_translate_incr_max_spatial_notation _ctx =
 
 let test_translate_abs_diff_pure_notation _ctx =
   let input =
-    "req (a < b ==> b - a <= 1) &&\n" ^
-    "    (b <= a ==> a - b <= 1);\n" ^
+    "req (a < b ==> b - a <= INT_MAX) &&\n" ^
+    "    (b <= a ==> a - b <= INT_MIN);\n" ^
     "ens[r] (a < b ==> a + r == b) &&\n" ^
     "       (b <= a ==> a - r == b);"
   in
   let expected =
     "/*@\n" ^
-    "  requires ((a < b) ==> (b - a <= 1)) && ((b <= a) ==> (a - b <= 1));\n" ^
+    "  requires ((a < b) ==> (b - a <= INT_MAX)) && ((b <= a) ==> (a - b <= INT_MIN));\n" ^
     "  assigns \\nothing;\n" ^
     "  ensures ((a < b) ==> (a + \\result == b)) && ((b <= a) ==> (a - \\result == b));\n" ^
     "*/"
