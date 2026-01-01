@@ -397,6 +397,22 @@ let test_translate_incr_max_spatial_notation _ctx =
   in
   test_framework input expected
 
+let test_translate_abs_diff_pure_notation _ctx =
+  let input =
+    "req (a < b ==> b - a <= 1) &&\n" ^
+    "    (b <= a ==> a - b <= 1);\n" ^
+    "ens[r] (a < b ==> a + r == b) &&\n" ^
+    "       (b <= a ==> a - r == b);"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires ((a < b) ==> (b - a <= 1)) && ((b <= a) ==> (a - b <= 1));\n" ^
+    "  assigns \\nothing;\n" ^
+    "  ensures ((a < b) ==> (a + \\result == b)) && ((b <= a) ==> (a - \\result == b));\n" ^
+    "*/"
+  in
+  test_framework input expected
+
 
 let suite =
   "translate" >::: [
@@ -423,6 +439,7 @@ let suite =
     "search_replace_loop" >:: test_sl_to_acsl_search_replace_loop;
     "incr_max" >:: test_translate_incr_max;
     "incr_max_spatial_notation" >:: test_translate_incr_max_spatial_notation;
+    "abs_diff_pure_notation" >:: test_translate_abs_diff_pure_notation;
   ]
 
 let () = run_test_tt_main suite

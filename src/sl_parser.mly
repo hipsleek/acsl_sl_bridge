@@ -42,15 +42,16 @@ main:
   | spec EOF { $1 }
 
 spec:
-  | REQ sl SEMICOLON ENS sl SEMICOLON
+  | REQ sl SEMICOLON ens_clause
+    {
+      let (ret_opt, post) = $4 in
       {
-        {
-          ret = None;
-          behaviors = [
-            { name = None; assumes = STrue; body = [ CReq $2; CEns $5 ] }
-          ];
-        }
+        ret = ret_opt;
+        behaviors = [
+          { name = None; assumes = STrue; body = [ CReq $2; CEns post ] }
+        ];
       }
+    }
 
   | REQ sl SEMICOLON CASE LBRACE case_list RBRACE SEMICOLON
   {
