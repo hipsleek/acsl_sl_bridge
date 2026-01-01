@@ -76,7 +76,9 @@ let rec acsl_term ?(ctx=PTop) (t : term) : string =
         (PAtom, "\\at(" ^ acsl_term ~ctx:PTop t1 ^ ", " ^ string_of_label lab ^ ")")
     | TApp (f, args) ->
         (PAtom, f ^ parens (args |> List.map (acsl_term ~ctx:PTop) |> comma_list))
-
+    | TBinOp (Sub, TInt 0, t1) ->
+        let inner = acsl_term ~ctx:PUnary t1 in
+        (PUnary, "-" ^ inner)
     | TBinOp (op, t1, t2) ->
         let p = prec_of_binop op in
         let lhs = acsl_term ~ctx:p t1 in
@@ -92,7 +94,6 @@ let rec acsl_term ?(ctx=PTop) (t : term) : string =
     | TRange (lo, hi) ->
         (PAtom,
         parens (acsl_term ~ctx:PTop lo ^ " .. " ^ acsl_term ~ctx:PTop hi))
-
   in
   with_parens_if ctx here s
 

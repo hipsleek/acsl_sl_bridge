@@ -200,6 +200,9 @@ expr:
 
   | LPAREN expr RPAREN
       { $2 }
+      
+  | MINUS expr
+      { EUnop (UNeg, $2) }
 
 
 case:

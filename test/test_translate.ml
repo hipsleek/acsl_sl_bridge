@@ -413,6 +413,22 @@ let test_translate_abs_diff_pure_notation _ctx =
   in
   test_framework input expected
 
+let test_translate_max_abs _ctx =
+  let input =
+    "req (a > INT_MIN) && (b > INT_MIN);\n" ^
+    "ens[r] (r >= 0) &&\n" ^
+    "       (r >= a && r >= -a && r >= b && r >= -b) &&\n" ^
+    "       (r == a || r == -a || r == b || r == -b);"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires a > INT_MIN && b > INT_MIN;\n" ^
+    "  assigns \\nothing;\n" ^
+    "  ensures \\result >= 0 && \\result >= a && \\result >= -a && \\result >= b && \\result >= -b && (\\result == a || \\result == -a || \\result == b || \\result == -b);\n" ^
+    "*/"
+  in
+  test_framework input expected
+
 
 let suite =
   "translate" >::: [
@@ -440,6 +456,7 @@ let suite =
     "incr_max" >:: test_translate_incr_max;
     "incr_max_spatial_notation" >:: test_translate_incr_max_spatial_notation;
     "abs_diff_pure_notation" >:: test_translate_abs_diff_pure_notation;
+    "max_abs" >:: test_translate_max_abs;
   ]
 
 let () = run_test_tt_main suite

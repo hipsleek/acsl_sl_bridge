@@ -159,7 +159,12 @@ let rec term_of_expr (default_phase : C.phase) (e : Sl_ast.expr) : C.term =
   | EConstBool b -> C.TApp ((if b then "true" else "false"), [])
   | EResult -> C.TResult
   | EApp (f, args) -> C.TApp (f, List.map (term_of_expr default_phase) args)
-  | EUnop (_op, e1) -> C.TApp ("unop", [ term_of_expr default_phase e1 ])
+  | EUnop (UNeg, e1) ->
+    C.TArith (C.Sub, C.TInt 0, term_of_expr default_phase e1)
+
+  | EUnop (UNot, e1) ->
+      C.TApp ("not", [ term_of_expr default_phase e1 ])
+
   | EDeref (EBinop (BAdd, base, idx)) ->
       C.TIndex (default_phase, term_of_expr default_phase base, term_of_expr default_phase idx)
   | EDeref e1 -> C.TLoad (default_phase, term_of_expr default_phase e1)
