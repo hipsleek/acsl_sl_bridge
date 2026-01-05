@@ -461,6 +461,31 @@ let test_translate_loop_invariant_all_zero_prefix _ctx =
   in
   test_framework input expected
 
+let test_translate_present_absent_search _ctx =
+  let input =
+    "req (len >= 0) && t->int*(0, len-1);\n" ^
+    "case {\n" ^
+    "  (\\exists integer i. (0 <= i && i < len) && t[i] == elt)\n" ^
+    "  ==> ens[r] (0 <= r && r < len && t[r] == elt);\n" ^
+    "\n" ^
+    "  (\\forall integer i. (0 <= i && i < len) ==> t[i] != elt)\n" ^
+    "  ==> ens[r] r == -1;\n" ^
+    "};"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires len >= 0 && \\valid_read(t + (0 .. len - 1));\n" ^
+    "  assigns \\nothing;\n" ^
+    "  behavior case1:\n" ^
+    "    assumes \\exists integer i; 0 <= i && i < len && t[i] == elt;\n" ^
+    "    ensures 0 <= \\result && \\result < len && \\old(t[\\result]) == elt;\n" ^
+    "  behavior case2:\n" ^
+    "    assumes \\forall integer i; (0 <= i && i < len) ==> (t[i] != elt);\n" ^
+    "    ensures \\result == -1;\n" ^
+    "*/"
+  in
+  test_framework input expected
+
 let suite =
   "translate" >::: [
     "swap" >:: test_translate_swap;
@@ -476,6 +501,7 @@ let suite =
     "loop_case_expr_change_var" >:: test_translate_loop_terminating_case_expr_change_var;
     "loop_terminating_triple_case_expr"  >:: test_translate_loop_terminating_triple_case_expr;
     "loop_terminating_conj_expr" >:: test_translate_loop_terminating_conj_expr;
+    "loop_invariant_all_zero_prefix" >:: test_translate_loop_invariant_all_zero_prefix;
     "translate_for_loop" >:: test_translate_for_loop;
     "translate_ens_res" >:: test_translate_ens_res;
     "translate_for_loop_search_forall_index" >:: test_translate_for_loop_search_forall_index;
@@ -489,7 +515,7 @@ let suite =
     "abs_diff_pure_notation" >:: test_translate_abs_diff_pure_notation;
     "max_abs" >:: test_translate_max_abs;
     "all_zero_array" >:: test_translate_all_zero_array;
-    "loop_invariant_all_zero_prefix" >:: test_translate_loop_invariant_all_zero_prefix;
+    "present_absent_search" >:: test_translate_present_absent_search;
   ]
 
 let () = run_test_tt_main suite
