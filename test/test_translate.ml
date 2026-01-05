@@ -445,6 +445,21 @@ let test_translate_all_zero_array _ctx =
   in
   test_framework input expected
 
+let test_translate_loop_invariant_all_zero_prefix _ctx =
+  let input =
+    "req (0 <= k && k <= n) && (\\forall integer j. (0 <= j && j < k) ==> t[j] == 0) && Term[n - k];\n" ^
+    "ens (0 <= k' && k' <= n);" 
+  in
+  let expected =
+    "/*@\n" ^
+    "  loop invariant k <= n;\n" ^
+    "  loop invariant 0 <= k;\n" ^
+    "  loop invariant \\forall integer j; (0 <= j && j < k) ==> (t[j] == 0);\n" ^
+    "  loop assigns k;\n" ^
+    "  loop variant n - k;\n" ^
+    "*/"
+  in
+  test_framework input expected
 
 let suite =
   "translate" >::: [
@@ -474,6 +489,7 @@ let suite =
     "abs_diff_pure_notation" >:: test_translate_abs_diff_pure_notation;
     "max_abs" >:: test_translate_max_abs;
     "all_zero_array" >:: test_translate_all_zero_array;
+    "loop_invariant_all_zero_prefix" >:: test_translate_loop_invariant_all_zero_prefix;
   ]
 
 let () = run_test_tt_main suite
