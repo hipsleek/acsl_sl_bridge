@@ -429,24 +429,40 @@ let test_translate_max_abs _ctx =
   in
   test_framework input expected
 
+let test_translate_all_zero_array _ctx =
+  let input =
+    "req (n >= 0) && t->int*(0, n-1);\n" ^
+    "ens (\\result != 0) <==>\n" ^
+    "    (\\forall integer j. (0 <= j && j < n) ==> t[j] == 0);"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires n >= 0 && \\valid_read(t + (0 .. n - 1));\n" ^
+    "  assigns \\nothing;\n" ^
+    "  ensures ((\\result != 0) ==> (\\forall integer j; (0 <= j && j < n) ==> (\\old(t[j]) == 0)))" ^
+    " && ((\\forall integer j; (0 <= j && j < n) ==> (\\old(t[j]) == 0)) ==> (\\result != 0));\n" ^
+    "*/"
+  in
+  test_framework input expected
+
 
 let suite =
   "translate" >::: [
-    "swap"                               >:: test_translate_swap;
-    "no_swap"                            >:: test_translate_no_swap;
-    "triple_swap"                        >:: test_translate_triple_swap;
-    "swap_type_mismatch"                 >:: test_translate_swap_type_mismatch;
-    "swap_prime_notation_sugar"          >:: test_translate_swap_prime_notation_sugar;
-    "swap_old_notation_sugar"            >:: test_translate_swap_old_notation_sugar;
-    "case_single"                        >:: test_translate_case_single;
-    "case_two"                           >:: test_translate_case_two;
-    "case_operators"                     >:: test_translate_case_operators;
-    "loop_terminating_case_expr"         >:: test_translate_loop_terminating_case_expr;
-    "loop_case_expr_change_var"          >:: test_translate_loop_terminating_case_expr_change_var;
+    "swap" >:: test_translate_swap;
+    "no_swap" >:: test_translate_no_swap;
+    "triple_swap"  >:: test_translate_triple_swap;
+    "swap_type_mismatch" >:: test_translate_swap_type_mismatch;
+    "swap_prime_notation_sugar"  >:: test_translate_swap_prime_notation_sugar;
+    "swap_old_notation_sugar" >:: test_translate_swap_old_notation_sugar;
+    "case_single" >:: test_translate_case_single;
+    "case_two" >:: test_translate_case_two;
+    "case_operators" >:: test_translate_case_operators;
+    "loop_terminating_case_expr" >:: test_translate_loop_terminating_case_expr;
+    "loop_case_expr_change_var" >:: test_translate_loop_terminating_case_expr_change_var;
     "loop_terminating_triple_case_expr"  >:: test_translate_loop_terminating_triple_case_expr;
-    "loop_terminating_conj_expr"         >:: test_translate_loop_terminating_conj_expr;
-    "translate_for_loop"                 >:: test_translate_for_loop;
-    "translate_ens_res"                  >:: test_translate_ens_res;
+    "loop_terminating_conj_expr" >:: test_translate_loop_terminating_conj_expr;
+    "translate_for_loop" >:: test_translate_for_loop;
+    "translate_ens_res" >:: test_translate_ens_res;
     "translate_for_loop_search_forall_index" >:: test_translate_for_loop_search_forall_index;
     "spec_search" >:: test_sl_to_acsl_spec_search;
     "mutable_arr" >:: test_sl_to_acsl_mutable_arr;
@@ -457,6 +473,7 @@ let suite =
     "incr_max_spatial_notation" >:: test_translate_incr_max_spatial_notation;
     "abs_diff_pure_notation" >:: test_translate_abs_diff_pure_notation;
     "max_abs" >:: test_translate_max_abs;
+    "all_zero_array" >:: test_translate_all_zero_array;
   ]
 
 let () = run_test_tt_main suite

@@ -20,6 +20,7 @@
 %token LBRACK RBRACK
 %token SEMICOLON
 %token IMPLIES
+%token IFF
 %token EOF
 
 %token <int> INT
@@ -28,6 +29,7 @@
 
 %start <Sl_ast.spec> main
 
+%right IFF
 %right IMPLIES
 %left SEPSTAR
 %left OR
@@ -108,12 +110,13 @@ ens_clause:
 
 
 sl:
-  | sl IMPLIES sl      { SImplies ($1, $3) }
-  | sl OR sl           { SOr [$1; $3] }
-  | sl AND sl          { SAnd [$1; $3] }
-  | sl STAR sl         { SSep [$1; $3] }
-  | sl SEPSTAR sl      { SSep [$1; $3] }
-  | sl_atom            { $1 }
+  | sl IFF sl { SAnd [SImplies($1,$3); SImplies($3,$1)] }
+  | sl IMPLIES sl { SImplies ($1, $3) }
+  | sl OR sl { SOr [$1; $3] }
+  | sl AND sl { SAnd [$1; $3] }
+  | sl STAR sl { SSep [$1; $3] }
+  | sl SEPSTAR sl { SSep [$1; $3] }
+  | sl_atom { $1 }
 
 binder:
   | ID COLON ID

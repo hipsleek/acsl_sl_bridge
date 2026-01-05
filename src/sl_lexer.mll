@@ -35,7 +35,8 @@ rule token = parse
 
   | "==>"  { IMPLIES }
   | "=>"   { IMPLIES }
-
+  | "<==>" { IFF }
+  
   | "->"   { ARROW }
   | "/\\"  { SL_CONJ }
 
