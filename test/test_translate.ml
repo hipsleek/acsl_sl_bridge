@@ -92,6 +92,32 @@ let test_translate_swap_old_notation_sugar _ctx =
   in
   test_framework input expected
 
+let test_translate_unary_not _ctx =
+  let input =
+    "ens !(a == b);"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires \\true;\n" ^
+    "  assigns \\nothing;\n" ^
+    "  ensures !(a == b);\n" ^
+    "*/"
+  in
+  test_framework input expected
+
+let test_translate_unary_negate _ctx =
+  let input =
+    "ens a != -(b + c);"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires \\true;\n" ^
+    "  assigns \\nothing;\n" ^
+    "  ensures a != -(b + c);\n" ^
+    "*/"
+  in
+  test_framework input expected
+
 let test_translate_case_single _ctx =
   let input =
     "case { a==b => req a->int*(u); ens a->int*(u); };"
@@ -506,6 +532,8 @@ let suite =
     "swap_type_mismatch" >:: test_translate_swap_type_mismatch;
     "swap_prime_notation_sugar"  >:: test_translate_swap_prime_notation_sugar;
     "swap_old_notation_sugar" >:: test_translate_swap_old_notation_sugar;
+    "unary_not" >:: test_translate_unary_not;
+    "unary_negate" >:: test_translate_unary_negate;
     "case_single" >:: test_translate_case_single;
     "case_two" >:: test_translate_case_two;
     "case_operators" >:: test_translate_case_operators;

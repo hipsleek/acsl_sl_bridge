@@ -10,6 +10,7 @@
 %token AND OR SL_CONJ
 %token EQEQ NEQ GTE GT LTE LT
 %token PLUS MINUS DIV
+%token NOT
 %token PRIME
 %token OLD
 %token RETURN
@@ -126,8 +127,11 @@ binder:
       { ($2, Some (SUser $1)) }
 
 sl_atom:
-  | heap_atom          { SHeap $1 }
-  | cmp_sl             { $1 }
+  | NOT sl_atom
+      { SNot $2 }
+
+  | heap_atom { SHeap $1 }
+  | cmp_sl { $1 }
 
   | ID
       {
@@ -135,7 +139,7 @@ sl_atom:
         else failwith ("Unexpected bare identifier in sl: " ^ $1)
       }
 
-  | LPAREN sl RPAREN   { $2 }
+  | LPAREN sl RPAREN { $2 }
 
   | FORALL binder DOT sl
       { SForall ([$2], $4) }
@@ -145,6 +149,7 @@ sl_atom:
 
   | RETURN expr
       { SPure (EBinop (BEq, EResult, $2)) }
+
 
 heap_atom:
   | ID ARROW TYPE STAR LPAREN expr RPAREN

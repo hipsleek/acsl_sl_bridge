@@ -55,6 +55,7 @@ rule token = parse
   | "**" { SEPSTAR }
   | "*"  { STAR }
   | "/" { DIV }
+  | "!" { NOT }
 
   | "'"  { PRIME }
   | "."  { DOT }
