@@ -153,6 +153,8 @@ let test_acsl_contract_cases _ctx =
     "  behavior no_alias:\n" ^
     "    assumes a != b;\n" ^
     "    ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
+    "  complete behaviors;\n" ^
+    "  disjoint behaviors;\n" ^
     "*/"
   in
   test_framework expected (acsl_contract contract)

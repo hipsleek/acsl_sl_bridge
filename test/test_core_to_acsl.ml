@@ -224,6 +224,8 @@ let test_core_to_acsl_case_behaviors _ctx =
     "  behavior case2:\n" ^
     "    assumes a != b;\n" ^
     "    ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
+    "  complete behaviors;\n" ^
+    "  disjoint behaviors;\n" ^
     "*/"
   in
   test_framework expected actual
@@ -300,6 +302,8 @@ let test_core_to_acsl_case_operators _ctx =
     "  behavior case4:\n" ^
     "    assumes a >= b;\n" ^
     "    ensures *a == \\old(*a);\n" ^
+    "  complete behaviors;\n" ^
+    "  disjoint behaviors;\n" ^
     "*/"
   in
   test_framework expected actual
@@ -542,6 +546,8 @@ let test_core_to_acsl_incr_max _ctx =
     "  behavior case2:\n" ^
     "    assumes *p < *q;\n" ^
     "    ensures *p == \\old(*p) && *q == \\old(*q) + 1;\n" ^
+    "  complete behaviors;\n" ^
+    "  disjoint behaviors;\n" ^
     "*/"
   in
   test_framework expected actual
@@ -631,6 +637,8 @@ let test_core_to_acsl_spec_search _ctx =
     "  behavior case2:\n" ^
     "    assumes \\forall size_t off; (0 <= off && off < length) ==> (array[off] != element);\n" ^
     "    ensures \\result == NULL;\n" ^
+    "  complete behaviors;\n" ^
+    "  disjoint behaviors;\n" ^
     "*/"
   in
   test_framework expected actual

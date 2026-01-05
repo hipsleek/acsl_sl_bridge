@@ -179,9 +179,25 @@ let acsl_contract (c : contract) : string =
   let requires = c.requires |> List.map acsl_pred |> conj in
   let assigns = acsl_assigns c.assigns in
   let body = c.behaviors |> List.concat_map acsl_behavior in
+
+  let behavior_clauses =
+    if List.length c.behaviors > 1 then
+      [ "  complete behaviors;"
+      ; "  disjoint behaviors;"
+      ]
+    else
+      []
+  in
+
   join "\n"
-    (["/*@"; "  requires " ^ requires ^ ";"; "  assigns " ^ assigns ^ ";"]
-     @ body @ ["*/"])
+    (["/*@"
+     ; "  requires " ^ requires ^ ";"
+     ; "  assigns " ^ assigns ^ ";"
+     ]
+     @ body
+     @ behavior_clauses
+     @ ["*/"])
+
 
 let acsl_loop_contract (lc : loop_contract) : string =
   let invs =
