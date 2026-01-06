@@ -148,7 +148,7 @@ let test_translate_case_operators _ctx =
   in
   test_framework input expected
 
-(* let test_translate_loop_terminating_case_expr _ctx =
+let test_translate_loop_terminating_case_expr _ctx =
   let input =
     "/*@\n" ^
     "  loop invariant i < 30;\n" ^
@@ -158,8 +158,8 @@ let test_translate_case_operators _ctx =
   in
   let expected =
     "case {\n" ^
-    "  i<30 => req Term[30-i]; ens i'==30;\n" ^
-    "  i>=30  => req Term[]; ens  i'==i;\n" ^
+    "  i < 30 => req Term[30 - i]; ens i == 30;\n" ^
+    "  !(i < 30) => req Term[]; ens i == \\old(i);\n" ^
     "};"
   in
   test_framework input expected
@@ -174,13 +174,13 @@ let test_translate_loop_terminating_case_expr_change_var _ctx =
   in
   let expected =
     "case {\n" ^
-    "  j<40 => req Term[40-j];ens j'==40;\n" ^
-    "  j>=40  => req Term[];ens     j'==j;\n" ^
+    "  j < 40 => req Term[40 - j]; ens j == 40;\n" ^
+    "  !(j < 40) => req Term[]; ens j == \\old(j);\n" ^
     "};"
   in
   test_framework input expected
 
-let test_translate_loop_terminating_triple_case_expr _ctx =
+(* let test_translate_loop_terminating_triple_case_expr _ctx =
   let input =
     "/*@\n" ^
     "  loop invariant i < 30;\n" ^
@@ -196,9 +196,9 @@ let test_translate_loop_terminating_triple_case_expr _ctx =
     "  i<20 => req Term[20-i]; ens i'==20;\n" ^
     "};"
   in
-  test_framework input expected
+  test_framework input expected *)
 
-let test_translate_loop_terminating_conj_expr _ctx =
+(* let test_translate_loop_terminating_conj_expr _ctx =
   let input =
     "/*@\n" ^
     "  loop invariant i < 30;\n" ^
@@ -210,9 +210,9 @@ let test_translate_loop_terminating_conj_expr _ctx =
     "req i<30 && Term[30-i]; ens i'==30;\n" ^
     "/\\ req i>=30 && Term[]; ens i'==i;"
   in
-  test_framework input expected
+  test_framework input expected *)
 
-let test_translate_for_loop _ctx =
+(* let test_translate_for_loop _ctx =
   let input =
     "/*@\n" ^
     "  loop invariant i <= 10;\n" ^
@@ -225,9 +225,25 @@ let test_translate_for_loop _ctx =
     "req i<=10 && Term[10-i];\n" ^
     "ens i'==10 && b'==b+(i'-i);"
   in
-  test_framework input expected
+  test_framework input expected *)
 
-let test_translate_ens_res _ctx =
+(* let test_translate_loop_invariant_all_zero_prefix _ctx =
+  let input =
+    "/*@\n" ^
+    "  loop invariant k <= n;\n" ^
+    "  loop invariant 0 <= k;\n" ^
+    "  loop invariant \\forall integer j; (0 <= j && j < k) ==> (t[j] == 0);\n" ^
+    "  loop assigns k;\n" ^
+    "  loop variant n - k;\n" ^
+    "*/"
+  in
+  let expected =
+    "req (0 <= k && k <= n) && (\\forall integer j. (0 <= j && j < k) ==> t[j] == 0) && Term[n - k];\n" ^
+    "ens (0 <= k' && k' <= n);"
+  in
+  test_framework input expected *)
+
+(* let test_translate_ens_res _ctx =
   let input =
     "/*@\n" ^
     "  requires \\true;\n" ^
@@ -441,22 +457,6 @@ let test_translate_all_zero_array _ctx =
   in
   test_framework input expected
 
-let test_translate_loop_invariant_all_zero_prefix _ctx =
-  let input =
-    "/*@\n" ^
-    "  loop invariant k <= n;\n" ^
-    "  loop invariant 0 <= k;\n" ^
-    "  loop invariant \\forall integer j; (0 <= j && j < k) ==> (t[j] == 0);\n" ^
-    "  loop assigns k;\n" ^
-    "  loop variant n - k;\n" ^
-    "*/"
-  in
-  let expected =
-    "req (0 <= k && k <= n) && (\\forall integer j. (0 <= j && j < k) ==> t[j] == 0) && Term[n - k];\n" ^
-    "ens (0 <= k' && k' <= n);"
-  in
-  test_framework input expected
-
 let test_translate_present_absent_search _ctx =
   let input =
     "/*@\n" ^
@@ -494,13 +494,13 @@ let suite =
     "case_single" >:: test_translate_case_single;
     "case_two" >:: test_translate_case_two;
     "case_operators" >:: test_translate_case_operators;
-    (* "loop_terminating_case_expr" >:: test_translate_loop_terminating_case_expr;
+    "loop_terminating_case_expr" >:: test_translate_loop_terminating_case_expr;
     "loop_case_expr_change_var" >:: test_translate_loop_terminating_case_expr_change_var;
-    "loop_terminating_triple_case_expr"  >:: test_translate_loop_terminating_triple_case_expr;
-    "loop_terminating_conj_expr" >:: test_translate_loop_terminating_conj_expr;
-    "loop_invariant_all_zero_prefix" >:: test_translate_loop_invariant_all_zero_prefix;
-    "translate_for_loop" >:: test_translate_for_loop;
-    "translate_ens_res" >:: test_translate_ens_res;
+    (* "loop_terminating_triple_case_expr"  >:: test_translate_loop_terminating_triple_case_expr; *)
+    (* "loop_terminating_conj_expr" >:: test_translate_loop_terminating_conj_expr; *)
+    (* "loop_invariant_all_zero_prefix" >:: test_translate_loop_invariant_all_zero_prefix; *)
+    (* "translate_for_loop" >:: test_translate_for_loop; *)
+    (* "translate_ens_res" >:: test_translate_ens_res;
     "translate_for_loop_search_forall_index" >:: test_translate_for_loop_search_forall_index;
     "spec_search" >:: test_sl_to_acsl_spec_search;
     "mutable_arr" >:: test_sl_to_acsl_mutable_arr;

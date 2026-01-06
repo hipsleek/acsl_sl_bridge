@@ -1,4 +1,4 @@
-{ 
+{
   open Acsl_parser
 }
 
@@ -28,57 +28,42 @@ rule token = parse
   | "invariant" { INVARIANT }
   | "variant"   { VARIANT }
 
-  | "\\valid_read" { VALID_READ }
   | "\\valid"      { VALID }
+  | "\\valid_read" { VALID_READ }
   | "\\old"        { OLD }
   | "\\at"         { AT }
 
-  | "\\true"  { TRUE }
-  | "\\false" { FALSE }
+  | "\\true"   { TRUE }
+  | "\\false"  { FALSE }
   | "\\nothing" { NOTHING }
+  | "\\result" { RESULT }
+  | "NULL"     { NULL }
 
   | "\\forall" { FORALL }
   | "\\exists" { EXISTS }
 
-  | "\\result" { RESULT }
-  | "NULL"     { NULL }
-
-  | "integer" { TYPE "integer" }
-  | "size_t"  { TYPE "size_t" }
-  | "int"     { TYPE "int" }
-  | "char"    { TYPE "char" }
-  | "bool"    { TYPE "bool" }
-  | "void"    { TYPE "void" }
-  | "long"    { TYPE "long" }
-  | "short"   { TYPE "short" }
-  | "float"   { TYPE "float" }
-  | "double"  { TYPE "double" }
-
   | "<==>" { IFF }
   | "==>"  { IMPLIES }
-
   | "&&"   { AND }
   | "||"   { OR }
 
-  | "=="   { EQEQ }
-  | "!="   { NEQ }
-  | ">="   { GTE }
-  | ">"    { GT }
-  | "<="   { LTE }
-  | "<"    { LT }
+  | "==" { EQEQ }
+  | "!=" { NEQ }
+  | ">=" { GTE }
+  | ">"  { GT }
+  | "<=" { LTE }
+  | "<"  { LT }
 
-  | ".."   { DOTDOT }
+  | ".." { DOTDOT }
+  | "+"  { PLUS }
+  | "-"  { MINUS }
+  | "*"  { STAR }
+  | "/"  { DIV }
+  | "!"  { NOT }
 
-  | "+"    { PLUS }
-  | "-"    { MINUS }
-  | "*"    { STAR }
-  | "/"    { DIV }
-  | "!"    { NOT }
-
-  | "."    { DOT }
-  | ","    { COMMA }
-  | ":"    { COLON }
-
+  | "." { DOT }
+  | "," { COMMA }
+  | ":" { COLON }
   | "(" { LPAREN }
   | ")" { RPAREN }
   | "{" { LBRACE }
@@ -87,10 +72,12 @@ rule token = parse
   | "]" { RBRACK }
   | ";" { SEMICOLON }
 
+  | ("int" | "integer" | "bool" | "boolean" | "ptr") as t { TYPE t }
+
   | digits as n { INT (int_of_string n) }
   | ident as s  { ID s }
 
   | eof { EOF }
 
   | _ as c
-      { failwith (Printf.sprintf "Unexpected character: %c" c) }
+      { failwith (Printf.sprintf "Unexpected character in ACSL lexer: %c" c) }

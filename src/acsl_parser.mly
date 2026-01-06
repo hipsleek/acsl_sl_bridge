@@ -118,27 +118,37 @@ ensures_clause:
   | ENSURES pred SEMICOLON { $2 }
 
 loop_spec:
-  | loop_inv_list loop_assigns_clause loop_variant_clause
+  | loop_items
       {
+        let (invs, assigns_opt, variant_opt) = $1 in
         {
-          invariants = $1;
-          assigns = $2;
-          variant = Some $3;
+          invariants = List.rev invs;
+          assigns = (match assigns_opt with None -> ANothing | Some a -> a);
+          variant = variant_opt;
         }
       }
 
-loop_inv_list:
-  | loop_invariant              { [$1] }
-  | loop_invariant loop_inv_list { $1 :: $2 }
+loop_items:
+  | loop_item loop_items
+      {
+        let (invs, aopt, vopt) = $2 in
+        match $1 with
+        | `Inv p   -> (p :: invs, aopt, vopt)
+        | `Assign a -> (invs, Some a, vopt)
+        | `Var e   -> (invs, aopt, Some e)
+      }
+  | loop_item
+      {
+        match $1 with
+        | `Inv p    -> ([p], None, None)
+        | `Assign a -> ([], Some a, None)
+        | `Var e    -> ([], None, Some e)
+      }
 
-loop_invariant:
-  | LOOP INVARIANT pred SEMICOLON { $3 }
-
-loop_assigns_clause:
-  | LOOP ASSIGNS assigns SEMICOLON { $3 }
-
-loop_variant_clause:
-  | LOOP VARIANT expr SEMICOLON { $3 }
+loop_item:
+  | LOOP INVARIANT pred SEMICOLON { `Inv $3 }
+  | LOOP ASSIGNS assigns SEMICOLON { `Assign $3 }
+  | LOOP VARIANT expr SEMICOLON { `Var $3 }
 
 loop_label:
   | ID
