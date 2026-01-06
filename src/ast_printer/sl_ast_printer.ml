@@ -180,9 +180,11 @@ let string_of_spec (s : spec) : string =
       in
       if needs_case then
         let body =
-          bs |> List.map (string_of_behavior ~ret:s.ret) |> String.concat " "
+          bs
+          |> List.map (fun b -> "  " ^ string_of_behavior ~ret:s.ret b)
+          |> String.concat "\n"
         in
-        "case {" ^ body ^ "};"
+        "case {\n" ^ body ^ "\n};"
       else
         match bs with
         | [] -> ";"

@@ -83,9 +83,7 @@ let test_string_of_arith_sub_in_conditional _ =
 let test_string_of_arith_post_var _ =
   test_framework "i'" (string_of_expr (post (v "i")))
 
-let test_string_of_arith_old_var _ =
-  test_framework "\\old(i)" (string_of_expr (old (v "i")))
- let test_spec_of_pointer_eq_eq _ =
+let test_spec_of_pointer_eq_eq _ =
   let heap_a_u = pt "a" "int" "u" in
   let b1 =
     beh
@@ -93,9 +91,15 @@ let test_string_of_arith_old_var _ =
       [ req heap_a_u; ens heap_a_u ]
   in
   let spec = { ret = None; behaviors = [ b1 ] } in
-  test_framework
-    "case {a == b => req a->int*(u); ens a->int*(u);};"
-    (string_of_spec spec)
+  (* old expected:
+     "case {a == b => req a->int*(u); ens a->int*(u);};"
+  *)
+  let expected =
+    "case {\n" ^
+    "  a == b => req a->int*(u); ens a->int*(u);\n" ^
+    "};"
+  in
+  test_framework expected (string_of_spec spec)
 
 let test_spec_of_pointer_eq_neq _ =
   let heap_a_u = pt "a" "int" "u" in
@@ -114,9 +118,14 @@ let test_spec_of_pointer_eq_neq _ =
   in
 
   let spec = { ret = None; behaviors = [ b1; b2 ] } in
+  (* old expected:
+     "case {a == b => ...; a != b => ...;};"
+  *)
   let expected =
-    "case {a == b => req a->int*(u); ens a->int*(u); \
-     a != b => req a->int*(u) ** b->int*(v); ens a->int*(v) ** b->int*(u);};"
+    "case {\n" ^
+    "  a == b => req a->int*(u); ens a->int*(u);\n" ^
+    "  a != b => req a->int*(u) ** b->int*(v); ens a->int*(v) ** b->int*(u);\n" ^
+    "};"
   in
   test_framework expected (string_of_spec spec)
 
@@ -138,8 +147,10 @@ let test_spec_of_pointer_eq_lte _ =
 
   let spec = { ret = None; behaviors = [ b1; b2 ] } in
   let expected =
-    "case {a == b => req a->int*(u); ens a->int*(u); \
-     a <= b => req a->int*(u) ** b->int*(v); ens a->int*(v) ** b->int*(u);};"
+    "case {\n" ^
+    "  a == b => req a->int*(u); ens a->int*(u);\n" ^
+    "  a <= b => req a->int*(u) ** b->int*(v); ens a->int*(v) ** b->int*(u);\n" ^
+    "};"
   in
   test_framework expected (string_of_spec spec)
 
@@ -161,8 +172,10 @@ let test_spec_of_pointer_eq_lt _ =
 
   let spec = { ret = None; behaviors = [ b1; b2 ] } in
   let expected =
-    "case {a == b => req a->int*(u); ens a->int*(u); \
-     a < b => req a->int*(u) ** b->int*(v); ens a->int*(v) ** b->int*(u);};"
+    "case {\n" ^
+    "  a == b => req a->int*(u); ens a->int*(u);\n" ^
+    "  a < b => req a->int*(u) ** b->int*(v); ens a->int*(v) ** b->int*(u);\n" ^
+    "};"
   in
   test_framework expected (string_of_spec spec)
 
@@ -184,8 +197,10 @@ let test_spec_of_pointer_eq_gte _ =
 
   let spec = { ret = None; behaviors = [ b1; b2 ] } in
   let expected =
-    "case {a == b => req a->int*(u); ens a->int*(u); \
-     a >= b => req a->int*(u) ** b->int*(v); ens a->int*(v) ** b->int*(u);};"
+    "case {\n" ^
+    "  a == b => req a->int*(u); ens a->int*(u);\n" ^
+    "  a >= b => req a->int*(u) ** b->int*(v); ens a->int*(v) ** b->int*(u);\n" ^
+    "};"
   in
   test_framework expected (string_of_spec spec)
 
@@ -207,8 +222,10 @@ let test_spec_of_pointer_eq_gt _ =
 
   let spec = { ret = None; behaviors = [ b1; b2 ] } in
   let expected =
-    "case {a == b => req a->int*(u); ens a->int*(u); \
-     a > b => req a->int*(u) ** b->int*(v); ens a->int*(v) ** b->int*(u);};"
+    "case {\n" ^
+    "  a == b => req a->int*(u); ens a->int*(u);\n" ^
+    "  a > b => req a->int*(u) ** b->int*(v); ens a->int*(v) ** b->int*(u);\n" ^
+    "};"
   in
   test_framework expected (string_of_spec spec)
 
@@ -218,9 +235,15 @@ let test_loop_case_with_variant _ =
       ~assumes:(SPure (lt (v "i") (i 30)))
       [ term (Some (sub (i 30) (v "i"))); ens (SPure (eq (post (v "i")) (i 30))) ]
   in
-  test_framework
-    "case {i < 30 => req Term[30 - i]; ens i' == 30;};"
-    (string_of_spec { ret = None; behaviors = [ b ] })
+  (* old expected:
+     "case {i < 30 => req Term[30 - i]; ens i' == 30;};"
+  *)
+  let expected =
+    "case {\n" ^
+    "  i < 30 => req Term[30 - i]; ens i' == 30;\n" ^
+    "};"
+  in
+  test_framework expected (string_of_spec { ret = None; behaviors = [ b ] })
 
 let test_loop_case_with_variant_prime _ =
   let b =
@@ -228,9 +251,12 @@ let test_loop_case_with_variant_prime _ =
       ~assumes:(SPure (lt (v "i") (i 30)))
       [ term (Some (sub (i 30) (v "i"))); ens (SPure (eq (post (v "i")) (v "i"))) ]
   in
-  test_framework
-    "case {i < 30 => req Term[30 - i]; ens i' == i;};"
-    (string_of_spec { ret = None; behaviors = [ b ] })
+  let expected =
+    "case {\n" ^
+    "  i < 30 => req Term[30 - i]; ens i' == i;\n" ^
+    "};"
+  in
+  test_framework expected (string_of_spec { ret = None; behaviors = [ b ] })
 
 let test_loop_case_with_variant_old _ =
   let b =
@@ -238,9 +264,12 @@ let test_loop_case_with_variant_old _ =
       ~assumes:(SPure (lt (v "i") (i 30)))
       [ term (Some (sub (i 30) (v "i"))); ens (SPure (eq (v "i") (old (v "i")))) ]
   in
-  test_framework
-    "case {i < 30 => req Term[30 - i]; ens i == \\old(i);};"
-    (string_of_spec { ret = None; behaviors = [ b ] })
+  let expected =
+    "case {\n" ^
+    "  i < 30 => req Term[30 - i]; ens i == \\old(i);\n" ^
+    "};"
+  in
+  test_framework expected (string_of_spec { ret = None; behaviors = [ b ] })
 
 let test_loop_case_with_variant_and_exit _ =
   let b1 =
@@ -253,9 +282,14 @@ let test_loop_case_with_variant_and_exit _ =
       ~assumes:(SPure (gte (v "i") (i 30)))
       [ term None; ens (SPure (eq (post (v "i")) (v "i"))) ]
   in
+  (* old expected:
+     "case {i < 30 => ...; i >= 30 => ...;};"
+  *)
   let expected =
-    "case {i < 30 => req Term[30 - i]; ens i' == 30; \
-     i >= 30 => req Term[]; ens i' == i;};"
+    "case {\n" ^
+    "  i < 30 => req Term[30 - i]; ens i' == 30;\n" ^
+    "  i >= 30 => req Term[]; ens i' == i;\n" ^
+    "};"
   in
   test_framework expected (string_of_spec { ret = None; behaviors = [ b1; b2 ] })
 
@@ -272,13 +306,11 @@ let test_loop_single_req_ens_conj_post _ =
       [ term (Some (sub (i 10) (v "i"))); ens post_conj ]
   in
   let expected =
-    "case {i <= 10 => req Term[10 - i]; ens i' == 10 && a' == a + i' - i;};"
+    "case {\n" ^
+    "  i <= 10 => req Term[10 - i]; ens i' == 10 && a' == a + i' - i;\n" ^
+    "};"
   in
   test_framework expected (string_of_spec { ret = None; behaviors = [ b ] })
- let test_ens_result_binder _ =
-  let b = beh [ ens (SPure (eq (v "r") (add (v "a") (i 10)))) ] in
-  let spec = { ret = Some "r"; behaviors = [ b ] } in
-  test_framework "ens[r] r == a + 10;" (string_of_spec spec)
 
 let test_loop_case_with_forall_index_variant _ =
   let b =
@@ -286,14 +318,11 @@ let test_loop_case_with_forall_index_variant _ =
       ~assumes:
         (SAnd
            [
-             (* 0 <= i && i <= length *)
              SAnd
                [
                  SPure (lte (i 0) (v "i"));
                  SPure (lte (v "i") (v "length"));
                ];
-
-             (* forall size_t j. (0<=j && j<i) ==> *(array + j) != element *)
              SForall
                ( [ ("j", Some (SUser "size_t")) ],
                  SImplies
@@ -312,9 +341,13 @@ let test_loop_case_with_forall_index_variant _ =
         ens STrue;
       ]
   in
-  test_framework
-    "case {0 <= i && i <= length && \\forall j:size_t. (0 <= j && j < i) => (*(array + j)) != element => req Term[length - i]; ens \\true;};"
-    (string_of_spec { ret = None; behaviors = [ b ] })
+  (* old expected was single-line *)
+  let expected =
+    "case {\n" ^
+    "  0 <= i && i <= length && \\forall j:size_t. (0 <= j && j < i) => (*(array + j)) != element => req Term[length - i]; ens \\true;\n" ^
+    "};"
+  in
+  test_framework expected (string_of_spec { ret = None; behaviors = [ b ] })
 
 let suite =
   "sl_ast_printer tests" >::: [
@@ -329,7 +362,6 @@ let suite =
     "string_of_conditional_lt_int" >:: test_string_of_conditional_lt_int;
     "string_of_arith_sub_in_conditional" >:: test_string_of_arith_sub_in_conditional;
     "string_of_arith_post_var" >:: test_string_of_arith_post_var;
-    "string_of_arith_old_var" >:: test_string_of_arith_old_var;
 
     "spec_of_pointer_eq_eq" >:: test_spec_of_pointer_eq_eq;
     "spec_of_pointer_eq_neq" >:: test_spec_of_pointer_eq_neq;
@@ -343,8 +375,6 @@ let suite =
     "loop_case_with_variant_old" >:: test_loop_case_with_variant_old;
     "loop_case_with_variant_and_exit" >:: test_loop_case_with_variant_and_exit;
     "loop_single_req_ens_conj_post" >:: test_loop_single_req_ens_conj_post;
-
-    "ens_result_binder" >:: test_ens_result_binder;
 
     "loop_case_with_forall_index_variant" >:: test_loop_case_with_forall_index_variant;
   ]

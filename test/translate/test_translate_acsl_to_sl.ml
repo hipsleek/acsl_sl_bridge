@@ -77,16 +77,20 @@ let test_translate_unary_negate _ctx =
   in
   test_framework input expected
 
-(* let test_translate_case_single _ctx =
+let test_translate_case_single _ctx =
   let input =
     "/*@\n" ^
     "  requires \\valid(a);\n" ^
     "  assigns *a;\n" ^
-    "  ensures *a == \\old(*a);\n" ^
+    "  behavior case1:\n" ^
+    "    assumes a == a;\n" ^
+    "    ensures *a == \\old(*a);\n" ^
     "*/"
   in
   let expected =
-    "case { a==b => req a->int*(u); ens a->int*(u); };"
+    "case {\n" ^
+    "  a == a => ens (*a) == \\old(*a);\n" ^
+    "};"
   in
   test_framework input expected
 
@@ -107,9 +111,8 @@ let test_translate_case_two _ctx =
   in
   let expected =
     "case {\n" ^
-    "  a==b => req a->int*(u); ens a->int*(u);\n" ^
-    "  a!=b => req a->int*(u) && b->int*(v);\n" ^
-    "          ens a->int*(v) && b->int*(u);\n" ^
+    "  a == b => ens (*a) == \\old(*a);\n" ^
+    "  a != b => ens (*a) == \\old(*b) && (*b) == \\old(*a);\n" ^
     "};"
   in
   test_framework input expected
@@ -137,15 +140,15 @@ let test_translate_case_operators _ctx =
   in
   let expected =
     "case {\n" ^
-    "  a<b  => req a->int*(u); ens a->int*(u);\n" ^
-    "  a<=b => req a->int*(u); ens a->int*(u);\n" ^
-    "  a>b  => req a->int*(u); ens a->int*(u);\n" ^
-    "  a>=b => req a->int*(u); ens a->int*(u);\n" ^
+    "  a < b => ens (*a) == \\old(*a);\n" ^
+    "  a <= b => ens (*a) == \\old(*a);\n" ^
+    "  a > b => ens (*a) == \\old(*a);\n" ^
+    "  a >= b => ens (*a) == \\old(*a);\n" ^
     "};"
   in
   test_framework input expected
 
-let test_translate_loop_terminating_case_expr _ctx =
+(* let test_translate_loop_terminating_case_expr _ctx =
   let input =
     "/*@\n" ^
     "  loop invariant i < 30;\n" ^
@@ -488,10 +491,10 @@ let suite =
     "triple_swap"  >:: test_translate_triple_swap;
     "unary_not" >:: test_translate_unary_not;
     "unary_negate" >:: test_translate_unary_negate;
-    (* "case_single" >:: test_translate_case_single;
+    "case_single" >:: test_translate_case_single;
     "case_two" >:: test_translate_case_two;
     "case_operators" >:: test_translate_case_operators;
-    "loop_terminating_case_expr" >:: test_translate_loop_terminating_case_expr;
+    (* "loop_terminating_case_expr" >:: test_translate_loop_terminating_case_expr;
     "loop_case_expr_change_var" >:: test_translate_loop_terminating_case_expr_change_var;
     "loop_terminating_triple_case_expr"  >:: test_translate_loop_terminating_triple_case_expr;
     "loop_terminating_conj_expr" >:: test_translate_loop_terminating_conj_expr;
