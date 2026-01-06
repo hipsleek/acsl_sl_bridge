@@ -54,8 +54,7 @@ let rec string_of_expr ?(ctx=PTop) = function
       inner ^ "'"
 
   | EUnop (op, e) ->
-      let s = string_of_unop op ^ string_of_expr ~ctx:PUnary e in
-      paren_if (ctx <> PTop && ctx <> PUnary && ctx <> PAtom) s
+      string_of_unop op ^ string_of_expr ~ctx:PUnary e
 
   | EBinop (op, a, b) ->
       let p = prec_of_binop op in

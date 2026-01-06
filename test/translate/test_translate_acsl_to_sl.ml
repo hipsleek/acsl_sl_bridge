@@ -51,9 +51,7 @@ let test_translate_triple_swap _ctx =
   in
   test_framework input expected
 
-
-
-(* let test_translate_unary_not _ctx =
+let test_translate_unary_not _ctx =
   let input =
     "/*@\n" ^
     "  requires \\true;\n" ^
@@ -79,7 +77,7 @@ let test_translate_unary_negate _ctx =
   in
   test_framework input expected
 
-let test_translate_case_single _ctx =
+(* let test_translate_case_single _ctx =
   let input =
     "/*@\n" ^
     "  requires \\valid(a);\n" ^
@@ -488,9 +486,9 @@ let suite =
     "swap" >:: test_translate_swap;
     "no_swap" >:: test_translate_no_swap;
     "triple_swap"  >:: test_translate_triple_swap;
-    (* "unary_not" >:: test_translate_unary_not;
+    "unary_not" >:: test_translate_unary_not;
     "unary_negate" >:: test_translate_unary_negate;
-    "case_single" >:: test_translate_case_single;
+    (* "case_single" >:: test_translate_case_single;
     "case_two" >:: test_translate_case_two;
     "case_operators" >:: test_translate_case_operators;
     "loop_terminating_case_expr" >:: test_translate_loop_terminating_case_expr;
