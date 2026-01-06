@@ -24,8 +24,8 @@
  (libraries acsl_sl_bridge_lib ounit2))
 
 (test
- (name test_translate)
- (modules test_translate)
+ (name test_translate_sl_to_acsl)
+ (modules test_translate_sl_to_acsl)
  (libraries acsl_sl_bridge_lib ounit2))
 
 (test
