@@ -10,6 +10,6 @@
  (name test_translate_sl_to_acsl)
  (libraries ounit2 acsl_sl_bridge_lib))
 
-; (test
-;  (name test_translate_acsl_to_sl)
-;  (libraries ounit2 acsl_sl_bridge_lib))
+(test
+ (name test_translate_acsl_to_sl)
+ (libraries ounit2 acsl_sl_bridge_lib))

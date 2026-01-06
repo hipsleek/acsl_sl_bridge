@@ -21,12 +21,11 @@ let test_translate_swap _ctx =
     "*/"
   in
   let expected =
-    "req a->int*(u) && b->int*(v);\n" ^
-    "ens a->int*(v) && b->int*(u);"
+    "ens (*a)==\\old(*b) && (*b)==\\old(*a);"
   in
   test_framework input expected
 
-(* let test_translate_no_swap _ctx =
+let test_translate_no_swap _ctx =
   let input =
     "/*@\n" ^
     "  requires \\valid(a);\n" ^
@@ -35,8 +34,7 @@ let test_translate_swap _ctx =
     "*/"
   in
   let expected =
-    "req a->int*(u);\n" ^
-    "ens a->int*(u);"
+    "ens (*a)==\\old(*a);"
   in
   test_framework input expected
 
@@ -49,48 +47,13 @@ let test_translate_triple_swap _ctx =
     "*/"
   in
   let expected =
-    "req a->int*(u) && b->int*(v) && c->int*(w);\n" ^
-    "ens a->int*(w) && b->int*(u) && c->int*(v);"
+    "ens (*a)==\\old(*c) && (*b)==\\old(*a) && (*c)==\\old(*b);"
   in
   test_framework input expected
 
-let test_translate_swap_type_mismatch _ctx =
-  let input =
-    "/*@\n" ^
-    "  requires \\valid(a) && \\valid(b);\n" ^
-    "  assigns *a, *b;\n" ^
-    "  ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
-    "*/"
-  in
-  let expected =
-    "req a->int*(u) && b->char*(v);\n" ^
-    "ens a->char*(v) && b->int*(u);"
-  in
-  test_framework input expected
 
-let test_translate_swap_prime_notation_sugar _ctx =
-  let input =
-    "/*@\n" ^
-    "  requires \\valid(a) && \\valid(b);\n" ^
-    "  assigns *a, *b;\n" ^
-    "  ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
-    "*/"
-  in
-  let expected = "ens (*a)'==(*b) && (*b)'==(*a);" in
-  test_framework input expected
 
-let test_translate_swap_old_notation_sugar _ctx =
-  let input =
-    "/*@\n" ^
-    "  requires \\valid(a) && \\valid(b);\n" ^
-    "  assigns *a, *b;\n" ^
-    "  ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
-    "*/"
-  in
-  let expected = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
-  test_framework input expected
-
-let test_translate_unary_not _ctx =
+(* let test_translate_unary_not _ctx =
   let input =
     "/*@\n" ^
     "  requires \\true;\n" ^
@@ -523,12 +486,9 @@ let test_translate_present_absent_search _ctx =
 let suite =
   "translate_acsl_to_sl" >::: [
     "swap" >:: test_translate_swap;
-    (* "no_swap" >:: test_translate_no_swap;
+    "no_swap" >:: test_translate_no_swap;
     "triple_swap"  >:: test_translate_triple_swap;
-    "swap_type_mismatch" >:: test_translate_swap_type_mismatch;
-    "swap_prime_notation_sugar"  >:: test_translate_swap_prime_notation_sugar;
-    "swap_old_notation_sugar" >:: test_translate_swap_old_notation_sugar;
-    "unary_not" >:: test_translate_unary_not;
+    (* "unary_not" >:: test_translate_unary_not;
     "unary_negate" >:: test_translate_unary_negate;
     "case_single" >:: test_translate_case_single;
     "case_two" >:: test_translate_case_two;

@@ -1,5 +1,3 @@
-(* test/test_sl_to_core.ml *)
-
 open OUnit2
 
 let parse_spec (input : string) : Sl_ast.spec =
