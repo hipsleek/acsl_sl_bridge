@@ -10,7 +10,6 @@ let ident = ident_start ident_char*
 
 rule token = parse
   | whitespace { token lexbuf }
-
   | "req"  { REQ }
   | "ens"  { ENS }
   | "case" { CASE }
