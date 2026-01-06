@@ -11,7 +11,7 @@ let test_framework (expected : string) (actual : string) : unit =
 
 let core_of (input : string) : string =
   let sl_spec = parse_spec input in
-  let core_spec = Spec_to_core.sl_to_core sl_spec in
+  let core_spec = Sl_to_core.sl_to_core sl_spec in
   Core_printer.string_of_spec core_spec
 
 let test_sl_to_core_swap _ctx =

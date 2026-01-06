@@ -1,5 +1,0 @@
-(library
- (name core_to_ac_sl)
- (modules core_to_acsl)
- (libraries ast ast_printer)
- (wrapped false))
