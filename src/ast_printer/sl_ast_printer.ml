@@ -33,13 +33,14 @@ let prec_of_binop = function
 let rec string_of_expr ?(ctx=PTop) = function
   | EVar x -> x
   | EConstInt n -> string_of_int n
-  | EConstBool true -> "true"
-  | EConstBool false -> "false"
+  | EConstBool true -> "\\true"
+  | EConstBool false -> "\\false"
   | EResult -> "\\result"
 
   | EDeref e ->
       let inner = string_of_expr ~ctx:PUnary e in
-      paren_if (ctx <> PTop && ctx <> PUnary && ctx <> PAtom) ("*" ^ inner)
+      let s = "*" ^ inner in
+      paren_if (ctx <> PTop && ctx <> PUnary && ctx <> PAtom) s
 
   | EOld e ->
       "\\old(" ^ string_of_expr e ^ ")"
@@ -85,19 +86,22 @@ let rec string_of_sl ?(ctx=PTop) = function
   | SHeap h -> string_of_heaplet h
 
   | SSep xs ->
-      xs |> List.map (string_of_sl ~ctx:PAnd)
-         |> String.concat " ** "
-         |> paren_if (ctx <> PTop)
+      xs
+      |> List.map (string_of_sl ~ctx:PAnd)
+      |> String.concat " ** "
+      |> paren_if (ctx <> PTop)
 
   | SAnd xs ->
-      xs |> List.map (string_of_sl ~ctx:PAnd)
-         |> String.concat " && "
-         |> paren_if (ctx = POr || ctx = PImpl)
+      xs
+      |> List.map (string_of_sl ~ctx:PAnd)
+      |> String.concat " && "
+      |> paren_if (ctx = POr || ctx = PImpl)
 
   | SOr xs ->
-      xs |> List.map (string_of_sl ~ctx:POr)
-         |> String.concat " || "
-         |> paren_if (ctx = PImpl)
+      xs
+      |> List.map (string_of_sl ~ctx:POr)
+      |> String.concat " || "
+      |> paren_if (ctx = PImpl)
 
   | SNot p ->
       "!(" ^ string_of_sl p ^ ")"
@@ -185,4 +189,3 @@ let string_of_spec (s : spec) : string =
         | [] -> ";"
         | [b] -> string_of_block ~ret:s.ret b.body
         | _ -> assert false
-
