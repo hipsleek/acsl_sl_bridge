@@ -1,59 +1,89 @@
+(* acsl_ast.ml *)
+
 type ident = string
 
+type c_type = string
+
+type sort =
+  | SInt
+  | SBool
+  | SPtr
+  | SUser of string
+
 type binop =
-  | Eq | Neq | Lt | Lte | Gt | Gte
-  | Add | Sub | Mul | Div
+  | BAdd | BSub | BMul | BDiv | BMod
+  | BEq | BNeq | BLt | BLe | BGt | BGe
+  | BAnd | BOr
 
-type label =
+type unop =
+  | UNeg
+  | UNot
+
+type loop_label =
   | LoopEntry
-  | Here
-  | Old
-  | Label of string
+  | LoopCurrent
+  | UserLabel of ident
 
-type term =
-  | TVar of ident
-  | TInt of int
-  | TDeref of term
-  | TOld of term
-  | TResult
-  | TApp of string * term list
-  | TBinOp of binop * term * term
-  | TAt of term * label
-  | TIndex of term * term
-  | TRange of term * term
+type expr =
+  | EVar of ident
+  | EConstInt of int
+  | EConstBool of bool
+  | EResult
+  | ENull
+  | EUnop of unop * expr
+  | EBinop of binop * expr * expr
+  | EApp of ident * expr list
+  | EDeref of expr
+  | EOld of expr
+  | EAt of expr * loop_label
+  | EIndex of expr * expr
+  | ERange of expr * expr
 
-type rel = Eq | Neq | Lt | Lte | Gt | Gte
-
-type predicate =
-  | PTrue
-  | PFalse
-  | PRel of rel * term * term
-  | PApp of string * term list
-  | PNot of predicate
-  | PAnd of predicate list
-  | POr of predicate list
-  | PImplies of predicate * predicate
-  | PForall of (ident * string option) list * predicate
-  | PExists of (ident * string option) list * predicate
+type assigns_target =
+  | AVar of ident
+  | ADeref of expr
+  | ARange of expr * expr * expr
 
 type assigns =
   | ANothing
-  | AList of term list
+  | AItems of assigns_target list
+
+type pred =
+  | PTrue
+  | PFalse
+  | PCmp of binop * expr * expr
+  | PApp of ident * expr list
+  | PAnd of pred list
+  | POr of pred list
+  | PNot of pred
+  | PImplies of pred * pred
+  | PIff of pred * pred
+  | PForall of (ident * sort option) list * pred
+  | PExists of (ident * sort option) list * pred
+  | PValid of expr
+  | PValidRead of expr
 
 type behavior = {
-  b_name : string option;
-  b_assumes : predicate list;
-  b_ensures : predicate list;
+  name : ident option;
+  assumes : pred;
+  ensures : pred;
 }
 
-type contract = {
-  requires : predicate list;
+type fun_spec = {
+  requires : pred option;
   assigns : assigns;
   behaviors : behavior list;
+  ensures : pred option;
+  complete_behaviors : bool;
+  disjoint_behaviors : bool;
 }
 
-type loop_contract = {
-  l_invariants : predicate list;
-  l_assigns : assigns;
-  l_variant : term option;
+type loop_spec = {
+  invariants : pred list;
+  assigns : assigns;
+  variant : expr option;
 }
+
+type spec =
+  | FunSpec of fun_spec
+  | LoopSpec of loop_spec
