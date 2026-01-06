@@ -21,7 +21,7 @@ let test_translate_swap _ctx =
     "*/"
   in
   let expected =
-    "ens (*a)==\\old(*b) && (*b)==\\old(*a);"
+    "ens (*a) == \\old(*b) && (*b) == \\old(*a);"
   in
   test_framework input expected
 
@@ -34,7 +34,7 @@ let test_translate_no_swap _ctx =
     "*/"
   in
   let expected =
-    "ens (*a)==\\old(*a);"
+    "ens (*a) == \\old(*a);"
   in
   test_framework input expected
 
@@ -47,7 +47,7 @@ let test_translate_triple_swap _ctx =
     "*/"
   in
   let expected =
-    "ens (*a)==\\old(*c) && (*b)==\\old(*a) && (*c)==\\old(*b);"
+    "ens (*a) == \\old(*c) && (*b) == \\old(*a) && (*c) == \\old(*b);"
   in
   test_framework input expected
 

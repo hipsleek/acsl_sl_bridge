@@ -3,110 +3,198 @@
 open Core
 module S = Sl_ast
 
-let extract_core_ensures (b : Core.behavior) : Core.predicate =
-  let rec go = function
-    | [] -> Core.PTrue
-    | Ensures p :: _ -> p
-    | _ :: tl -> go tl
-  in
-  go b.clauses
+(***)
+(* Utilities *)
+(***)
 
-let extract_swap_eqs (p : Core.predicate) : (string * string) list =
-  let rec atoms acc = function
-    | Core.PAnd ps -> List.fold_left atoms acc ps
-    | Core.PAtom (Core.ARel (Core.Eq, Core.THeap (Core.Post, a), Core.THeap (Core.Pre, b))) ->
-        (a, b) :: acc
-    | Core.PAtom (Core.ARel (Core.Eq, Core.THeap (Core.Pre, b), Core.THeap (Core.Post, a))) ->
-        (a, b) :: acc
-    | _ -> acc
-  in
-  atoms [] p |> List.rev
+let rec sl_flatten_and (xs : S.sl list) : S.sl list =
+  match xs with
+  | [] -> []
+  | S.STrue :: tl -> sl_flatten_and tl
+  | S.SAnd ys :: tl -> sl_flatten_and (ys @ tl)
+  | x :: tl -> x :: sl_flatten_and tl
 
-let rec sl_expr_of_core_term (t : Core.term) : Sl_ast.expr =
+let rec sl_flatten_or (xs : S.sl list) : S.sl list =
+  match xs with
+  | [] -> []
+  | S.SFalse :: tl -> sl_flatten_or tl
+  | S.SOr ys :: tl -> sl_flatten_or (ys @ tl)
+  | x :: tl -> x :: sl_flatten_or tl
+
+let sl_and (xs : S.sl list) : S.sl =
+  let xs = sl_flatten_and xs in
+  match xs with
+  | [] -> S.STrue
+  | [ x ] -> x
+  | _ -> S.SAnd xs
+
+let sl_or (xs : S.sl list) : S.sl =
+  let xs = sl_flatten_or xs in
+  match xs with
+  | [] -> S.SFalse
+  | [ x ] -> x
+  | _ -> S.SOr xs
+
+(***)
+(* Core.rel / Core.arith_op -> SL binop *)
+(***)
+
+let sl_binop_of_rel : Core.rel -> S.binop = function
+  | Eq -> S.BEq
+  | Neq -> S.BNeq
+  | Lt -> S.BLt
+  | Lte -> S.BLe
+  | Gt -> S.BGt
+  | Gte -> S.BGe
+
+let sl_binop_of_arith : Core.arith_op -> S.binop = function
+  | Add -> S.BAdd
+  | Sub -> S.BSub
+  | Mul -> S.BMul
+  | Div -> S.BDiv
+
+(***)
+(* Term -> SL expr *)
+(***)
+
+type expr_ctx =
+  | CReq
+  | CEns
+
+let rec expr_of_term ?(ctx=CReq) (t : Core.term) : S.expr =
   match t with
-  | Core.TInt n -> Sl_ast.EConstInt n
-  | Core.TVar (_, x) -> Sl_ast.EVar x
-  | Core.TResult -> Sl_ast.EResult
+  | TInt n -> S.EConstInt n
+  | TResult -> S.EResult
 
-  | Core.TArith (Core.Sub, Core.TInt 0, t2) ->
-      Sl_ast.EUnop (Sl_ast.UNeg, sl_expr_of_core_term t2)
+  | TPtr p ->
+      S.EVar p
 
-  | Core.TArith (Core.Add, a, b) ->
-      Sl_ast.EBinop (Sl_ast.BAdd, sl_expr_of_core_term a, sl_expr_of_core_term b)
+  | TVar (ph, x) ->
+      begin match ctx with
+      | CReq -> S.EVar x
+      | CEns -> if ph = Pre then S.EOld (S.EVar x) else S.EVar x
+      end
 
-  | Core.TArith (Core.Sub, a, b) ->
-      Sl_ast.EBinop (Sl_ast.BSub, sl_expr_of_core_term a, sl_expr_of_core_term b)
+  | THeap (ph, p) ->
+      let d = S.EDeref (S.EVar p) in
+      begin match ctx with
+      | CReq -> d
+      | CEns -> if ph = Pre then S.EOld d else d
+      end
 
-  | Core.TArith (Core.Mul, a, b) ->
-      Sl_ast.EBinop (Sl_ast.BMul, sl_expr_of_core_term a, sl_expr_of_core_term b)
+  | TLoad (ph, addr) ->
+      let d = S.EDeref (expr_of_term ~ctx:CReq addr) in
+      begin match ctx with
+      | CReq -> d
+      | CEns -> if ph = Pre then S.EOld d else d
+      end
 
-  | Core.TArith (Core.Div, a, b) ->
-      Sl_ast.EBinop (Sl_ast.BDiv, sl_expr_of_core_term a, sl_expr_of_core_term b)
+  | TIndex (ph, base, idx) ->
+      let base_e = expr_of_term ~ctx:CReq base in
+      let idx_e = expr_of_term ~ctx:CReq idx in
+      let d = S.EDeref (S.EBinop (S.BAdd, base_e, idx_e)) in
+      begin match ctx with
+      | CReq -> d
+      | CEns -> if ph = Pre then S.EOld d else d
+      end
 
-  | Core.TApp ("not", [ x ]) ->
-      Sl_ast.EUnop (Sl_ast.UNot, sl_expr_of_core_term x)
+  | TArith (Core.Sub, Core.TInt 0, t2) ->
+      S.EUnop (S.UNeg, expr_of_term ~ctx t2)
 
-  | _ ->
-      failwith "core_to_sl: unsupported pure term"
+  | TArith (op, t1, t2) ->
+      S.EBinop (sl_binop_of_arith op, expr_of_term ~ctx t1, expr_of_term ~ctx t2)
 
+  | TApp (f, args) ->
+      S.EApp (f, List.map (expr_of_term ~ctx) args)
 
-let rec sl_of_core_pred (p : Core.predicate) : Sl_ast.sl =
+(***)
+(* Predicate -> SL *)
+(***)
+
+let is_acsl_only_pred_name (nm : string) : bool =
+  nm = "valid"
+  || nm = "valid_read"
+  || nm = "valid_read_range"
+  || nm = "\\valid"
+  || nm = "\\valid_read"
+
+let rec sl_of_core_pred ?(ctx=CReq) (p : Core.predicate) : S.sl =
   match p with
-  | Core.PTrue -> Sl_ast.STrue
-  | Core.PFalse -> Sl_ast.SFalse
+  | PTrue -> S.STrue
+  | PFalse -> S.SFalse
 
-  | Core.PAtom (Core.ARel (rel, a, b)) ->
-      let bop =
-        match rel with
-        | Core.Eq  -> Sl_ast.BEq
-        | Core.Neq -> Sl_ast.BNeq
-        | Core.Lt  -> Sl_ast.BLt
-        | Core.Lte -> Sl_ast.BLe
-        | Core.Gt  -> Sl_ast.BGt
-        | Core.Gte -> Sl_ast.BGe
-      in
-      Sl_ast.SPure
-        (Sl_ast.EBinop (bop, sl_expr_of_core_term a, sl_expr_of_core_term b))
+  | PAtom (ARel (r, t1, t2)) ->
+      S.SPure (S.EBinop (sl_binop_of_rel r, expr_of_term ~ctx t1, expr_of_term ~ctx t2))
 
-  | Core.PNot q ->
-      Sl_ast.SNot (sl_of_core_pred q)
+  | PAtom (APred (name, args)) ->
+      if is_acsl_only_pred_name name then
+        S.STrue
+      else
+        (* best-effort: treat as boolean term application *)
+        S.SPure (S.EApp (name, List.map (expr_of_term ~ctx) args))
 
-  | Core.PAnd qs ->
-      Sl_ast.SAnd (List.map sl_of_core_pred qs)
+  | PNot q ->
+      S.SNot (sl_of_core_pred ~ctx q)
 
-  | Core.POr qs ->
-      Sl_ast.SOr (List.map sl_of_core_pred qs)
+  | PAnd ps ->
+      ps |> List.map (sl_of_core_pred ~ctx) |> sl_and
 
-  | Core.PImplies (a, b) ->
-      Sl_ast.SImplies (sl_of_core_pred a, sl_of_core_pred b)
+  | POr ps ->
+      ps |> List.map (sl_of_core_pred ~ctx) |> sl_or
 
-  | _ ->
-      failwith "core_to_sl: unsupported predicate form"
-    
-let core_to_sl (core_spec : Core.spec) : string =
-  match core_spec.kind with
-  | Core.LoopContract ->
-      failwith "Core_to_sl: LoopContract not supported yet"
+  | PImplies (a, b) ->
+      S.SImplies (sl_of_core_pred ~ctx a, sl_of_core_pred ~ctx b)
 
-  | Core.FunctionContract -> (
-      match core_spec.behaviors with
-      | [] -> failwith "Core_to_sl: empty behaviors"
-      | b0 :: _ ->
-          let ensures_p = extract_core_ensures b0 in
-          let swap_pairs = extract_swap_eqs ensures_p in
+  | PForall (bs, body) ->
+      let bs' = List.map (fun (b : Core.binder) -> (b.b_name, None)) bs in
+      S.SForall (bs', sl_of_core_pred ~ctx body)
 
-          (* Case 1: heap swap / old sugar *)
-          if swap_pairs <> [] then
-            let eqs =
-              swap_pairs
-              |> List.map (fun (a, b) -> "(*" ^ a ^ ")==\\old(*" ^ b ^ ")")
-              |> String.concat " && "
-            in
-            "ens " ^ eqs ^ ";"
+  | PExists (bs, body) ->
+      let bs' = List.map (fun (b : Core.binder) -> (b.b_name, None)) bs in
+      S.SExists (bs', sl_of_core_pred ~ctx body)
 
-          (* Case 2: pure ensures *)
-          else
-            let sl = sl_of_core_pred ensures_p in
-            "ens " ^ Sl_ast_printer.string_of_sl sl ^ ";"
-    )
+(***)
+(* Spec -> SL string *)
+(***)
 
+let core_to_sl (s : Core.spec) : string =
+  let all_clauses = s.behaviors |> List.concat_map (fun b -> b.clauses) in
+
+  let req_ps =
+    all_clauses |> List.filter_map (function Requires p -> Some p | _ -> None)
+  in
+  let ens_ps =
+    all_clauses |> List.filter_map (function Ensures p -> Some p | _ -> None)
+  in
+
+  let req_p =
+    match req_ps with
+    | [] -> Core.PTrue
+    | [p] -> p
+    | ps -> Core.PAnd ps
+  in
+
+  let ens_p =
+    match ens_ps with
+    | [] -> Core.PTrue
+    | [p] -> p
+    | ps -> Core.PAnd ps
+  in
+
+  let req_sl = sl_of_core_pred ~ctx:CReq req_p in
+  let ens_sl = sl_of_core_pred ~ctx:CEns ens_p in
+
+  let body =
+    (match req_sl with
+     | S.STrue -> []
+     | _ -> [ S.CReq req_sl ])
+    @
+    (match ens_sl with
+     | S.STrue -> []
+     | _ -> [ S.CEns ens_sl ])
+  in
+
+  let spec : S.spec =
+    { S.ret = None; behaviors = [ { S.name = None; assumes = S.STrue; body } ] }
+  in
+  Sl_ast_printer.string_of_spec spec

@@ -31,19 +31,19 @@ let test_parser_swap_spec_char _ctx =
   test_framework input expected
 
   let test_parser_swap_spec_prime_sugar _ctx =
-  let input = "ens (*a)'==(*b) && (*b)'==(*a);" in
+  let input = "ens (*a)' == (*b) && (*b)' == (*a);" in
   let expected = "ens (*a)' == (*b) && (*b)' == (*a);" in
   test_framework input expected
 
 let test_parser_swap_spec_old_sugar _ctx =
-  let input = "ens (*a)==\\old(*b) && (*b)==\\old(*a);" in
+  let input = "ens (*a) == \\old(*b) && (*b) == \\old(*a);" in
   let expected = "ens (*a) == \\old(*b) && (*b) == \\old(*a);" in
   test_framework input expected
 
 let test_parser_case_post_var _ctx =
   let input =
     "case {\n" ^
-    "  i'==30 => req a->int*(u); ens a->int*(u);\n" ^
+    "  i' == 30 => req a->int*(u); ens a->int*(u);\n" ^
     "};"
   in
   let expected =
@@ -54,7 +54,7 @@ let test_parser_case_post_var _ctx =
 let test_parser_case_old_var _ctx =
   let input =
     "case {\n" ^
-    "  i==\\old(i) => req a->int*(u); ens a->int*(u);\n" ^
+    "  i == \\old(i) => req a->int*(u); ens a->int*(u);\n" ^
     "};"
   in
   let expected =
@@ -65,7 +65,7 @@ let test_parser_case_old_var _ctx =
 let test_parser_eq_neq _ctx =
   let input =
     "case {\n" ^
-    "  a==b => req a->int*(u); ens a->int*(u);\n" ^
+    "  a == b => req a->int*(u); ens a->int*(u);\n" ^
     "  a!=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
     "};"
   in
@@ -76,9 +76,9 @@ let test_parser_eq_neq _ctx =
 
 let test_parser_loop_case_two_clauses _ctx =
   let input =
-    "req i<30 && Term[30-i]; ens i'==30;\n" ^
+    "req i<30 && Term[30-i]; ens i' == 30;\n" ^
     "/\\\n" ^
-    "req i>=30 && Term[]; ens i'==i;"
+    "req i>=30 && Term[]; ens i' == i;"
   in
   let expected =
     "case {i < 30 => req Term[30 - i]; ens i' == 30; i >= 30 => req Term[]; ens i' == i;};"
@@ -87,7 +87,7 @@ let test_parser_loop_case_two_clauses _ctx =
 
 let test_parser_loop_case_single_clause _ctx =
   let input =
-    "req i<30 && Term[30-i]; ens i'==30;"
+    "req i<30 && Term[30-i]; ens i' == 30;"
   in
   let expected =
     "case {i < 30 => req Term[30 - i]; ens i' == 30;};"
