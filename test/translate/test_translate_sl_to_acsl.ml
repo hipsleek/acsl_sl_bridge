@@ -203,8 +203,8 @@ let test_translate_loop_terminating_case_expr _ctx =
 let test_translate_loop_terminating_case_expr_change_var _ctx =
   let input =
     "case {\n" ^
-    "  j<40 => req Term[40-j];ens j'==40;\n" ^
-    "  j>=40  => req Term[];ens     j'==j;\n" ^
+    "  j<40 => req Term[40-j];ens j==40;\n" ^
+    "  j>=40 => req Term[];ens j==\\old(j);\n" ^
     "};"
   in
   let expected =

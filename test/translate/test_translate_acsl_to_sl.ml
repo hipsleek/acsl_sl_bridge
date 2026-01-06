@@ -183,32 +183,19 @@ let test_translate_loop_terminating_case_expr_change_var _ctx =
 (* let test_translate_loop_terminating_triple_case_expr _ctx =
   let input =
     "/*@\n" ^
-    "  loop invariant i < 30;\n" ^
-    "  loop invariant 20 <= i;\n" ^
+    "  loop invariant i <= 10;\n" ^
+    "  loop invariant i >= \\at(i,Pre);\n" ^
+    "  loop invariant \\at(i,Pre) < 5 ==> i <= 5;\n" ^
     "  loop assigns i;\n" ^
-    "  loop variant 30 - i;\n" ^
+    "  loop variant 10 - i;\n" ^
     "*/"
   in
   let expected =
     "case {\n" ^
-    "  i>=30  => req Term[]; ens  i'==i;\n" ^
-    "  20<=i<30 => req Term[30-i]; ens i'==30;\n" ^
-    "  i<20 => req Term[20-i]; ens i'==20;\n" ^
+    "  i>=10 => req Term[]; ens i'==i;\n" ^
+    "  5<=i<10 => req Term[10-i]; ens i'==10;\n" ^
+    "  i<5 => req Term[5-i]; ens i'==5;\n" ^
     "};"
-  in
-  test_framework input expected *)
-
-(* let test_translate_loop_terminating_conj_expr _ctx =
-  let input =
-    "/*@\n" ^
-    "  loop invariant i < 30;\n" ^
-    "  loop assigns i;\n" ^
-    "  loop variant 30 - i;\n" ^
-    "*/"
-  in
-  let expected =
-    "req i<30 && Term[30-i]; ens i'==30;\n" ^
-    "/\\ req i>=30 && Term[]; ens i'==i;"
   in
   test_framework input expected *)
 
@@ -497,7 +484,6 @@ let suite =
     "loop_terminating_case_expr" >:: test_translate_loop_terminating_case_expr;
     "loop_case_expr_change_var" >:: test_translate_loop_terminating_case_expr_change_var;
     (* "loop_terminating_triple_case_expr"  >:: test_translate_loop_terminating_triple_case_expr; *)
-    (* "loop_terminating_conj_expr" >:: test_translate_loop_terminating_conj_expr; *)
     (* "loop_invariant_all_zero_prefix" >:: test_translate_loop_invariant_all_zero_prefix; *)
     (* "translate_for_loop" >:: test_translate_for_loop; *)
     (* "translate_ens_res" >:: test_translate_ens_res;

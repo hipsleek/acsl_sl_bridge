@@ -1,3 +1,5 @@
+(* src/translator/sl_to_core.ml *)
+
 open Sl_ast
 module C = Core
 
@@ -160,8 +162,7 @@ let rec term_of_expr (default_phase : C.phase) (e : Sl_ast.expr) : C.term =
   | EResult -> C.TResult
   | EApp (f, args) -> C.TApp (f, List.map (term_of_expr default_phase) args)
   | EUnop (UNeg, e1) ->
-    C.TArith (C.Sub, C.TInt 0, term_of_expr default_phase e1)
-
+      C.TArith (C.Sub, C.TInt 0, term_of_expr default_phase e1)
   | EUnop (UNot, e1) ->
       C.TApp ("not", [ term_of_expr default_phase e1 ])
 
@@ -208,8 +209,7 @@ let rec pred_of_sl (s : Sl_ast.sl) : C.predicate =
 (* Clause extraction *)
 (***) 
 
-let extract_req_ens_var
-    (body : Sl_ast.block)
+let extract_req_ens_var (body : Sl_ast.block)
   : Sl_ast.sl option * Sl_ast.sl option * Sl_ast.expr option
   =
   let req = ref None in
@@ -281,12 +281,18 @@ let collect_range_atoms (s : Sl_ast.sl) : range_atom list =
   in
   fold_sl ~f_sl ~f_expr:(fun a _ -> a) [] s |> List.rev
 
+let collect_vars_in_expr (e : Sl_ast.expr) : StringSet.t =
+  let f acc = function
+    | EVar x -> StringSet.add x acc
+    | _ -> acc
+  in
+  fold_expr ~f StringSet.empty e
+
 let pre_value_to_loc_map (pre_atoms : pt_atom list) : string StringMap.t =
   List.fold_left
     (fun acc { loc; value } -> StringMap.add value loc acc)
     StringMap.empty
     pre_atoms
-
 
 let rewrite_value_vars_with_pre_map (pre_map : string StringMap.t) (s : Sl_ast.sl) : Sl_ast.sl =
   let rec map_expr = function
@@ -419,6 +425,14 @@ let collect_post_vars_in_sl (s : Sl_ast.sl) : StringSet.t =
   in
   fold_sl ~f_sl:(fun a _ -> a) ~f_expr StringSet.empty s
 
+(* NEW: treat variables used under \old(...) as relevant for loop assigns inference *)
+let collect_old_vars_in_sl (s : Sl_ast.sl) : StringSet.t =
+  let f_expr acc = function
+    | EOld (EVar x) -> StringSet.add x acc
+    | _ -> acc
+  in
+  fold_sl ~f_sl:(fun a _ -> a) ~f_expr StringSet.empty s
+
 let assigns_from_post_vars (post_sl : Sl_ast.sl) : C.assignable list =
   post_sl |> collect_post_vars_in_sl |> StringSet.elements |> List.map (fun v -> C.AsVar v)
 
@@ -510,7 +524,6 @@ let requires_from_ranges (ranges : range_atom list) : C.predicate =
            (term_of_expr C.Pre lo)
            (term_of_expr C.Pre hi))
   |> p_and
-
 
 let canon_pair (a : string) (b : string) : string * string =
   if String.compare a b <= 0 then (a, b) else (b, a)
@@ -771,6 +784,7 @@ let analyze_behavior
 (***)
 (* Clause builders *)
 (***) 
+
 let mk_requires
     ~(ptrs : StringSet.t)
     ~(ranges : range_atom list)
@@ -782,12 +796,14 @@ let mk_requires
   let p_read  = requires_from_ranges ranges in
   C.Requires (p_and [ sep_neqs; p_valid; p_read; pure ])
 
+(* UPDATED: add ~var_expr so loop assigns can fall back to variant vars when needed *)
 let mk_assigns
     ~(kind : C.spec_kind)
     ~(ptrs : StringSet.t)
     ~(req_ranges : range_atom list)
     ~(assumes_sl_for_writes : Sl_ast.sl)
     ~(post_sl_opt : Sl_ast.sl option)
+    ~(var_expr : Sl_ast.expr option)
   : C.clause
   =
   match kind with
@@ -817,16 +833,46 @@ let mk_assigns
       C.Assigns (range_assigns @ heap_assigns)
 
   | C.LoopContract ->
-      let var_assigns =
+      (* Vars assigned in a loop can be stated either via:
+         - prime notation: x'
+         - \old comparisons: x == \old(x) (still relevant loop var)
+         If neither appears (e.g. only Term[...] + ens), fall back to vars in the variant. *)
+      let post_vars =
         match post_sl_opt with
-        | None -> []
-        | Some post_sl -> assigns_from_post_vars post_sl
+        | None -> StringSet.empty
+        | Some post_sl ->
+            StringSet.union
+              (collect_post_vars_in_sl post_sl)
+              (collect_old_vars_in_sl post_sl)
       in
+
+      let var_assigns =
+        post_vars
+        |> StringSet.elements
+        |> List.map (fun v -> C.AsVar v)
+      in
+
       let written_bases = collect_post_write_bases_in_sl assumes_sl_for_writes in
       let range_assigns =
-        assigns_from_ranges_if_written ~ranges:req_ranges ~written_bases ~widen_to_full:true
+        assigns_from_ranges_if_written
+          ~ranges:req_ranges
+          ~written_bases
+          ~widen_to_full:true
       in
-      C.Assigns (var_assigns @ range_assigns)
+
+      let assigns =
+        if var_assigns = [] && range_assigns = [] then
+          match var_expr with
+          | None -> []
+          | Some e ->
+              collect_vars_in_expr e
+              |> StringSet.elements
+              |> List.map (fun v -> C.AsVar v)
+        else
+          var_assigns @ range_assigns
+      in
+
+      C.Assigns assigns
 
 let mk_variant (vopt : Sl_ast.expr option) : C.clause list =
   match vopt with
@@ -850,7 +896,8 @@ let build_core_behavior
         ~ptrs:a.ptrs
         ~req_ranges:a.req_ranges
         ~assumes_sl_for_writes
-        ~post_sl_opt:a.post_sl_opt;
+        ~post_sl_opt:a.post_sl_opt
+        ~var_expr:a.var_expr;
     ]
     @ mk_variant a.var_expr
   in
