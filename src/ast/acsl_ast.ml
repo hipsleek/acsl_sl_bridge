@@ -1,5 +1,3 @@
-(* acsl_ast.ml *)
-
 type ident = string
 
 type c_type = string

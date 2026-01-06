@@ -1,112 +1,212 @@
 open OUnit2
-module A = Acsl_ast
+open Acsl_ast
 open Acsl_ast_printer
 
 let test_framework (expected : string) (actual : string) : unit =
-  assert_equal ~printer:(fun s -> "\n" ^ s ^ "\n") expected actual
+  assert_equal
+    ~printer:(fun s -> "\n" ^ s ^ "\n")
+    expected
+    actual
 
-let test_acsl_term_var _ctx =
-  test_framework "a" (acsl_term (A.TVar "a"))
+let v (x : string) : expr = EVar x
+let i (n : int) : expr = EConstInt n
+let b (x : bool) : expr = EConstBool x
+let res : expr = EResult
+let nul : expr = ENull
 
-let test_acsl_term_int _ctx =
-  test_framework "42" (acsl_term (A.TInt 42))
+let add a b : expr = EBinop (BAdd, a, b)
+let sub a b : expr = EBinop (BSub, a, b)
+let mul a b : expr = EBinop (BMul, a, b)
+(* let div a b : expr = EBinop (BDiv, a, b) *)
 
-let test_acsl_term_deref _ctx =
-  test_framework "*a" (acsl_term (A.TDeref (A.TVar "a")))
+let eq a b : pred = PCmp (BEq, a, b)
+let neq a b : pred = PCmp (BNeq, a, b)
+let lt a b : pred = PCmp (BLt, a, b)
+let lte a b : pred = PCmp (BLe, a, b)
+(* let gt a b : pred = PCmp (BGt, a, b) *)
+(* let gte a b : pred = PCmp (BGe, a, b) *)
 
-let test_acsl_term_old _ctx =
-  test_framework "\\old(*a)" (acsl_term (A.TOld (A.TDeref (A.TVar "a"))))
+let and2 a b : pred = PAnd [ a; b ]
+let or2 a b : pred = POr [ a; b ]
+let notp p : pred = PNot p
+let impl a b : pred = PImplies (a, b)
+let iff a b : pred = PIff (a, b)
 
-let test_acsl_term_app_valid _ctx =
-  test_framework "\\valid(a)" (acsl_term (A.TApp ("\\valid",[A.TVar "a"])))
+let ptrue : pred = PTrue
+let pfalse : pred = PFalse
 
-let test_acsl_term_result _ctx =
-  test_framework "\\result" (acsl_term A.TResult)
+let old (e : expr) : expr = EOld e
+let at_entry (e : expr) : expr = EAt (e, LoopEntry)
+let at_curr (e : expr) : expr = EAt (e, LoopCurrent)
+let at_label (e : expr) (lab : string) : expr = EAt (e, UserLabel lab)
+let deref (e : expr) : expr = EDeref e
+let idx a i : expr = EIndex (a, i)
+let range lo hi : expr = ERange (lo, hi)
+let app (f : string) (args : expr list) : expr = EApp (f, args)
 
-let test_acsl_term_arith_add _ctx =
-  test_framework "a + 10" (acsl_term (A.TBinOp (A.Add, A.TVar "a", A.TInt 10)))
+let valid (e : expr) : pred = PValid e
+let valid_read (e : expr) : pred = PValidRead e
+let papp (f : string) (args : expr list) : pred = PApp (f, args)
+let forall (bs : (ident * sort option) list) (p : pred) : pred = PForall (bs, p)
+let exists (bs : (ident * sort option) list) (p : pred) : pred = PExists (bs, p)
 
-let test_acsl_term_arith_sub _ctx =
-  test_framework "30 - i" (acsl_term (A.TBinOp (A.Sub, A.TInt 30, A.TVar "i")))
+let binder ?(s = None) (x : string) : (ident * sort option) = (x, s)
 
-let test_acsl_pred_true_false _ctx =
-  test_framework "\\true" (acsl_pred A.PTrue);
-  test_framework "\\false" (acsl_pred A.PFalse)
+let a_var (x : string) : assigns_target = AVar x
+let a_deref (e : expr) : assigns_target = ADeref e
+let a_range (base : expr) (lo : expr) (hi : expr) : assigns_target = ARange (base, lo, hi)
 
-let test_acsl_pred_rel_eq _ctx =
-  let p = A.PRel (A.Eq, A.TVar "a", A.TVar "b") in
-  test_framework "a == b" (acsl_pred p)
+let assigns_nothing : assigns = ANothing
+let assigns_items (xs : assigns_target list) : assigns = AItems xs
 
-let test_acsl_pred_rel_lte _ctx =
-  let p = A.PRel (A.Lte, A.TVar "x", A.TInt 5) in
-  test_framework "x <= 5" (acsl_pred p)
+let beh (name : ident option) ~(assumes : pred) ~(ensures : pred) : behavior =
+  { name; assumes; ensures }
 
-let test_acsl_pred_app_valid _ctx =
-  let p = A.PApp ("\\valid",[A.TVar "a"]) in
-  test_framework "\\valid(a)" (acsl_pred p)
 
-let test_acsl_pred_not _ctx =
-  let p = A.PNot (A.PRel (A.Eq, A.TVar "a", A.TVar "b")) in
-  test_framework "!(a == b)" (acsl_pred p)
 
-let test_acsl_pred_and _ctx =
-  let p =
-    A.PAnd
-      [ A.PRel (A.Lt, A.TVar "i", A.TInt 10)
-      ; A.PRel (A.Gt, A.TVar "i", A.TInt 0)
-      ]
+let funspec
+    ?(requires : pred option = None)
+    ?(assigns : assigns = ANothing)
+    ?(behaviors : behavior list = [])
+    ?(ensures : pred option = None)
+    ?(complete_behaviors : bool = false)
+    ?(disjoint_behaviors : bool = false)
+    ()
+  : fun_spec =
+  { requires; assigns; behaviors; ensures; complete_behaviors; disjoint_behaviors }
+
+let loopspec
+    ?(invariants : pred list = [])
+    ?(assigns : assigns = ANothing)
+    ?(variant : expr option = None)
+    ()
+  : loop_spec =
+  { invariants; assigns; variant }
+
+let test_string_of_expr_var _ =
+  test_framework "a" (string_of_expr (v "a"))
+
+let test_string_of_expr_int _ =
+  test_framework "123" (string_of_expr (i 123))
+
+let test_string_of_expr_bool_true _ =
+  test_framework "\\true" (string_of_expr (b true))
+
+let test_string_of_expr_bool_false _ =
+  test_framework "\\false" (string_of_expr (b false))
+
+let test_string_of_expr_result _ =
+  test_framework "\\result" (string_of_expr res)
+
+let test_string_of_expr_null _ =
+  test_framework "NULL" (string_of_expr nul)
+
+let test_string_of_expr_old _ =
+  test_framework "\\old(a)" (string_of_expr (old (v "a")))
+
+let test_string_of_expr_at_loop_entry _ =
+  test_framework "\\at(a, LoopEntry)" (string_of_expr (at_entry (v "a")))
+
+let test_string_of_expr_at_loop_current _ =
+  test_framework "\\at(a, LoopCurrent)" (string_of_expr (at_curr (v "a")))
+
+let test_string_of_expr_at_user_label _ =
+  test_framework "\\at(a, MyLabel)" (string_of_expr (at_label (v "a") "MyLabel"))
+
+let test_string_of_expr_deref _ =
+  test_framework "*p" (string_of_expr (deref (v "p")))
+
+let test_string_of_expr_index _ =
+  test_framework "t[i]" (string_of_expr (idx (v "t") (v "i")))
+
+let test_string_of_expr_range _ =
+  test_framework "(0 .. n - 1)" (string_of_expr (range (i 0) (sub (v "n") (i 1))))
+
+let test_string_of_expr_app _ =
+  test_framework "f(a, 1, \\result)" (string_of_expr (app "f" [ v "a"; i 1; res ]))
+
+let test_string_of_expr_binop_precedence _ =
+  test_framework "a + b * c" (string_of_expr (add (v "a") (mul (v "b") (v "c"))))
+
+let test_string_of_expr_unop_precedence _ =
+  test_framework "-(a + b)" (string_of_expr (EUnop (UNeg, add (v "a") (v "b"))))
+
+let test_string_of_pred_true _ =
+  test_framework "\\true" (string_of_pred ptrue)
+
+let test_string_of_pred_false _ =
+  test_framework "\\false" (string_of_pred pfalse)
+
+let test_string_of_pred_valid _ =
+  test_framework "\\valid(a)" (string_of_pred (valid (v "a")))
+
+let test_string_of_pred_valid_read _ =
+  test_framework "\\valid_read(array + (0 .. length - 1))"
+    (string_of_pred (valid_read (add (v "array") (range (i 0) (sub (v "length") (i 1))))))
+
+let test_string_of_pred_cmp _ =
+  test_framework "a == b" (string_of_pred (eq (v "a") (v "b")))
+
+let test_string_of_pred_not _ =
+  test_framework "!(a == b)" (string_of_pred (notp (eq (v "a") (v "b"))))
+
+let test_string_of_pred_and_or_precedence _ =
+  test_framework "a == b && (c == d || e == f)"
+    (string_of_pred (and2 (eq (v "a") (v "b")) (or2 (eq (v "c") (v "d")) (eq (v "e") (v "f")))))
+
+let test_string_of_pred_implies _ =
+  test_framework "(a == b) ==> (c == d)"
+    (string_of_pred (impl (eq (v "a") (v "b")) (eq (v "c") (v "d"))))
+
+let test_string_of_pred_iff _ =
+  test_framework "(a == b) <==> (c == d)"
+    (string_of_pred (iff (eq (v "a") (v "b")) (eq (v "c") (v "d"))))
+
+let test_string_of_pred_forall _ =
+  test_framework "\\forall integer i; (0 <= i) ==> (i < n)"
+    (string_of_pred
+       (forall
+          [ binder ~s:(Some SInt) "i" ]
+          (impl (lte (i 0) (v "i")) (lt (v "i") (v "n")))))
+
+let test_string_of_pred_exists _ =
+  test_framework "\\exists size_t off; 0 <= off && off < length && array[off] == element"
+    (string_of_pred
+       (exists
+          [ binder ~s:(Some (SUser "size_t")) "off" ]
+          (PAnd
+             [
+               lte (i 0) (v "off");
+               lt (v "off") (v "length");
+               eq (idx (v "array") (v "off")) (v "element");
+             ])))
+
+let test_string_of_pred_app _ =
+  test_framework "P(a, 1)" (string_of_pred (papp "P" [ v "a"; i 1 ]))
+
+let test_string_of_assigns_nothing _ =
+  test_framework "\\nothing" (string_of_assigns assigns_nothing)
+
+let test_string_of_assigns_items_basic _ =
+  test_framework "*a, *b" (string_of_assigns (assigns_items [ a_deref (v "a"); a_deref (v "b") ]))
+
+let test_string_of_assigns_items_range _ =
+  test_framework "array[(0 .. length - 1)]"
+    (string_of_assigns
+       (assigns_items
+          [
+            a_range (v "array") (i 0) (sub (v "length") (i 1));
+          ]))
+
+let test_print_fun_spec_simple_swap _ =
+  let spec =
+    FunSpec
+      (funspec
+         ~requires:(Some (and2 (valid (v "a")) (valid (v "b"))))
+         ~assigns:(assigns_items [ a_deref (v "a"); a_deref (v "b") ])
+         ~ensures:(Some (and2 (eq (deref (v "a")) (old (deref (v "b")))) (eq (deref (v "b")) (old (deref (v "a"))))))
+         ())
   in
-  test_framework "i < 10 && i > 0" (acsl_pred p)
-
-let test_acsl_pred_or _ctx =
-  let p =
-    A.POr
-      [ A.PRel (A.Eq, A.TVar "a", A.TVar "b")
-      ; A.PRel (A.Neq, A.TVar "a", A.TVar "c")
-      ]
-  in
-  test_framework "a == b || a != c" (acsl_pred p)
-
-let test_acsl_pred_implies _ctx =
-  let p =
-    A.PImplies
-      ( A.PRel (A.Lt, A.TVar "i", A.TInt 10)
-      , A.PRel (A.Eq, A.TVar "i", A.TInt 10)
-      )
-  in
-  test_framework "(i < 10) ==> (i == 10)" (acsl_pred p)
-
-let test_acsl_pred_forall _ctx =
-  let p = A.PForall ([("j",Some "integer")], A.PRel (A.Lte, A.TVar "j", A.TVar "i")) in
-  test_framework "\\forall integer j; j <= i" (acsl_pred p)
-
-let test_acsl_pred_exists _ctx =
-  let p = A.PExists ([("k",None)], A.PRel (A.Eq, A.TVar "k", A.TInt 0)) in
-  test_framework "\\exists k; k == 0" (acsl_pred p)
-
-
-(* Replace the old multi-line string literals in the relevant expected values
-   with this explicit "\n" ^ concatenation style. *)
-
-let test_acsl_contract_flat _ctx =
-  let requires =
-    [ A.PApp ("\\valid", [ A.TVar "a" ])
-    ; A.PApp ("\\valid", [ A.TVar "b" ])
-    ]
-  in
-  let assigns = A.AList [ A.TDeref (A.TVar "a"); A.TDeref (A.TVar "b") ] in
-  let behavior : A.behavior =
-    {
-      b_name = None;
-      b_assumes = [];
-      b_ensures =
-        [
-          A.PRel (A.Eq, A.TDeref (A.TVar "a"), A.TOld (A.TDeref (A.TVar "b")));
-          A.PRel (A.Eq, A.TDeref (A.TVar "b"), A.TOld (A.TDeref (A.TVar "a")));
-        ];
-    }
-  in
-  let contract : A.contract = { requires; assigns; behaviors = [ behavior ] } in
   let expected =
     "/*@\n" ^
     "  requires \\valid(a) && \\valid(b);\n" ^
@@ -114,290 +214,171 @@ let test_acsl_contract_flat _ctx =
     "  ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
     "*/"
   in
-  test_framework expected (acsl_contract contract)
+  test_framework expected (string_of_spec spec)
 
-let test_acsl_contract_cases _ctx =
-  let requires =
-    [ A.PApp ("\\valid", [ A.TVar "a" ])
-    ; A.PApp ("\\valid", [ A.TVar "b" ])
-    ]
+let test_print_fun_spec_case_two _ =
+  let b1 =
+    beh
+      (Some "case1")
+      ~assumes:(eq (v "a") (v "b"))
+      ~ensures:(eq (deref (v "a")) (old (deref (v "a"))))
   in
-  let assigns = A.AList [ A.TDeref (A.TVar "a"); A.TDeref (A.TVar "b") ] in
-  let b1 : A.behavior =
-    {
-      b_name = Some "alias";
-      b_assumes = [ A.PRel (A.Eq, A.TVar "a", A.TVar "b") ];
-      b_ensures =
-        [ A.PRel (A.Eq, A.TDeref (A.TVar "a"), A.TOld (A.TDeref (A.TVar "a"))) ];
-    }
+  let b2 =
+    beh
+      (Some "case2")
+      ~assumes:(neq (v "a") (v "b"))
+      ~ensures:(and2 (eq (deref (v "a")) (old (deref (v "b")))) (eq (deref (v "b")) (old (deref (v "a")))))
   in
-  let b2 : A.behavior =
-    {
-      b_name = Some "no_alias";
-      b_assumes = [ A.PRel (A.Neq, A.TVar "a", A.TVar "b") ];
-      b_ensures =
-        [
-          A.PRel (A.Eq, A.TDeref (A.TVar "a"), A.TOld (A.TDeref (A.TVar "b")));
-          A.PRel (A.Eq, A.TDeref (A.TVar "b"), A.TOld (A.TDeref (A.TVar "a")));
-        ];
-    }
+  let spec =
+    FunSpec
+      (funspec
+         ~requires:(Some (and2 (valid (v "a")) (valid (v "b"))))
+         ~assigns:(assigns_items [ a_deref (v "a"); a_deref (v "b") ])
+         ~behaviors:[ b1; b2 ]
+         ~complete_behaviors:true
+         ~disjoint_behaviors:true
+         ())
   in
-  let contract : A.contract = { requires; assigns; behaviors = [ b1; b2 ] } in
   let expected =
     "/*@\n" ^
     "  requires \\valid(a) && \\valid(b);\n" ^
     "  assigns *a, *b;\n" ^
-    "  behavior alias:\n" ^
+    "  behavior case1:\n" ^
     "    assumes a == b;\n" ^
     "    ensures *a == \\old(*a);\n" ^
-    "  behavior no_alias:\n" ^
+    "  behavior case2:\n" ^
     "    assumes a != b;\n" ^
     "    ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
     "  complete behaviors;\n" ^
     "  disjoint behaviors;\n" ^
     "*/"
   in
-  test_framework expected (acsl_contract contract)
+  test_framework expected (string_of_spec spec)
 
-let test_acsl_contract_with_result_ensures _ctx =
-  let c : A.contract =
-    {
-      requires = [];
-      assigns = A.ANothing;
-      behaviors =
-        [
-          {
-            b_name = None;
-            b_assumes = [];
-            b_ensures =
-              [
-                A.PRel
-                  ( A.Eq
-                  , A.TResult
-                  , A.TBinOp (A.Add, A.TOld (A.TVar "a"), A.TInt 10)
-                  );
-              ];
-          };
-        ];
-    }
+let test_print_fun_spec_valid_read_assigns_array _ =
+  let spec =
+    FunSpec
+      (funspec
+         ~requires:(Some (valid_read (add (v "array") (range (i 0) (sub (v "length") (i 1))))))
+         ~assigns:(assigns_items [ a_range (v "array") (i 0) (sub (v "length") (i 1)) ])
+         ~ensures:(Some
+                    (forall
+                       [ binder ~s:(Some (SUser "size_t")) "j" ]
+                       (impl
+                          (PAnd [ lte (i 0) (v "j"); lt (v "j") (v "length") ])
+                          (eq (idx (v "array") (v "j")) (i 0)))))
+         ())
   in
   let expected =
     "/*@\n" ^
-    "  requires \\true;\n" ^
-    "  assigns \\nothing;\n" ^
-    "  ensures \\result == \\old(a) + 10;\n" ^
+    "  requires \\valid_read(array + (0 .. length - 1));\n" ^
+    "  assigns array[(0 .. length - 1)];\n" ^
+    "  ensures \\forall size_t j; (0 <= j && j < length) ==> (array[j] == 0);\n" ^
     "*/"
   in
-  test_framework expected (acsl_contract c)
+  test_framework expected (string_of_spec spec)
 
-let test_acsl_loop_contract_simple _ctx =
-  let lc : A.loop_contract =
-    {
-      l_invariants = [ A.PRel (A.Lte, A.TVar "i", A.TInt 30) ];
-      l_assigns = A.AList [ A.TVar "i" ];
-      l_variant = Some (A.TBinOp (A.Sub, A.TInt 30, A.TVar "i"));
-    }
+let test_print_loop_spec_basic _ =
+  let ls =
+    loopspec
+      ~invariants:[ lt (v "i") (i 30) ]
+      ~assigns:(assigns_items [ a_var "i" ])
+      ~variant:(Some (sub (i 30) (v "i")))
+      ()
   in
   let expected =
     "/*@\n" ^
-    "  loop invariant i <= 30;\n" ^
+    "  loop invariant i < 30;\n" ^
     "  loop assigns i;\n" ^
     "  loop variant 30 - i;\n" ^
     "*/"
   in
-  test_framework expected (acsl_loop_contract lc)
+  test_framework expected (string_of_spec (LoopSpec ls))
 
-let test_acsl_loop_contract_with_two_assigns_and_variant _ctx =
-  let lc : A.loop_contract =
-    {
-      l_invariants =
-        [
-          (* i <= 10 *)
-          A.PRel (A.Lte, A.TVar "i", A.TInt 10);
-
-          (* a == \at(a,LoopEntry) + (i-\at(i,LoopEntry)) *)
-          A.PRel
-            ( A.Eq,
-              A.TVar "a",
-              A.TBinOp
-                ( A.Add,
-                  A.TAt (A.TVar "a", A.LoopEntry),
-                  A.TBinOp
-                    ( A.Sub,
-                      A.TVar "i",
-                      A.TAt (A.TVar "i", A.LoopEntry) ) ) );
-        ];
-      l_assigns = A.AList [ A.TVar "a"; A.TVar "i" ];
-      l_variant = Some (A.TBinOp (A.Sub, A.TInt 10, A.TVar "i"));
-    }
+let test_print_loop_spec_two_invariants _ =
+  let ls =
+    loopspec
+      ~invariants:[ lt (v "i") (i 30); lte (i 20) (v "i") ]
+      ~assigns:(assigns_items [ a_var "i" ])
+      ~variant:(Some (sub (i 30) (v "i")))
+      ()
   in
   let expected =
     "/*@\n" ^
-    "  loop invariant i <= 10;\n" ^
-    "  loop invariant a == \\at(a, LoopEntry) + (i - \\at(i, LoopEntry));\n" ^
-    "  loop assigns a, i;\n" ^
-    "  loop variant 10 - i;\n" ^
-    "*/"
-  in
-  test_framework expected (acsl_loop_contract lc)
-
-
-let test_acsl_loop_contract_defaults _ctx =
-  let lc : A.loop_contract =
-    { l_invariants = []; l_assigns = A.ANothing; l_variant = None }
-  in
-  let expected =
-    "/*@\n" ^
-    "  loop invariant \\true;\n" ^
-    "  loop assigns \\nothing;\n" ^
-    "*/"
-  in
-  test_framework expected (acsl_loop_contract lc)
-
-let test_acsl_assigns_nothing _ctx =
-  test_framework "\\nothing" (acsl_assigns ANothing)
-
-let test_acsl_assigns_list _ctx =
-  test_framework "*a, *b"
-    (acsl_assigns (AList [ TDeref (TVar "a"); TDeref (TVar "b") ]))
-
-let test_acsl_loop_contract_with_forall_and_index _ctx =
-  let lc : A.loop_contract =
-    {
-      l_invariants =
-        [
-          (* 0 <= i <= length *)
-          A.PAnd
-            [
-              A.PRel (A.Lte, A.TInt 0, A.TVar "i");
-              A.PRel (A.Lte, A.TVar "i", A.TVar "length");
-            ];
-
-          (* \forall size_t j; 0 <= j < i ==> array[j] != element *)
-          A.PForall
-            ( [ ("j", Some "size_t") ],
-              A.PImplies
-                ( A.PAnd
-                    [
-                      A.PRel (A.Lte, A.TInt 0, A.TVar "j");
-                      A.PRel (A.Lt, A.TVar "j", A.TVar "i");
-                    ],
-                  A.PRel
-                    ( A.Neq,
-                      A.TIndex (A.TVar "array", A.TVar "j"),
-                      A.TVar "element" ) ) );
-        ];
-      l_assigns = A.AList [ A.TVar "i" ];
-      l_variant = Some (A.TBinOp (A.Sub, A.TVar "length", A.TVar "i"));
-    }
-  in
-  let expected =
-    "/*@\n" ^
-    "  loop invariant 0 <= i && i <= length;\n" ^
-    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
+    "  loop invariant i < 30;\n" ^
+    "  loop invariant 20 <= i;\n" ^
     "  loop assigns i;\n" ^
+    "  loop variant 30 - i;\n" ^
+    "*/"
+  in
+  test_framework expected (string_of_spec (LoopSpec ls))
+
+let test_print_loop_spec_assigns_array_range _ =
+  let ls =
+    loopspec
+      ~invariants:[
+        forall
+          [ binder ~s:(Some (SUser "size_t")) "j" ]
+          (impl
+             (PAnd [ lte (i 0) (v "j"); lt (v "j") (v "i") ])
+             (eq (idx (v "array") (v "j")) (i 0)))
+      ]
+      ~assigns:(assigns_items [ a_var "i"; a_range (v "array") (i 0) (sub (v "length") (i 1)) ])
+      ~variant:(Some (sub (v "length") (v "i")))
+      ()
+  in
+  let expected =
+    "/*@\n" ^
+    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] == 0);\n" ^
+    "  loop assigns i, array[(0 .. length - 1)];\n" ^
     "  loop variant length - i;\n" ^
     "*/"
   in
-  test_framework expected (acsl_loop_contract lc)
-
-let test_acsl_term_range_prints _ctx =
-  let t : A.term = A.TRange (A.TInt 0, A.TInt 10) in
-  let expected = "(0 .. 10)" in
-  test_framework expected (acsl_term t)
-
-let test_acsl_term_ptr_plus_range_prints _ctx =
-  let t : A.term =
-    A.TBinOp
-      ( A.Add,
-        A.TVar "array",
-        A.TRange (A.TInt 0, A.TBinOp (A.Sub, A.TVar "length", A.TInt 1)) )
-  in
-  let expected = "array + (0 .. length - 1)" in
-  test_framework expected (acsl_term t)
-
-let test_acsl_pred_valid_plus_range_prints _ctx =
-  let p : A.predicate =
-    A.PApp
-      ( "\\valid",
-        [
-          A.TBinOp
-            ( A.Add,
-              A.TVar "array",
-              A.TRange (A.TInt 0, A.TBinOp (A.Sub, A.TVar "length", A.TInt 1)) );
-        ] )
-  in
-  let expected = "\\valid(array + (0 .. length - 1))" in
-  test_framework expected (acsl_pred p)
-
-let test_acsl_contract_requires_valid_plus_range_prints _ctx =
-  let c : A.contract =
-    {
-      A.requires =
-        [
-          A.PApp
-            ( "\\valid",
-              [
-                A.TBinOp
-                  ( A.Add,
-                    A.TVar "array",
-                    A.TRange
-                      (A.TInt 0, A.TBinOp (A.Sub, A.TVar "length", A.TInt 1)) );
-              ] );
-        ];
-      A.assigns = A.ANothing;
-      A.behaviors = [];
-    }
-  in
-  let expected =
-    "/*@\n" ^
-    "  requires \\valid(array + (0 .. length - 1));\n" ^
-    "  assigns \\nothing;\n" ^
-    "*/"
-  in
-  test_framework expected (acsl_contract c)
-
+  test_framework expected (string_of_spec (LoopSpec ls))
 
 let suite =
-  "acsl_ast" >::: [
-    "acsl_term_var" >:: test_acsl_term_var;
-    "acsl_term_int" >:: test_acsl_term_int;
-    "acsl_term_deref" >:: test_acsl_term_deref;
-    "acsl_term_old" >:: test_acsl_term_old;
-    "acsl_term_app_valid" >:: test_acsl_term_app_valid;
-    "acsl_term_result" >:: test_acsl_term_result;
-    "acsl_term_arith_add" >:: test_acsl_term_arith_add;
-    "acsl_term_arith_sub" >:: test_acsl_term_arith_sub;
+  "acsl_printer" >::: [
+    "expr_var" >:: test_string_of_expr_var;
+    "expr_int" >:: test_string_of_expr_int;
+    "expr_bool_true" >:: test_string_of_expr_bool_true;
+    "expr_bool_false" >:: test_string_of_expr_bool_false;
+    "expr_result" >:: test_string_of_expr_result;
+    "expr_null" >:: test_string_of_expr_null;
+    "expr_old" >:: test_string_of_expr_old;
+    "expr_at_loop_entry" >:: test_string_of_expr_at_loop_entry;
+    "expr_at_loop_current" >:: test_string_of_expr_at_loop_current;
+    "expr_at_user_label" >:: test_string_of_expr_at_user_label;
+    "expr_deref" >:: test_string_of_expr_deref;
+    "expr_index" >:: test_string_of_expr_index;
+    "expr_range" >:: test_string_of_expr_range;
+    "expr_app" >:: test_string_of_expr_app;
+    "expr_prec_binop" >:: test_string_of_expr_binop_precedence;
+    "expr_prec_unop" >:: test_string_of_expr_unop_precedence;
 
-    "acsl_pred_true_false" >:: test_acsl_pred_true_false;
-    "acsl_pred_rel_eq" >:: test_acsl_pred_rel_eq;
-    "acsl_pred_rel_lte" >:: test_acsl_pred_rel_lte;
-    "acsl_pred_app_valid" >:: test_acsl_pred_app_valid;
-    "acsl_pred_not" >:: test_acsl_pred_not;
-    "acsl_pred_and" >:: test_acsl_pred_and;
-    "acsl_pred_or" >:: test_acsl_pred_or;
-    "acsl_pred_implies" >:: test_acsl_pred_implies;
-    "acsl_pred_forall" >:: test_acsl_pred_forall;
-    "acsl_pred_exists" >:: test_acsl_pred_exists;
+    "pred_true" >:: test_string_of_pred_true;
+    "pred_false" >:: test_string_of_pred_false;
+    "pred_valid" >:: test_string_of_pred_valid;
+    "pred_valid_read" >:: test_string_of_pred_valid_read;
+    "pred_cmp" >:: test_string_of_pred_cmp;
+    "pred_not" >:: test_string_of_pred_not;
+    "pred_and_or_prec" >:: test_string_of_pred_and_or_precedence;
+    "pred_implies" >:: test_string_of_pred_implies;
+    "pred_iff" >:: test_string_of_pred_iff;
+    "pred_forall" >:: test_string_of_pred_forall;
+    "pred_exists" >:: test_string_of_pred_exists;
+    "pred_app" >:: test_string_of_pred_app;
 
-    "acsl_assigns_nothing" >:: test_acsl_assigns_nothing;
-    "acsl_assigns_list" >:: test_acsl_assigns_list;
+    "assigns_nothing" >:: test_string_of_assigns_nothing;
+    "assigns_items_basic" >:: test_string_of_assigns_items_basic;
+    "assigns_items_range" >:: test_string_of_assigns_items_range;
 
+    "fun_spec_simple_swap" >:: test_print_fun_spec_simple_swap;
+    "fun_spec_case_two" >:: test_print_fun_spec_case_two;
+    "fun_spec_valid_read_assigns_array" >:: test_print_fun_spec_valid_read_assigns_array;
 
-    "acsl_contract_flat" >:: test_acsl_contract_flat;
-    "acsl_contract_cases" >:: test_acsl_contract_cases;
-    "acsl_contract_with_result_ensures" >:: test_acsl_contract_with_result_ensures;
-
-    "acsl_loop_contract_simple" >:: test_acsl_loop_contract_simple;
-    "acsl_loop_contract_with_two_assigns_and_variant" >:: test_acsl_loop_contract_with_two_assigns_and_variant;
-    "acsl_loop_contract_defaults" >:: test_acsl_loop_contract_defaults;
-
-    "acsl_loop_contract_with_forall_and_index" >:: test_acsl_loop_contract_with_forall_and_index;
-
-    "acsl_term_range_prints" >:: test_acsl_term_range_prints;
-    "acsl_term_ptr_plus_range_prints" >:: test_acsl_term_ptr_plus_range_prints;
-    "acsl_pred_valid_plus_range_prints" >:: test_acsl_pred_valid_plus_range_prints;
-    "acsl_contract_requires_valid_plus_range_prints" >:: test_acsl_contract_requires_valid_plus_range_prints;
+    "loop_spec_basic" >:: test_print_loop_spec_basic;
+    "loop_spec_two_invariants" >:: test_print_loop_spec_two_invariants;
+    "loop_spec_assigns_array_range" >:: test_print_loop_spec_assigns_array_range;
   ]
 
 let () = run_test_tt_main suite

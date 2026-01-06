@@ -226,8 +226,8 @@ let test_translate_loop_terminating_triple_case_expr _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  loop invariant i < 30;\n" ^
     "  loop invariant 20 <= i;\n" ^
+    "  loop invariant i < 30;\n" ^
     "  loop assigns i;\n" ^
     "  loop variant 30 - i;\n" ^
     "*/"
@@ -285,8 +285,8 @@ let test_translate_for_loop_search_forall_index _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  loop invariant i <= length;\n" ^
     "  loop invariant 0 <= i;\n" ^
+    "  loop invariant i <= length;\n" ^
     "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
     "  loop assigns i;\n" ^
     "  loop variant length - i;\n" ^
@@ -458,7 +458,7 @@ let test_translate_max_abs _ctx =
     "/*@\n" ^
     "  requires a > INT_MIN && b > INT_MIN;\n" ^
     "  assigns \\nothing;\n" ^
-    "  ensures \\result >= 0 && \\result >= a && \\result >= -a && \\result >= b && \\result >= -b && (\\result == a || \\result == -a || \\result == b || \\result == -b);\n" ^
+    "  ensures \\result >= a && \\result >= b && \\result >= 0 && \\result >= -a && \\result >= -b && (\\result == a || \\result == -a || \\result == b || \\result == -b);\n" ^
     "*/"
   in
   test_framework input expected
@@ -486,8 +486,8 @@ let test_translate_loop_invariant_all_zero_prefix _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  loop invariant k <= n;\n" ^
     "  loop invariant 0 <= k;\n" ^
+    "  loop invariant k <= n;\n" ^
     "  loop invariant \\forall integer j; (0 <= j && j < k) ==> (t[j] == 0);\n" ^
     "  loop assigns k;\n" ^
     "  loop variant n - k;\n" ^
