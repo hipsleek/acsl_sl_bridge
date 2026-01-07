@@ -307,7 +307,7 @@ let test_sl_to_acsl_spec_search _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  requires \\valid_read(array + (0 .. length - 1));\n" ^
+    "  requires \\valid(array + (0 .. length - 1));\n" ^
     "  assigns \\nothing;\n" ^
     "  behavior case1:\n" ^
     "    assumes \\exists size_t off; 0 <= off && off < length && array[off] == element;\n" ^
@@ -328,7 +328,7 @@ let test_sl_to_acsl_mutable_arr _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  requires \\valid_read(array + (0 .. length - 1));\n" ^
+    "  requires \\valid(array + (0 .. length - 1));\n" ^
     "  assigns array[(0 .. length - 1)];\n" ^
     "  ensures \\forall size_t j; (0 <= j && j < length) ==> (array[j] == 0);\n" ^
     "*/"
@@ -337,9 +337,9 @@ let test_sl_to_acsl_mutable_arr _ctx =
 
 let test_sl_to_acsl_mutable_arr_loop _ctx =
   let input =
-    "req array->int*(0,length-1) && 0<=i<=length && Term[length-i]\n" ^
+    "req array->int*(0,length-1)@I && 0<=i<=length && Term[length-i]\n" ^
     "&& \\forall size_t j. (0<=j<i ==> array[j]!=element);\n" ^
-    "ens i'==length;"
+    "ens i'==length || \\return#(array+i') && array[i']==element /\\0<=i'<length;"
   in
   let expected =
     "/*@\n" ^
@@ -360,7 +360,7 @@ let test_sl_to_acsl_search_replace _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  requires \\valid_read(array + (0 .. length - 1));\n" ^
+    "  requires \\valid(array + (0 .. length - 1));\n" ^
     "  assigns array[(0 .. length - 1)];\n" ^
     "  ensures \\forall size_t j; ((0 <= j && j < length && \\old(arr[j]) == old) ==> (array[j] == new))" ^
     " && \\forall size_t j; (0 <= j && j < length && \\old(arr[j]) != old) ==> (array[j] == \\old(array[j]));\n" ^
@@ -472,7 +472,7 @@ let test_translate_all_zero_array _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  requires n >= 0 && \\valid_read(t + (0 .. n - 1));\n" ^
+    "  requires n >= 0 && \\valid(t + (0 .. n - 1));\n" ^
     "  assigns \\nothing;\n" ^
     "  ensures ((\\result != 0) ==> (\\forall integer j; (0 <= j && j < n) ==> (\\old(t[j]) == 0)))" ^
     " && ((\\forall integer j; (0 <= j && j < n) ==> (\\old(t[j]) == 0)) ==> (\\result != 0));\n" ^
@@ -509,7 +509,7 @@ let test_translate_present_absent_search _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  requires len >= 0 && \\valid_read(t + (0 .. len - 1));\n" ^
+    "  requires len >= 0 && \\valid(t + (0 .. len - 1));\n" ^
     "  assigns \\nothing;\n" ^
     "  behavior case1:\n" ^
     "    assumes \\exists integer i; 0 <= i && i < len && t[i] == elt;\n" ^

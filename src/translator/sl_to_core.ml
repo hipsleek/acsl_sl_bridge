@@ -258,7 +258,7 @@ let rewrite_result (ret : string) (s : Sl_ast.sl) : Sl_ast.sl =
 
 type pt_atom = { loc : string; value : string }
 type pt_atom_any = { loc : string; value_e : Sl_ast.expr }
-type range_atom = { base : string; lo : Sl_ast.expr; hi : Sl_ast.expr }
+type range_atom = { base : string; lo : Sl_ast.expr; hi : Sl_ast.expr; mode : Sl_ast.heap_mode }
 
 let collect_pt_atoms (s : Sl_ast.sl) : pt_atom list =
   let f_sl acc = function
@@ -276,7 +276,7 @@ let collect_pt_atoms_any (s : Sl_ast.sl) : pt_atom_any list =
 
 let collect_range_atoms (s : Sl_ast.sl) : range_atom list =
   let f_sl acc = function
-    | SHeap (HRange { loc = EVar p; lo; hi; _ }) -> { base = p; lo; hi } :: acc
+    | SHeap (HRange { loc = EVar p; lo; hi; mode; _ }) -> { base = p; lo; hi; mode } :: acc
     | _ -> acc
   in
   fold_sl ~f_sl ~f_expr:(fun a _ -> a) [] s |> List.rev
@@ -311,10 +311,10 @@ let rewrite_value_vars_with_pre_map (pre_map : string StringMap.t) (s : Sl_ast.s
   let rec map_sl = function
     | (STrue | SFalse | SEmp) as x -> x
     | SPure e -> SPure (map_expr e)
-    | SHeap (HPt { loc; ty; value }) ->
-        SHeap (HPt { loc = map_expr loc; ty; value = map_expr value })
-    | SHeap (HRange { loc; ty; lo; hi }) ->
-        SHeap (HRange { loc = map_expr loc; ty; lo = map_expr lo; hi = map_expr hi })
+    | SHeap (HPt { loc; ty; value; mode }) ->
+        SHeap (HPt { loc = map_expr loc; ty; value = map_expr value; mode })
+    | SHeap (HRange { loc; ty; lo; hi; mode }) ->
+        SHeap (HRange { loc = map_expr loc; ty; lo = map_expr lo; hi = map_expr hi; mode })
     | SHeap (HPred (nm, args)) ->
         SHeap (HPred (nm, List.map map_expr args))
     | SSep xs -> SSep (List.map map_sl xs)
@@ -471,7 +471,7 @@ let assigns_from_ranges_if_written
   in
   ranges
   |> List.filter (fun { base; _ } -> StringSet.mem base written_bases)
-  |> List.map (fun { base; lo; hi } ->
+  |> List.map (fun { base; lo; hi; _ } ->
          if widen_to_full then
            C.AsRange (base, term_of_expr C.Pre full_lo, term_of_expr C.Pre full_hi)
          else
@@ -510,6 +510,9 @@ let mk_valid (x : string) : C.predicate =
 let mk_valid_read_range (base : C.term) (lo : C.term) (hi : C.term) : C.predicate =
   p_atom (C.APred ("valid_read_range", [ base; lo; hi ]))
 
+let mk_valid_range (base : C.term) (lo : C.term) (hi : C.term) : C.predicate =
+  p_atom (C.APred ("valid_range", [ base; lo; hi ]))
+
 let assigns_from_ptrs (ptrs : StringSet.t) : C.assignable list =
   ptrs |> StringSet.elements |> List.map (fun p -> C.AsHeap p)
 
@@ -518,12 +521,15 @@ let requires_from_ptrs (ptrs : StringSet.t) : C.predicate =
 
 let requires_from_ranges (ranges : range_atom list) : C.predicate =
   ranges
-  |> List.map (fun { base; lo; hi } ->
-         mk_valid_read_range
-           (C.TVar (C.Pre, base))
-           (term_of_expr C.Pre lo)
-           (term_of_expr C.Pre hi))
+  |> List.map (fun { base; lo; hi; mode } ->
+         let base_t = C.TVar (C.Pre, base) in
+         let lo_t = term_of_expr C.Pre lo in
+         let hi_t = term_of_expr C.Pre hi in
+         match mode with
+         | Sl_ast.In -> mk_valid_read_range base_t lo_t hi_t
+         | Sl_ast.Default -> mk_valid_range base_t lo_t hi_t)
   |> p_and
+
 
 let canon_pair (a : string) (b : string) : string * string =
   if String.compare a b <= 0 then (a, b) else (b, a)

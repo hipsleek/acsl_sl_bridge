@@ -334,7 +334,7 @@ let test_sl_to_core_loop_search_forall_index _ctx =
     "params()\n" ^
     "behavior <anon>:\n" ^
     "  assumes 0 <= i && i <= length && forall size_t j. (0 <= j && j < i) ==> (array[j] != element)\n" ^
-    "  requires valid_read_range(array, 0, length - i)\n" ^
+    "  requires valid_range(array, 0, length - i)\n" ^
     "  ensures i' == length || \\result == array[i'] && array[i'] != element && 0 <= i' && i' < length\n" ^
     "  assigns { i }\n" ^
     "  variant length - i"
@@ -343,7 +343,7 @@ let test_sl_to_core_loop_search_forall_index _ctx =
 
 let test_sl_to_core_spec_search _ctx =
   let input =
-    "req array->int*(0,length-1);\n" ^
+    "req array->int*(0,length-1)@I;\n" ^
     "case {\n" ^
     "  (\\exists size_t off . 0<=off<length && array[off]==element)\n" ^
     "    => ens[r] r>=array && r<array+length && *r==element;\n" ^
@@ -379,7 +379,7 @@ let test_sl_to_core_mutable_arr _ctx =
     "params()\n" ^
     "behavior <anon>:\n" ^
     "  assumes true\n" ^
-    "  requires valid_read_range(array, 0, length - 1)\n" ^
+    "  requires valid_range(array, 0, length - 1)\n" ^
     "  ensures forall size_t j. (0 <= j && j < length) ==> (array'[j'] == 0)\n" ^
     "  assigns { array+(0..length - 1) }"
   in
@@ -397,7 +397,7 @@ let test_sl_to_core_mutable_arr_loop _ctx =
     "params()\n" ^
     "behavior <anon>:\n" ^
     "  assumes i <= length && forall size_t j. (0 <= j && j < i) ==> (array[j] == 0)\n" ^
-    "  requires valid_read_range(array, i, length - i)\n" ^
+    "  requires valid_range(array, i, length - i)\n" ^
     "  ensures i' == length\n" ^
     "  assigns { i, array+(0..length - 1) }\n" ^
     "  variant length - i"
@@ -416,7 +416,7 @@ let test_sl_to_core_search_replace _ctx =
     "params()\n" ^
     "behavior <anon>:\n" ^
     "  assumes true\n" ^
-    "  requires valid_read_range(array, 0, length - 1)\n" ^
+    "  requires valid_range(array, 0, length - 1)\n" ^
     "  ensures forall size_t j. ((0 <= j && j < length && arr[j] == old) ==> (array'[j'] == new)) && forall size_t j. (0 <= j && j < length && arr[j] != old) ==> (array'[j'] == array[j])\n" ^
     "  assigns { array+(0..length - 1) }"
   in
@@ -435,7 +435,7 @@ let test_sl_to_core_search_replace_loop _ctx =
     "params()\n" ^
     "behavior <anon>:\n" ^
     "  assumes forall size_t j. ((0 <= j && j < length && arr[j] == old) ==> (array'[j'] == new)) && forall size_t j. (0 <= j && j < length && arr[j] != old) ==> (array'[j'] == array[j])\n" ^
-    "  requires valid_read_range(array, 0, length - 1)\n" ^
+    "  requires valid_range(array, 0, length - 1)\n" ^
     "  ensures i' == length\n" ^
     "  assigns { i, array+(0..length - 1) }\n" ^
     "  variant length - i"

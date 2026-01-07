@@ -29,7 +29,8 @@ rule token = parse
   | "\\old"  { OLD }
   | "\\forall" { FORALL }
   | "\\exists" { EXISTS }
-  | "\\return" { RETURN }
+  | "\\return#" { RETURN_HASH }
+  | "\\return"  { RETURN }
   | "\\result" { ID "\\result" }
 
   | "==>"  { IMPLIES }
@@ -59,6 +60,7 @@ rule token = parse
   | "'"  { PRIME }
   | "."  { DOT }
   | ","  { COMMA }
+  | "@I" { AT_I }
 
   | "(" { LPAREN }
   | ")" { RPAREN }

@@ -127,6 +127,17 @@ let rec pred_of_core (c : ctx) (p : Core.predicate) : A.pred =
              A.PValidRead ptr
          | _ ->
              A.PApp ("\\valid_read", List.map (expr_of_core c) args))
+      else if name = "valid_range" then
+        (match args with
+        | [ base; lo; hi ] ->
+            let base' = expr_of_core c base in
+            let lo' = expr_of_core c lo in
+            let hi' = expr_of_core c hi in
+            let ptr = A.EBinop (A.BAdd, base', A.ERange (lo', hi')) in
+            A.PValid ptr
+        | _ ->
+            A.PApp ("\\valid", List.map (expr_of_core c) args))
+
       else
         A.PApp (name, List.map (expr_of_core c) args)
 

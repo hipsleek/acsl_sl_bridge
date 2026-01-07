@@ -123,10 +123,10 @@ let rec string_of_sl ?(ctx=PTop) = function
       ". " ^ string_of_sl p
 
 and string_of_heaplet = function
-  | HPt { loc; ty; value } ->
+  | HPt { loc; ty; value; _ } ->
       string_of_expr loc ^ "->" ^ ty ^ "*(" ^ string_of_expr value ^ ")"
 
-  | HRange { loc; ty; lo; hi } ->
+  | HRange { loc; ty; lo; hi; _ } ->
       string_of_expr loc ^ "->" ^ ty ^ "*(" ^
       string_of_expr lo ^ "," ^ string_of_expr hi ^ ")"
 
