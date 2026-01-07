@@ -21,8 +21,8 @@ let gt a b : expr = EBinop (BGt, a, b)
 let post (e : expr) : expr = EPost e
 let old (e : expr) : expr = EOld e
 let deref (e : expr) : expr = EDeref e
- let pt (p : string) (ty : string) (x : string) : sl =
-  SHeap (HPt { loc = v p; ty; value = v x })
+let pt (p : string) (ty : string) (x : string) : sl =
+  SHeap (HPt { loc = v p; ty; value = v x; mode = Default })
 
 let sep2 a b : sl = SSep [ a; b ]
 let and2 a b : sl = SAnd [ a; b ]
