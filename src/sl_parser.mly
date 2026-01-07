@@ -45,8 +45,13 @@
 main:
   | spec EOF { $1 }
 
+req_head:
+  | sl
+      { $1 }
+  | sl TERM_AND LBRACK RBRACK
+      { $1 }
 spec:
-  | REQ sl SEMICOLON ens_clause
+  | REQ req_head SEMICOLON ens_clause
     {
       let (ret_opt, post) = $4 in
       {
@@ -57,23 +62,23 @@ spec:
       }
     }
 
-  | REQ sl SEMICOLON CASE LBRACE case_list RBRACE SEMICOLON
-  {
-    let cases = $6 in
-    let ret_opt =
-      cases |> List.find_map (fun (_b, r) -> r)
-    in
-    let global_req = $2 in
+  | REQ req_head SEMICOLON CASE LBRACE case_list RBRACE SEMICOLON
+    {
+      let cases = $6 in
+      let ret_opt =
+        cases |> List.find_map (fun (_b, r) -> r)
+      in
+      let global_req = $2 in
 
-    let behaviors =
-      cases
-      |> List.map (fun ((b : Sl_ast.behavior), r) ->
-           let b' = { b with body = (CReq global_req) :: b.body } in
-           (b', r))
-      |> List.map fst
-    in
-    { ret = ret_opt; behaviors }
-  }
+      let behaviors =
+        cases
+        |> List.map (fun ((b : Sl_ast.behavior), r) ->
+             let b' = { b with body = (CReq global_req) :: b.body } in
+             (b', r))
+        |> List.map fst
+      in
+      { ret = ret_opt; behaviors }
+    }
 
 
 

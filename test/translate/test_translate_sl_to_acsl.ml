@@ -297,7 +297,7 @@ let test_translate_for_loop_search_forall_index _ctx =
 (* No observed difference*)
 let test_sl_to_acsl_spec_search _ctx =
   let input =
-    "req array->int*(0,length-1);\n" ^
+    "req array->int*(0,length-1)@I && Term[];\n" ^
     "case {\n" ^
     "  (\\exists size_t off . 0<=off<length && array[off]==element)\n" ^
     "    => ens[r] r>=array && r<array+length && *r==element;\n" ^
@@ -307,7 +307,7 @@ let test_sl_to_acsl_spec_search _ctx =
   in
   let expected =
     "/*@\n" ^
-    "  requires \\valid(array + (0 .. length - 1));\n" ^
+    "  requires \\valid_read(array + (0 .. length - 1));\n" ^
     "  assigns \\nothing;\n" ^
     "  behavior case1:\n" ^
     "    assumes \\exists size_t off; 0 <= off && off < length && array[off] == element;\n" ^
