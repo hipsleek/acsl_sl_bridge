@@ -48,12 +48,12 @@ let test_parser_swap_spec_old_sugar _ctx =
 let test_parser_case_post_var _ctx =
   let input =
     "case {\n" ^
-    "  i' == 30 => req a->int*(u); ens a->int*(u);\n" ^
+    "  i' == 30 ==> req a->int*(u); ens a->int*(u);\n" ^
     "};"
   in
   let expected =
     "case {\n" ^
-    "  i' == 30 => req a->int*(u); ens a->int*(u);\n" ^
+    "  i' == 30 ==> req a->int*(u); ens a->int*(u);\n" ^
     "};"
   in
   test_framework input expected
@@ -61,12 +61,12 @@ let test_parser_case_post_var _ctx =
 let test_parser_case_old_var _ctx =
   let input =
     "case {\n" ^
-    "  i == \\old(i) => req a->int*(u); ens a->int*(u);\n" ^
+    "  i == \\old(i) ==> req a->int*(u); ens a->int*(u);\n" ^
     "};"
   in
   let expected =
     "case {\n" ^
-    "  i == \\old(i) => req a->int*(u); ens a->int*(u);\n" ^
+    "  i == \\old(i) ==> req a->int*(u); ens a->int*(u);\n" ^
     "};"
   in
   test_framework input expected
@@ -74,14 +74,14 @@ let test_parser_case_old_var _ctx =
 let test_parser_eq_neq _ctx =
   let input =
     "case {\n" ^
-    "  a == b => req a->int*(u); ens a->int*(u);\n" ^
-    "  a!=b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
+    "  a == b ==> req a->int*(u); ens a->int*(u);\n" ^
+    "  a!=b ==> req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
     "};"
   in
   let expected =
     "case {\n" ^
-    "  a == b => req a->int*(u); ens a->int*(u);\n" ^
-    "  a != b => req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
+    "  a == b ==> req a->int*(u); ens a->int*(u);\n" ^
+    "  a != b ==> req a->int*(u) && b->int*(v); ens a->int*(v) && b->int*(u);\n" ^
     "};"
   in
   test_framework input expected
@@ -94,8 +94,8 @@ let test_parser_loop_case_two_clauses _ctx =
   in
   let expected =
     "case {\n" ^
-    "  i < 30 => req Term[30 - i]; ens i' == 30;\n" ^
-    "  i >= 30 => req Term[]; ens i' == i;\n" ^
+    "  i < 30 ==> req Term[30 - i]; ens i' == 30;\n" ^
+    "  i >= 30 ==> req Term[]; ens i' == i;\n" ^
     "};"
   in
   test_framework input expected
@@ -106,7 +106,7 @@ let test_parser_loop_case_single_clause _ctx =
   in
   let expected =
     "case {\n" ^
-    "  i < 30 => req Term[30 - i]; ens i' == 30;\n" ^
+    "  i < 30 ==> req Term[30 - i]; ens i' == 30;\n" ^
     "};"
   in
   test_framework input expected
@@ -117,7 +117,7 @@ let test_parser_loop_simple_req_term_ens_conj _ctx =
   in
   let expected =
     "case {\n" ^
-    "  i <= 10 => req Term[10 - i]; ens i' == 10 && a' == a;\n" ^
+    "  i <= 10 ==> req Term[10 - i]; ens i' == 10 && a' == a;\n" ^
     "};"
   in
   test_framework input expected
@@ -144,7 +144,7 @@ let test_parse_loop_term_only _ctx =
   in
   let expected =
     "case {\n" ^
-    "  i <= 10 => req Term[10 - i]; ens i' == 10;\n" ^
+    "  i <= 10 ==> req Term[10 - i]; ens i' == 10;\n" ^
     "};"
   in
   test_framework input expected
@@ -156,19 +156,19 @@ let test_parse_heap_range _ctx =
   in
   let expected =
     "case {\n" ^
-    "  array->int*(0,length - i) => req Term[length - i]; ens i' == length;\n" ^
+    "  array->int*(0,length - i) ==> req Term[length - i]; ens i' == length;\n" ^
     "};"
   in
   test_framework input expected
 
 let test_parse_forall_basic _ctx =
   let input =
-    "req \\forall size_t j. (0<=j => j<10) && Term[1];\n" ^
+    "req \\forall size_t j. (0<=j ==> j<10) && Term[1];\n" ^
     "ens i'==10;"
   in
   let expected =
     "case {\n" ^
-    "  \\forall j:size_t. 0 <= j => j < 10 => req Term[1]; ens i' == 10;\n" ^
+    "  \\forall j:size_t. 0 <= j ==> j < 10 ==> req Term[1]; ens i' == 10;\n" ^
     "};"
   in
   test_framework input expected
@@ -180,19 +180,19 @@ let test_parse_index_basic _ctx =
   in
   let expected =
     "case {\n" ^
-    "  (*(array + i)) != element => req Term[1]; ens i' == 10;\n" ^
+    "  (*(array + i)) != element ==> req Term[1]; ens i' == 10;\n" ^
     "};"
   in
   test_framework input expected
 
 let test_parse_forall_with_index _ctx =
   let input =
-    "req \\forall size_t j. (0<=j => array[j]!=element) && Term[1];\n" ^
+    "req \\forall size_t j. (0<=j ==> array[j]!=element) && Term[1];\n" ^
     "ens i'==10;"
   in
   let expected =
     "case {\n" ^
-    "  \\forall j:size_t. 0 <= j => (*(array + j)) != element => req Term[1]; ens i' == 10;\n" ^
+    "  \\forall j:size_t. 0 <= j ==> (*(array + j)) != element ==> req Term[1]; ens i' == 10;\n" ^
     "};"
   in
   test_framework input expected
@@ -204,7 +204,7 @@ let test_parse_return_expr _ctx =
   in
   let expected =
     "case {\n" ^
-    "  i <= 10 => req Term[1]; ens \\result == (*(array + i'));\n" ^
+    "  i <= 10 ==> req Term[1]; ens \\result == (*(array + i'));\n" ^
     "};"
   in
   test_framework input expected
@@ -216,7 +216,7 @@ let test_parse_or _ctx =
   in
   let expected =
     "case {\n" ^
-    "  i <= 10 => req Term[1]; ens i' == 10 || i' == 11;\n" ^
+    "  i <= 10 ==> req Term[1]; ens i' == 10 || i' == 11;\n" ^
     "};"
   in
   test_framework input expected
@@ -224,12 +224,12 @@ let test_parse_or _ctx =
 let test_parse_target_full _ctx =
   let input =
     "req array->int*(0,length-i) && 0<=i<=length && Term[length-i]\n" ^
-    "&& \\forall size_t j. (0<=j => array[j]!=element);\n" ^
+    "&& \\forall size_t j. (0<=j ==> array[j]!=element);\n" ^
     "ens i'==length || \\return*(array+i') && array[i']!=element && 0<=i'<length;"
   in
   let expected =
     "case {\n" ^
-    "  array->int*(0,length - i) && 0 <= i && i <= length && \\forall j:size_t. 0 <= j => (*(array + j)) != element => " ^
+    "  array->int*(0,length - i) && 0 <= i && i <= length && \\forall j:size_t. 0 <= j ==> (*(array + j)) != element ==> " ^
     "req Term[length - i]; ens i' == length || (\\result == (*(array + i')) && (*(array + i')) != element && 0 <= i' && i' < length);\n" ^
     "};"
   in
@@ -255,14 +255,14 @@ let test_parse_ens_ret_named_minimal _ctx =
 let test_parse_case_two_branches_minimal _ctx =
   let input =
     "case {\n" ^
-    "  i<0 => req Term[]; ens i'==i;\n" ^
-    "  i>=0 => req Term[]; ens i'==0;\n" ^
+    "  i<0 ==> req Term[]; ens i'==i;\n" ^
+    "  i>=0 ==> req Term[]; ens i'==0;\n" ^
     "};"
   in
   let expected =
     "case {\n" ^
-    "  i < 0 => req Term[]; ens i' == i;\n" ^
-    "  i >= 0 => req Term[]; ens i' == 0;\n" ^
+    "  i < 0 ==> req Term[]; ens i' == i;\n" ^
+    "  i >= 0 ==> req Term[]; ens i' == 0;\n" ^
     "};"
   in
   test_framework input expected
@@ -270,12 +270,12 @@ let test_parse_case_two_branches_minimal _ctx =
 let test_parse_exists_assumes _ctx =
   let input =
     "case {\n" ^
-    "  (\\exists size_t off . 0<=off<length) => req Term[]; ens off==off;\n" ^
+    "  (\\exists size_t off . 0<=off<length) ==> req Term[]; ens off==off;\n" ^
     "};"
   in
   let expected =
     "case {\n" ^
-    "  \\exists off:size_t. 0 <= off && off < length => req Term[]; ens off == off;\n" ^
+    "  \\exists off:size_t. 0 <= off && off < length ==> req Term[]; ens off == off;\n" ^
     "};"
   in
   test_framework input expected
@@ -284,12 +284,12 @@ let test_parse_forall_implies_assumes _ctx =
   let input =
     "case {\n" ^
     "  (\\forall size_t off . (0<=off<length ==> array[off]!=element))\n" ^
-    "    => req Term[]; ens off==off;\n" ^
+    "    ==> req Term[]; ens off==off;\n" ^
     "};"
   in
   let expected =
     "case {\n" ^
-    "  \\forall off:size_t. (0 <= off && off < length) => (*(array + off)) != element => req Term[]; ens off == off;\n" ^
+    "  \\forall off:size_t. (0 <= off && off < length) ==> (*(array + off)) != element ==> req Term[]; ens off == off;\n" ^
     "};"
   in
   test_framework input expected
@@ -299,16 +299,16 @@ let test_parse_search_spec_full _ctx =
     "req array->int*(0,length-1);\n" ^
     "case {\n" ^
     "  (\\exists size_t off . 0<=off<length && array[off]==element)\n" ^
-    "    => ens[r] r>=array && r<array+length && *r==element;\n" ^
+    "    ==> ens[r] r>=array && r<array+length && *r==element;\n" ^
     "  (\\forall size_t off . (0<=off<length ==> array[off]!=element))\n" ^
-    "    => ens[r] r==NULL;\n" ^
+    "    ==> ens[r] r==NULL;\n" ^
     "};"
   in
   let expected =
     "case {\n" ^
-    "  \\exists off:size_t. 0 <= off && off < length && (*(array + off)) == element => " ^
+    "  \\exists off:size_t. 0 <= off && off < length && (*(array + off)) == element ==> " ^
     "req array->int*(0,length - 1); ens[r] r >= array && r < array + length && (*r) == element;\n" ^
-    "  \\forall off:size_t. (0 <= off && off < length) => (*(array + off)) != element => " ^
+    "  \\forall off:size_t. (0 <= off && off < length) ==> (*(array + off)) != element ==> " ^
     "req array->int*(0,length - 1); ens[r] r == NULL;\n" ^
     "};"
   in

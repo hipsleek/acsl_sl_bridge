@@ -89,7 +89,7 @@ let test_translate_case_single _ctx =
   in
   let expected =
     "case {\n" ^
-    "  a == a => ens (*a) == \\old(*a);\n" ^
+    "  a == a ==> ens (*a) == \\old(*a);\n" ^
     "};"
   in
   test_framework input expected
@@ -111,8 +111,8 @@ let test_translate_case_two _ctx =
   in
   let expected =
     "case {\n" ^
-    "  a == b => ens (*a) == \\old(*a);\n" ^
-    "  a != b => ens (*a) == \\old(*b) && (*b) == \\old(*a);\n" ^
+    "  a == b ==> ens (*a) == \\old(*a);\n" ^
+    "  a != b ==> ens (*a) == \\old(*b) && (*b) == \\old(*a);\n" ^
     "};"
   in
   test_framework input expected
@@ -140,10 +140,10 @@ let test_translate_case_operators _ctx =
   in
   let expected =
     "case {\n" ^
-    "  a < b => ens (*a) == \\old(*a);\n" ^
-    "  a <= b => ens (*a) == \\old(*a);\n" ^
-    "  a > b => ens (*a) == \\old(*a);\n" ^
-    "  a >= b => ens (*a) == \\old(*a);\n" ^
+    "  a < b ==> ens (*a) == \\old(*a);\n" ^
+    "  a <= b ==> ens (*a) == \\old(*a);\n" ^
+    "  a > b ==> ens (*a) == \\old(*a);\n" ^
+    "  a >= b ==> ens (*a) == \\old(*a);\n" ^
     "};"
   in
   test_framework input expected
@@ -158,8 +158,8 @@ let test_translate_loop_terminating_case_expr _ctx =
   in
   let expected =
     "case {\n" ^
-    "  i < 30 => req Term[30 - i]; ens i == 30;\n" ^
-    "  !(i < 30) => req Term[]; ens i == \\old(i);\n" ^
+    "  i < 30 ==> req Term[30 - i]; ens i == 30;\n" ^
+    "  !(i < 30) ==> req Term[]; ens i == \\old(i);\n" ^
     "};"
   in
   test_framework input expected
@@ -174,8 +174,8 @@ let test_translate_loop_terminating_case_expr_change_var _ctx =
   in
   let expected =
     "case {\n" ^
-    "  j < 40 => req Term[40 - j]; ens j == 40;\n" ^
-    "  !(j < 40) => req Term[]; ens j == \\old(j);\n" ^
+    "  j < 40 ==> req Term[40 - j]; ens j == 40;\n" ^
+    "  !(j < 40) ==> req Term[]; ens j == \\old(j);\n" ^
     "};"
   in
   test_framework input expected
@@ -192,9 +192,9 @@ let test_translate_loop_terminating_case_expr_change_var _ctx =
   in
   let expected =
     "case {\n" ^
-    "  i>=10 => req Term[]; ens i'==i;\n" ^
-    "  5<=i<10 => req Term[10-i]; ens i'==10;\n" ^
-    "  i<5 => req Term[5-i]; ens i'==5;\n" ^
+    "  i>=10 ==> req Term[]; ens i'==i;\n" ^
+    "  5<=i<10 ==> req Term[10-i]; ens i'==10;\n" ^
+    "  i<5 ==> req Term[5-i]; ens i'==5;\n" ^
     "};"
   in
   test_framework input expected *)
@@ -255,7 +255,7 @@ let test_translate_for_loop_search_forall_index _ctx =
   in
   let expected =
     "req array->int*(0,length-i) && 0<=i<=length && Term[length-i]\n" ^
-    "&& \\forall size_t j. (0<=j<i => array[j]!=element);\n" ^
+    "&& \\forall size_t j. (0<=j<i ==> array[j]!=element);\n" ^
     "ens i'==length || \\return*(array+i') && array[i']!=element && 0<=i'<length;"
   in
   test_framework input expected
@@ -279,9 +279,9 @@ let test_sl_to_acsl_spec_search _ctx =
     "req array->int*(0,length-1);\n" ^
     "case {\n" ^
     "  (\\exists size_t off . 0<=off<length && array[off]==element)\n" ^
-    "    => ens[r] r>=array && r<array+length && *r==element;\n" ^
+    "    ==> ens[r] r>=array && r<array+length && *r==element;\n" ^
     "  (\\forall size_t off . (0<=off<length ==> array[off]!=element))\n" ^
-    "    => ens[r] r==NULL;\n" ^
+    "    ==> ens[r] r==NULL;\n" ^
     "};"
   in
   test_framework input expected
@@ -296,7 +296,7 @@ let test_sl_to_acsl_mutable_arr _ctx =
   in
   let expected =
     "req array->int*(0,length-1);\n" ^
-    "ens \\forall size_t j. (0<=j<length => array[j]'==0);"
+    "ens \\forall size_t j. (0<=j<length ==> array[j]'==0);"
   in
   test_framework input expected
 
@@ -311,7 +311,7 @@ let test_sl_to_acsl_mutable_arr_loop _ctx =
   in
   let expected =
     "req array->int*(i,length-i) && i<=length && Term[length-i]\n" ^
-    "&& \\forall size_t j. (i<=j<length => array[j]'==0);\n" ^
+    "&& \\forall size_t j. (i<=j<length ==> array[j]'==0);\n" ^
     "ens i'==length;"
   in
   test_framework input expected
@@ -327,8 +327,8 @@ let test_sl_to_acsl_search_replace _ctx =
   in
   let expected =
     "req array->int*(0,length-1);\n" ^
-    "ens \\forall size_t j. (0<=j<length && arr[j]==old => array[j]'==new)" ^
-    "&& \\forall size_t j. (0<=j<length && arr[j]!=old => array[j]'==array[j]);"
+    "ens \\forall size_t j. (0<=j<length && arr[j]==old ==> array[j]'==new)" ^
+    "&& \\forall size_t j. (0<=j<length && arr[j]!=old ==> array[j]'==array[j]);"
   in
   test_framework input expected
 
@@ -342,8 +342,8 @@ let test_sl_to_acsl_search_replace_loop _ctx =
   in
   let expected =
     "req array->int*(0,length-1) && Term[length - i]\n" ^
-    "&& \\forall size_t j. (0<=j<length && arr[j]==old => array[j]'==new)" ^
-    "&& \\forall size_t j. (0<=j<length && arr[j]!=old => array[j]'==array[j]);" ^
+    "&& \\forall size_t j. (0<=j<length && arr[j]==old ==> array[j]'==new)" ^
+    "&& \\forall size_t j. (0<=j<length && arr[j]!=old ==> array[j]'==array[j]);" ^
     "ens i'==length;"
   in
   test_framework input expected
@@ -366,8 +366,8 @@ let test_translate_incr_max _ctx =
   let expected =
     "req p!=q && p->int*(a) && q->int*(b);\n" ^
     "case {\n" ^
-    "  a>=b => ens p->int*(a+1) && q->int*(b);\n" ^
-    "  a<b  => ens p->int*(a) && q->int*(b+1);\n" ^
+    "  a>=b ==> ens p->int*(a+1) && q->int*(b);\n" ^
+    "  a<b  ==> ens p->int*(a) && q->int*(b+1);\n" ^
     "};"
   in
   test_framework input expected
@@ -390,8 +390,8 @@ let test_translate_incr_max_spatial_notation _ctx =
   let expected =
     "req p->int*(a) ** q->int*(b);\n" ^
     "case {\n" ^
-    "  a>=b => ens p->int*(a+1) && q->int*(b);\n" ^
-    "  a<b  => ens p->int*(a) && q->int*(b+1);\n" ^
+    "  a>=b ==> ens p->int*(a+1) && q->int*(b);\n" ^
+    "  a<b  ==> ens p->int*(a) && q->int*(b+1);\n" ^
     "};"
   in
   test_framework input expected

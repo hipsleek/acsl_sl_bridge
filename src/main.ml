@@ -38,17 +38,19 @@ let split_all_on_sl (text : string) : string array =
     i + end_len <= n && String.sub text i end_len = end_marker
   in
 
-  (* Must start with SL marker *)
-  if not (starts_with_marker 0) then (
-    Printf.eprintf "Error: file must begin with SL marker \"%s\".\n" start_marker;
-    exit 1
-  );
-
   let segments = ref [] in
   let i = ref 0 in
 
+  if not (starts_with_marker 0) then (
+    let code_start = 0 in
+    while !i < n && not (starts_with_marker !i) do
+      incr i
+    done;
+    let code_chunk = String.sub text code_start (!i - code_start) in
+    segments := code_chunk :: !segments
+  );
+
   while !i < n do
-    (* Expect an SL marker at the current position *)
     if not (starts_with_marker !i) then (
       Printf.eprintf
         "Error: expected SL marker \"%s\" at position %d.\n"
@@ -56,7 +58,6 @@ let split_all_on_sl (text : string) : string array =
       exit 1
     );
 
-    (* Scan to find the end marker "*/" *)
     let sl_content_start = !i + start_len in
     let j = ref sl_content_start in
     while !j < n && not (ends_with_marker !j) do
@@ -64,18 +65,18 @@ let split_all_on_sl (text : string) : string array =
     done;
 
     if !j + end_len > n then (
-      Printf.eprintf "Error: SL block end marker not found (expected \"%s\").\n" end_marker;
+      Printf.eprintf
+        "Error: SL block end marker not found (expected \"%s\").\n"
+        end_marker;
       exit 1
     );
 
     let sl_inside = String.sub text sl_content_start (!j - sl_content_start) in
     segments := sl_inside :: !segments;
 
-    (* Move i past the end marker *)
     let after_end = !j + end_len in
     i := after_end;
 
-    (* Collect code until next SL marker or EOF *)
     let code_start = !i in
     while !i < n && not (starts_with_marker !i) do
       incr i
@@ -86,6 +87,7 @@ let split_all_on_sl (text : string) : string array =
   done;
 
   Array.of_list (List.rev !segments)
+
 
 let make_output_filename (filename : string) : string =
   if not (Filename.check_suffix filename ".c") then
@@ -104,19 +106,31 @@ let write_to_file (filename : string) (content : string) : unit =
 let () =
   let filename = user_input_handler () in
   let file_text = read_all_from_file filename in
+
+  (* Approach 2: determine whether SL starts at index 0 or 1 *)
+  let sl_starts_first =
+    let start_marker = "/*@[SL]" in
+    let start_len = String.length start_marker in
+    String.length file_text >= start_len
+    && String.sub file_text 0 start_len = start_marker
+  in
+
   let segments = split_all_on_sl file_text in
 
   try
     let segments =
-        Array.mapi
-            (fun idx segment ->
-            if idx mod 2 = 0 then
-                let lexbuf = Lexing.from_string segment in
-                let spec = Sl_parser.main Sl_lexer.token lexbuf in
-                Translate.sl_to_acsl spec
-            else
-                segment)
-            segments
+      Array.mapi
+        (fun idx segment ->
+          let is_sl =
+            if sl_starts_first then idx mod 2 = 0 else idx mod 2 = 1
+          in
+          if is_sl then
+            let lexbuf = Lexing.from_string segment in
+            let spec = Sl_parser.main Sl_lexer.token lexbuf in
+            Translate.sl_to_acsl spec
+          else
+            segment)
+        segments
     in
     let output_text = String.concat "" (Array.to_list segments) in
     let output_filename = make_output_filename filename in
@@ -132,6 +146,3 @@ let () =
   | Failure msg ->
       Printf.eprintf "Failure: %s\n" msg;
       exit 1
-
-
-

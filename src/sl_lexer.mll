@@ -34,7 +34,6 @@ rule token = parse
   | "\\result" { ID "\\result" }
 
   | "==>"  { IMPLIES }
-  | "=>"   { IMPLIES }
   | "<==>" { IFF }
   
   | "->"   { ARROW }

@@ -110,7 +110,7 @@ let test_sl_to_core_swap_old_sugar _ctx =
 
 let test_sl_to_core_case_single _ctx =
   let input =
-    "case { a==b => req a->int*(u); ens a->int*(u); };"
+    "case { a==b ==> req a->int*(u); ens a->int*(u); };"
   in
   let actual = core_of input in
   let expected =
@@ -127,8 +127,8 @@ let test_sl_to_core_case_single _ctx =
 let test_sl_to_core_case_two _ctx =
   let input =
     "case {\n" ^
-    "  a==b => req a->int*(u); ens a->int*(u);\n" ^
-    "  a!=b => req a->int*(u) && b->int*(v);\n" ^
+    "  a==b ==> req a->int*(u); ens a->int*(u);\n" ^
+    "  a!=b ==> req a->int*(u) && b->int*(v);\n" ^
     "          ens a->int*(v) && b->int*(u);\n" ^
     "};"
   in
@@ -152,10 +152,10 @@ let test_sl_to_core_case_two _ctx =
 let test_sl_to_core_case_operators _ctx =
   let input =
     "case {\n" ^
-    "  a<b  => req a->int*(u); ens a->int*(u);\n" ^
-    "  a<=b => req a->int*(u); ens a->int*(u);\n" ^
-    "  a>b  => req a->int*(u); ens a->int*(u);\n" ^
-    "  a>=b => req a->int*(u); ens a->int*(u);\n" ^
+    "  a<b  ==> req a->int*(u); ens a->int*(u);\n" ^
+    "  a<=b ==> req a->int*(u); ens a->int*(u);\n" ^
+    "  a>b  ==> req a->int*(u); ens a->int*(u);\n" ^
+    "  a>=b ==> req a->int*(u); ens a->int*(u);\n" ^
     "};"
   in
   let actual = core_of input in
@@ -188,8 +188,8 @@ let test_sl_to_core_case_operators _ctx =
 let test_sl_to_core_loop_terminating_case_expr _ctx =
   let input =
     "case {\n" ^
-    "  i<30 => req Term[30-i]; ens i'==30;\n" ^
-    "  i>=30  => req Term[]; ens  i'==i;\n" ^
+    "  i<30 ==> req Term[30-i]; ens i'==30;\n" ^
+    "  i>=30  ==> req Term[]; ens  i'==i;\n" ^
     "};"
   in
   let actual = core_of input in
@@ -213,8 +213,8 @@ let test_sl_to_core_loop_terminating_case_expr _ctx =
 let test_sl_to_core_loop_terminating_case_expr_change_var _ctx =
   let input =
     "case {\n" ^
-    "  j<40 => req Term[40-j];ens j'==40;\n" ^
-    "  j>=40  => req Term[];ens     j'==j;\n" ^
+    "  j<40 ==> req Term[40-j];ens j'==40;\n" ^
+    "  j>=40  ==> req Term[];ens     j'==j;\n" ^
     "};"
   in
   let actual = core_of input in
@@ -238,9 +238,9 @@ let test_sl_to_core_loop_terminating_case_expr_change_var _ctx =
 let test_sl_to_core_loop_terminating_triple_case_expr _ctx =
   let input =
     "case {\n" ^
-    "  i>=30  => req Term[]; ens  i'==i;\n" ^
-    "  20<=i<30 => req Term[30-i]; ens i'==30;\n" ^
-    "  i<20 => req Term[20-i]; ens i'==20;\n" ^
+    "  i>=30  ==> req Term[]; ens  i'==i;\n" ^
+    "  20<=i<30 ==> req Term[30-i]; ens i'==30;\n" ^
+    "  i<20 ==> req Term[20-i]; ens i'==20;\n" ^
     "};"
   in
   let actual = core_of input in
@@ -325,7 +325,7 @@ let test_sl_to_core_ens_res _ctx =
 let test_sl_to_core_loop_search_forall_index _ctx =
   let input =
     "req array->int*(0,length-i) && 0<=i<=length && Term[length-i]\n" ^
-    "&& \\forall size_t j. (0<=j<i => array[j]!=element);\n" ^
+    "&& \\forall size_t j. (0<=j<i ==> array[j]!=element);\n" ^
     "ens i'==length || \\return*(array+i') && array[i']!=element && 0<=i'<length;"
   in
   let actual = core_of input in
@@ -346,9 +346,9 @@ let test_sl_to_core_spec_search _ctx =
     "req array->int*(0,length-1)@I;\n" ^
     "case {\n" ^
     "  (\\exists size_t off . 0<=off<length && array[off]==element)\n" ^
-    "    => ens[r] r>=array && r<array+length && *r==element;\n" ^
+    "    ==> ens[r] r>=array && r<array+length && *r==element;\n" ^
     "  (\\forall size_t off . (0<=off<length ==> array[off]!=element))\n" ^
-    "    => ens[r] r==NULL;\n" ^
+    "    ==> ens[r] r==NULL;\n" ^
     "};"
   in
   let actual = core_of input in
@@ -371,7 +371,7 @@ let test_sl_to_core_spec_search _ctx =
 let test_sl_to_core_mutable_arr _ctx =
   let input =
     "req array->int*(0,length-1);\n" ^
-    "ens \\forall size_t j. (0<=j<length => array[j]'==0);"
+    "ens \\forall size_t j. (0<=j<length ==> array[j]'==0);"
   in
   let actual = core_of input in
   let expected =
@@ -388,7 +388,7 @@ let test_sl_to_core_mutable_arr _ctx =
 let test_sl_to_core_mutable_arr_loop _ctx =
   let input =
     "req array->int*(i,length-i) && i<=length && Term[length-i]\n" ^
-    "&& \\forall size_t j. (i<=j<length => array[j]'==0);\n" ^
+    "&& \\forall size_t j. (i<=j<length ==> array[j]'==0);\n" ^
     "ens i'==length;"
   in
   let actual = core_of input in
@@ -407,8 +407,8 @@ let test_sl_to_core_mutable_arr_loop _ctx =
 let test_sl_to_core_search_replace _ctx =
   let input =
     "req array->int*(0,length-1);\n" ^
-    "ens \\forall size_t j. (0<=j<length && arr[j]==old => array[j]'==new)" ^
-    "&& \\forall size_t j. (0<=j<length && arr[j]!=old => array[j]'==array[j]);"
+    "ens \\forall size_t j. (0<=j<length && arr[j]==old ==> array[j]'==new)" ^
+    "&& \\forall size_t j. (0<=j<length && arr[j]!=old ==> array[j]'==array[j]);"
   in
   let actual = core_of input in
   let expected =
@@ -425,8 +425,8 @@ let test_sl_to_core_search_replace _ctx =
 let test_sl_to_core_search_replace_loop _ctx =
   let input =
     "req array->int*(0,length-1) && Term[length - i]\n" ^
-    "&& \\forall size_t j. (0<=j<length && arr[j]==old => array[j]'==new)" ^
-    "&& \\forall size_t j. (0<=j<length && arr[j]!=old => array[j]'==array[j]);" ^
+    "&& \\forall size_t j. (0<=j<length && arr[j]==old ==> array[j]'==new)" ^
+    "&& \\forall size_t j. (0<=j<length && arr[j]!=old ==> array[j]'==array[j]);" ^
     "ens i'==length;"
   in
   let actual = core_of input in
@@ -446,8 +446,8 @@ let test_sl_to_core_incr_max _ctx =
   let input =
     "req p!=q && p->int*(a) && q->int*(b);\n" ^
     "case {\n" ^
-    "  a>=b => ens p->int*(a+1) && q->int*(b);\n" ^
-    "  a<b  => ens p->int*(a) && q->int*(b+1);\n" ^
+    "  a>=b ==> ens p->int*(a+1) && q->int*(b);\n" ^
+    "  a<b  ==> ens p->int*(a) && q->int*(b+1);\n" ^
     "};"
   in
   let actual = core_of input in
@@ -471,8 +471,8 @@ let test_sl_to_core_incr_max_spatial_notation _ctx =
   let input =
     "req p->int*(a) ** q->int*(b);\n" ^
     "case {\n" ^
-    "  a>=b => ens p->int*(a+1) && q->int*(b);\n" ^
-    "  a<b  => ens p->int*(a) && q->int*(b+1);\n" ^
+    "  a>=b ==> ens p->int*(a+1) && q->int*(b);\n" ^
+    "  a<b  ==> ens p->int*(a) && q->int*(b+1);\n" ^
     "};"
   in
   let actual = core_of input in

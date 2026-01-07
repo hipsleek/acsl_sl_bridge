@@ -107,7 +107,7 @@ let rec string_of_sl ?(ctx=PTop) = function
 
   | SImplies (a, b) ->
       let s =
-        string_of_sl ~ctx:PImpl a ^ " => " ^
+        string_of_sl ~ctx:PImpl a ^ " ==> " ^
         string_of_sl ~ctx:PImpl b
       in
       paren_if (ctx <> PTop) s
@@ -158,7 +158,7 @@ let string_of_block ~ret b =
 let string_of_behavior ~ret b =
   let body_s = string_of_block ~ret b.body in
   if b.assumes = STrue then body_s
-  else string_of_sl b.assumes ^ " => " ^ body_s
+  else string_of_sl b.assumes ^ " ==> " ^ body_s
 
 let string_of_spec (s : spec) : string =
   match s.behaviors with
