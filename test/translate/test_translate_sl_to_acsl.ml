@@ -337,15 +337,16 @@ let test_sl_to_acsl_mutable_arr _ctx =
 
 let test_sl_to_acsl_mutable_arr_loop _ctx =
   let input =
-    "req array->int*(i,length-i) && i<=length && Term[length-i]\n" ^
-    "&& \\forall size_t j. (i<=j<length => array[j]'==0);\n" ^
+    "req array->int*(0,length-1) && 0<=i<=length && Term[length-i]\n" ^
+    "&& \\forall size_t j. (0<=j<i ==> array[j]!=element);\n" ^
     "ens i'==length;"
   in
   let expected =
     "/*@\n" ^
+    "  loop invariant 0 <= i;\n" ^
     "  loop invariant i <= length;\n" ^
-    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] == 0);\n" ^
-    "  loop assigns i, array[(0 .. length - 1)];\n" ^
+    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
+    "  loop assigns i;\n" ^
     "  loop variant length - i;\n" ^
     "*/"
   in
