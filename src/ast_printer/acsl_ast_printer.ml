@@ -163,7 +163,7 @@ let string_of_assigns_target = function
   | AVar x -> x
   | ADeref e -> "*" ^ string_of_expr ~ctx:PUnary e
   | ARange (base, lo, hi) ->
-      string_of_expr base ^ "[(" ^ string_of_expr lo ^ " .. " ^ string_of_expr hi ^ ")]"
+      string_of_expr base ^ "[" ^ string_of_expr lo ^ " .. " ^ string_of_expr hi ^ "]"
 
 let string_of_assigns = function
   | ANothing -> "\\nothing"

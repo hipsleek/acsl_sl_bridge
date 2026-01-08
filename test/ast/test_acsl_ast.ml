@@ -191,7 +191,7 @@ let test_string_of_assigns_items_basic _ =
   test_framework "*a, *b" (string_of_assigns (assigns_items [ a_deref (v "a"); a_deref (v "b") ]))
 
 let test_string_of_assigns_items_range _ =
-  test_framework "array[(0 .. length - 1)]"
+  test_framework "array[0 .. length - 1]"
     (string_of_assigns
        (assigns_items
           [
@@ -272,7 +272,7 @@ let test_print_fun_spec_valid_read_assigns_array _ =
   let expected =
     "/*@\n" ^
     "  requires \\valid_read(array + (0 .. length - 1));\n" ^
-    "  assigns array[(0 .. length - 1)];\n" ^
+    "  assigns array[0 .. length - 1];\n" ^
     "  ensures \\forall size_t j; (0 <= j && j < length) ==> (array[j] == 0);\n" ^
     "*/"
   in
@@ -330,7 +330,7 @@ let test_print_loop_spec_assigns_array_range _ =
   let expected =
     "/*@\n" ^
     "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] == 0);\n" ^
-    "  loop assigns i, array[(0 .. length - 1)];\n" ^
+    "  loop assigns i, array[0 .. length - 1];\n" ^
     "  loop variant length - i;\n" ^
     "*/"
   in

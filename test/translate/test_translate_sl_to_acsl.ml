@@ -346,7 +346,7 @@ let test_sl_to_acsl_mutable_arr _ctx =
   let expected =
     "/*@\n" ^
     "  requires \\valid(array + (0 .. length - 1));\n" ^
-    "  assigns array[(0 .. length - 1)];\n" ^
+    "  assigns array[0 .. length - 1];\n" ^
     "  ensures \\forall size_t j; (0 <= j && j < length) ==> (array[j] == 0);\n" ^
     "*/"
   in
@@ -371,14 +371,14 @@ let test_sl_to_acsl_mutable_arr_loop _ctx =
 let test_sl_to_acsl_search_replace _ctx =
   let input =
     "req array->int*(0,length-1) && Term[];\n" ^
-    "ens \\forall size_t j. (0<=j<length && array[j]==old ==> array[j]'==new)\n" ^
-    " && \\forall size_t j. (0<=j<length && array[j]!=old ==> array[j]'==array[j]);"
+    "ens (\\forall size_t j. (0<=j<length && array[j]==old ==> array[j]'==new))\n" ^
+    " && (\\forall size_t j. (0<=j<length && array[j]!=old ==> array[j]'==array[j]));"
   in
   let expected =
     "/*@\n" ^
     "  requires \\valid(array + (0 .. length - 1));\n" ^
-    "  assigns array[(0 .. length - 1)];\n" ^
-    "  ensures \\forall size_t j; ((0 <= j && j < length && \\old(array[j]) == old) ==> (array[j] == new)) && \\forall size_t j; (0 <= j && j < length && \\old(array[j]) != old) ==> (array[j] == \\old(array[j]));\n" ^
+    "  assigns array[0 .. length - 1];\n" ^
+    "  ensures \\forall size_t j; (0 <= j && j < length && \\old(array[j]) == old) ==> (array[j] == new) && \\forall size_t j; (0 <= j && j < length && \\old(array[j]) != old) ==> (array[j] == \\old(array[j]));\n" ^
     "*/"
   in
   test_framework input expected
@@ -386,16 +386,19 @@ let test_sl_to_acsl_search_replace _ctx =
 
 let test_sl_to_acsl_search_replace_loop _ctx =
   let input =
-    "req array->int*(i,length-1) && Term[length - i];\n" ^
-    "ens array->int*(i,length-1) && i'==length\n" ^
-    " && (\\forall size_t j. (i<=j<length && array[j]==old ==> array[j]'==new))\n" ^
-    " && (\\forall size_t j. (i<=j<length && array[j]!=old ==> array[j]'==array[j]));"
+    "req array->int*(0,length-1)\n" ^
+    " && 0<=i<=length\n" ^
+    " && (\\forall size_t j. (0<=j<i && \\old(array[j])==old ==> array[j]==new))\n" ^
+    " && (\\forall size_t j. (0<=j<i && \\old(array[j])!=old ==> array[j]==\\old(array[j])))\n" ^
+    " && (\\forall size_t j. (i<=j<length ==> array[j]==\\old(array[j])))\n" ^
+    " && Term[length - i];"
   in
   let expected =
     "/*@\n" ^
     "  loop invariant 0 <= i <= length;\n" ^
     "  loop invariant \\forall size_t j; (0 <= j && j < i && \\at(array[j], LoopEntry) == old) ==> (array[j] == new);\n" ^
     "  loop invariant \\forall size_t j; (0 <= j && j < i && \\at(array[j], LoopEntry) != old) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
+    "  loop invariant \\forall size_t j; (i <= j && j < length) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
     "  loop assigns i, array[0 .. length - 1];\n" ^
     "  loop variant length - i;\n" ^
     "*/"
