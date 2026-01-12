@@ -31,28 +31,41 @@ let rec expr_of_core (c : ctx) (t : Core.term) : A.expr =
   | TPtr p -> A.EVar p
 
   | TVar (ph, x) -> (
-      match c with
-      | CLoop -> A.EVar x
-      | CLoopRel ->
-          (match ph with
-           | Pre -> A.EAt (A.EVar x, A.LoopEntry)
-           | Post -> A.EVar x)
-      | CRequires -> A.EVar x
-      | CEnsures -> A.EVar x)
+    match c with
+    | CLoop ->
+        (* invariants from assumes describe current loop state *)
+        (match ph with
+         | LoopEntry -> A.EAt (A.EVar x, A.LoopEntry)
+         | Pre | Post -> A.EVar x)
+    | CLoopRel ->
+        (* relational invariants: Pre/LoopEntry = LoopEntry, Post = current *)
+        (match ph with
+         | Post -> A.EVar x
+         | Pre | LoopEntry -> A.EAt (A.EVar x, A.LoopEntry))
+    | CRequires -> A.EVar x
+    | CEnsures -> A.EVar x)
+
+
 
   | THeap (ph, p) -> (
-      let deref = A.EDeref (A.EVar p) in
-      match c with
-      | CLoop -> deref
-      | CLoopRel ->
-          (match ph with
-           | Pre -> A.EAt (deref, A.LoopEntry)
-           | Post -> deref)
-      | CRequires -> deref
-      | CEnsures ->
-          (match ph with
-           | Post -> deref
-           | Pre -> A.EOld deref))
+    let deref = A.EDeref (A.EVar p) in
+    match c with
+    | CLoop ->
+        (match ph with
+         | LoopEntry -> A.EAt (deref, A.LoopEntry)
+         | Pre | Post -> deref)
+    | CLoopRel ->
+        (match ph with
+         | Post -> deref
+         | Pre | LoopEntry -> A.EAt (deref, A.LoopEntry))
+    | CRequires -> deref
+    | CEnsures ->
+        (match ph with
+         | Post -> deref
+         | Pre -> A.EOld deref
+         | LoopEntry -> A.EAt (deref, A.LoopEntry)) )
+
+
 
   | TArith (Core.Sub, Core.TInt 0, t2) ->
     A.EUnop (A.UNeg, expr_of_core c t2)
@@ -64,34 +77,39 @@ let rec expr_of_core (c : ctx) (t : Core.term) : A.expr =
       A.EApp (f, List.map (expr_of_core c) args)
 
   | TIndex (ph, a, idx) ->
-      let e = A.EIndex (expr_of_core c a, expr_of_core c idx) in
-      (match c with
-       | CEnsures ->
-           (match ph with
-            | Pre -> A.EOld e
-            | Post -> e)
-       | CLoopRel ->
-           (match ph with
-            | Pre -> A.EAt (e, A.LoopEntry)
-            | Post -> e)
-       | CRequires
-       | CLoop ->
-           e)
+    let e = A.EIndex (expr_of_core c a, expr_of_core c idx) in
+    (match c with
+     | CEnsures ->
+         (match ph with
+          | Pre -> A.EOld e
+          | Post | LoopEntry -> e)
+     | CLoopRel ->
+         (match ph with
+          | Post -> e
+          | Pre | LoopEntry -> A.EAt (e, A.LoopEntry))
+     | CRequires | CLoop ->
+         (match ph with
+          | LoopEntry -> A.EAt (e, A.LoopEntry)
+          | Pre | Post -> e))
+
 
   | TLoad (ph, addr) -> (
-      let a = expr_of_core c addr in
-      match c with
-      | CEnsures ->
-          (match ph with
-           | Post -> A.EDeref a
-           | Pre -> A.EOld (A.EDeref a))
-      | CLoopRel ->
-          (match ph with
-           | Post -> A.EDeref a
-           | Pre -> A.EAt (A.EDeref a, A.LoopEntry))
-      | CLoop
-      | CRequires ->
-          A.EDeref a)
+    let a = expr_of_core c addr in
+    let deref = A.EDeref a in
+    match c with
+    | CEnsures ->
+        (match ph with
+         | Pre -> A.EOld deref
+         | Post | LoopEntry -> deref)
+    | CLoopRel ->
+        (match ph with
+         | Post -> deref
+         | Pre | LoopEntry -> A.EAt (deref, A.LoopEntry))
+    | CLoop | CRequires ->
+        (match ph with
+         | LoopEntry -> A.EAt (deref, A.LoopEntry)
+         | Pre | Post -> deref))
+
 
 let sort_of_core_ty_opt (ty : string option) : A.sort option =
   match ty with
@@ -425,6 +443,8 @@ let is_liftable_relational (p : Core.predicate) : bool =
       pred_is_relational_pre_post p && not (pred_mentions_result p)
   | _ ->
       false
+
+let ctx_for_loop_inv (_p : Core.predicate) : ctx = CLoop
 
 let loop_spec_of_core (s : Core.spec) : A.loop_spec =
   let chosen =

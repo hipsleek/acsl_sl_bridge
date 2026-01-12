@@ -9,7 +9,7 @@ type param = {
   mode : mode;
 }
 
-type phase = Pre | Post
+type phase = Pre | Post | LoopEntry
 
 type arith_op = Add | Sub | Mul | Div
 

@@ -399,7 +399,7 @@ let test_sl_to_core_mutable_arr_loop _ctx =
     "  assumes i <= length && forall size_t j. (0 <= j && j < i) ==> (array[j] == 0)\n" ^
     "  requires valid_range(array, i, length - i)\n" ^
     "  ensures i' == length\n" ^
-    "  assigns { i, array+(0..length - 1) }\n" ^
+    "  assigns { i }\n" ^
     "  variant length - i"
   in
   test_framework expected actual
@@ -437,7 +437,7 @@ let test_sl_to_core_search_replace_loop _ctx =
     "  assumes forall size_t j. ((0 <= j && j < length && arr[j] == old) ==> (array'[j'] == new)) && forall size_t j. (0 <= j && j < length && arr[j] != old) ==> (array'[j'] == array[j])\n" ^
     "  requires valid_range(array, 0, length - 1)\n" ^
     "  ensures i' == length\n" ^
-    "  assigns { i, array+(0..length - 1) }\n" ^
+    "  assigns { i }\n" ^
     "  variant length - i"
   in
   test_framework expected actual

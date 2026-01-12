@@ -154,56 +154,92 @@ let rec fold_sl
 (* Expr -> Core.term *)
 (***) 
 
-let rec term_of_expr (default_phase : C.phase) (e : Sl_ast.expr) : C.term =
+let rec term_of_expr (kind : C.spec_kind) (default_phase : C.phase) (e : Sl_ast.expr) : C.term =
   match e with
   | EVar x -> C.TVar (default_phase, x)
   | EConstInt n -> C.TInt n
   | EConstBool b -> C.TApp ((if b then "true" else "false"), [])
   | EResult -> C.TResult
-  | EApp (f, args) -> C.TApp (f, List.map (term_of_expr default_phase) args)
+
+  | EApp (f, args) ->
+      C.TApp (f, List.map (term_of_expr kind default_phase) args)
+
   | EUnop (UNeg, e1) ->
-      C.TArith (C.Sub, C.TInt 0, term_of_expr default_phase e1)
+      C.TArith (C.Sub, C.TInt 0, term_of_expr kind default_phase e1)
+
   | EUnop (UNot, e1) ->
-      C.TApp ("not", [ term_of_expr default_phase e1 ])
+      C.TApp ("not", [ term_of_expr kind default_phase e1 ])
 
   | EDeref (EBinop (BAdd, base, idx)) ->
-      C.TIndex (default_phase, term_of_expr default_phase base, term_of_expr default_phase idx)
-  | EDeref e1 -> C.TLoad (default_phase, term_of_expr default_phase e1)
-  | EOld e1 -> term_of_expr C.Pre e1
-  | EPost e1 -> term_of_expr C.Post e1
+    let sub_ph = if default_phase = C.LoopEntry then C.Post else default_phase in
+    C.TIndex
+      ( default_phase
+      , term_of_expr kind sub_ph base
+      , term_of_expr kind sub_ph idx
+      )
+
+| EDeref e1 ->
+    let sub_ph = if default_phase = C.LoopEntry then C.Post else default_phase in
+    C.TLoad (default_phase, term_of_expr kind sub_ph e1)
+
+  | EOld e1 ->
+      let ph =
+        match kind with
+        | C.LoopContract -> C.LoopEntry
+        | C.FunctionContract -> C.Pre
+      in
+      term_of_expr kind ph e1
+
+  | EPost e1 ->
+      term_of_expr kind C.Post e1
+
   | EBinop (op, e1, e2) -> (
       match arith_of_binop op with
       | Some aop ->
-          C.TArith (aop, term_of_expr default_phase e1, term_of_expr default_phase e2)
+          C.TArith
+            ( aop
+            , term_of_expr kind default_phase e1
+            , term_of_expr kind default_phase e2
+            )
       | None ->
-          C.TApp ("binop", [ term_of_expr default_phase e1; term_of_expr default_phase e2 ]) )
+          C.TApp
+            ( "binop"
+            , [ term_of_expr kind default_phase e1
+              ; term_of_expr kind default_phase e2
+              ]
+            ) )
+
 
 (***)
 (* SL -> Core.predicate (heap ignored) *)
 (***) 
 
-let pred_of_cmp_expr (default_phase : C.phase) (e : Sl_ast.expr) : C.predicate =
+let pred_of_cmp_expr (kind : C.spec_kind) (default_phase : C.phase) (e : Sl_ast.expr) : C.predicate =
   match e with
   | EBinop (op, e1, e2) -> (
       match rel_of_binop op with
-      | Some r -> mk_rel r (term_of_expr default_phase e1) (term_of_expr default_phase e2)
-      | None -> p_atom (C.APred ("bool", [ term_of_expr default_phase e ])) )
+      | Some r ->
+          mk_rel r
+            (term_of_expr kind default_phase e1)
+            (term_of_expr kind default_phase e2)
+      | None ->
+          p_atom (C.APred ("bool", [ term_of_expr kind default_phase e ])) )
   | _ ->
-      p_atom (C.APred ("bool", [ term_of_expr default_phase e ]))
+      p_atom (C.APred ("bool", [ term_of_expr kind default_phase e ]))
 
-let rec pred_of_sl (s : Sl_ast.sl) : C.predicate =
+let rec pred_of_sl (kind : C.spec_kind) (s : Sl_ast.sl) : C.predicate =
   match s with
   | STrue -> C.PTrue
   | SFalse -> C.PFalse
   | SEmp -> C.PTrue
   | SHeap _ -> C.PTrue
-  | SPure e -> pred_of_cmp_expr C.Pre e
-  | SSep xs | SAnd xs -> p_and (List.map pred_of_sl xs)
-  | SOr xs -> p_or (List.map pred_of_sl xs)
-  | SNot x -> C.PNot (pred_of_sl x)
-  | SImplies (a, b) -> C.PImplies (pred_of_sl a, pred_of_sl b)
-  | SForall (bs, body) -> C.PForall (binders_of_sl bs, pred_of_sl body)
-  | SExists (bs, body) -> C.PExists (binders_of_sl bs, pred_of_sl body)
+  | SPure e -> pred_of_cmp_expr kind C.Pre e
+  | SSep xs | SAnd xs -> p_and (List.map (pred_of_sl kind) xs)
+  | SOr xs -> p_or (List.map (pred_of_sl kind) xs)
+  | SNot x -> C.PNot (pred_of_sl kind x)
+  | SImplies (a, b) -> C.PImplies (pred_of_sl kind a, pred_of_sl kind b)
+  | SForall (bs, body) -> C.PForall (binders_of_sl bs, pred_of_sl kind body)
+  | SExists (bs, body) -> C.PExists (binders_of_sl bs, pred_of_sl kind body)
 
 (***)
 (* Clause extraction *)
@@ -287,6 +323,22 @@ let collect_vars_in_expr (e : Sl_ast.expr) : StringSet.t =
     | _ -> acc
   in
   fold_expr ~f StringSet.empty e
+
+let collect_deref_bases (s : Sl_ast.sl) : StringSet.t =
+  let f_expr acc = function
+    | EDeref (EBinop (BAdd, EVar base, _idx)) -> StringSet.add base acc
+    | EDeref (EVar base) -> StringSet.add base acc
+    | _ -> acc
+  in
+  fold_sl ~f_sl:(fun a _ -> a) ~f_expr StringSet.empty s
+
+let collect_old_deref_bases (s : Sl_ast.sl) : StringSet.t =
+  let f_expr acc = function
+    | EOld (EDeref (EBinop (BAdd, EVar base, _idx))) -> StringSet.add base acc
+    | EOld (EDeref (EVar base)) -> StringSet.add base acc
+    | _ -> acc
+  in
+  fold_sl ~f_sl:(fun a _ -> a) ~f_expr StringSet.empty s
 
 let pre_value_to_loc_map (pre_atoms : pt_atom list) : string StringMap.t =
   List.fold_left
@@ -438,11 +490,18 @@ let assigns_from_post_vars (post_sl : Sl_ast.sl) : C.assignable list =
 
 let collect_post_write_bases_in_sl (s : Sl_ast.sl) : StringSet.t =
   let f_expr acc = function
+    (* Post-state applied to the whole cell *)
     | EPost (EDeref (EBinop (BAdd, EVar base, _idx))) -> StringSet.add base acc
     | EPost (EDeref (EVar base)) -> StringSet.add base acc
+
+    (* Post-state applied to the base pointer inside the address (common if prime binds to base) *)
+    | EDeref (EBinop (BAdd, EPost (EVar base), _idx)) -> StringSet.add base acc
+    | EDeref (EPost (EVar base)) -> StringSet.add base acc
+
     | _ -> acc
   in
   fold_sl ~f_sl:(fun a _ -> a) ~f_expr StringSet.empty s
+
 
 let expr_mentions_var (x : string) (e : Sl_ast.expr) : bool =
   let found = ref false in
@@ -458,6 +517,7 @@ let infer_length_name_from_ranges (ranges : range_atom list) : string option =
   if List.exists has_length ranges then Some "length" else None
 
 let assigns_from_ranges_if_written
+    ~(kind : C.spec_kind)
     ~(ranges : range_atom list)
     ~(written_bases : StringSet.t)
     ~(widen_to_full : bool)
@@ -473,9 +533,9 @@ let assigns_from_ranges_if_written
   |> List.filter (fun { base; _ } -> StringSet.mem base written_bases)
   |> List.map (fun { base; lo; hi; _ } ->
          if widen_to_full then
-           C.AsRange (base, term_of_expr C.Pre full_lo, term_of_expr C.Pre full_hi)
+           C.AsRange (base, term_of_expr kind C.Pre full_lo, term_of_expr kind C.Pre full_hi)
          else
-           C.AsRange (base, term_of_expr C.Pre lo, term_of_expr C.Pre hi))
+           C.AsRange (base, term_of_expr kind C.Pre lo, term_of_expr kind C.Pre hi))
 
 (***)
 (* Ptr discovery / sharing *)
@@ -519,12 +579,12 @@ let assigns_from_ptrs (ptrs : StringSet.t) : C.assignable list =
 let requires_from_ptrs (ptrs : StringSet.t) : C.predicate =
   ptrs |> StringSet.elements |> List.map mk_valid |> p_and
 
-let requires_from_ranges (ranges : range_atom list) : C.predicate =
+let requires_from_ranges (kind : C.spec_kind) (ranges : range_atom list) : C.predicate =
   ranges
   |> List.map (fun { base; lo; hi; mode } ->
          let base_t = C.TVar (C.Pre, base) in
-         let lo_t = term_of_expr C.Pre lo in
-         let hi_t = term_of_expr C.Pre hi in
+         let lo_t = term_of_expr kind C.Pre lo in
+         let hi_t = term_of_expr kind C.Pre hi in
          match mode with
          | Sl_ast.In -> mk_valid_read_range base_t lo_t hi_t
          | Sl_ast.Default -> mk_valid_range base_t lo_t hi_t)
@@ -616,10 +676,10 @@ let infer_sep_neqs (req_sl : Sl_ast.sl) : C.predicate =
 let mk_eq (t1 : C.term) (t2 : C.term) : C.predicate =
   p_atom (C.ARel (C.Eq, t1, t2))
 
-let ensures_from_post_heaplets (post_atoms : pt_atom_any list) : C.predicate =
+let ensures_from_post_heaplets (kind : C.spec_kind) (post_atoms : pt_atom_any list) : C.predicate =
   post_atoms
   |> List.map (fun { loc = p; value_e } ->
-         mk_eq (C.THeap (C.Post, p)) (term_of_expr C.Pre value_e))
+         mk_eq (C.THeap (C.Post, p)) (term_of_expr kind C.Pre value_e))
   |> p_and
 
 let ensures_from_pure_heap_eqs (eqs : (string * string) list) : C.predicate =
@@ -627,17 +687,17 @@ let ensures_from_pure_heap_eqs (eqs : (string * string) list) : C.predicate =
   |> List.map (fun (a, b) -> mk_eq (C.THeap (C.Post, a)) (C.THeap (C.Pre, b)))
   |> p_and
 
-let build_ensures ~(post_sl : Sl_ast.sl) : C.predicate =
+let build_ensures ~(kind : C.spec_kind) ~(post_sl : Sl_ast.sl) : C.predicate =
   let post_heap_atoms = collect_pt_atoms_any post_sl in
   let pure_heap_eqs = collect_heap_equalities_from_pure post_sl in
   let heaplet_part =
-    if post_heap_atoms <> [] then ensures_from_post_heaplets post_heap_atoms else C.PTrue
+    if post_heap_atoms <> [] then ensures_from_post_heaplets kind post_heap_atoms else C.PTrue
   in
   let pure_part =
     if pure_heap_eqs <> [] then ensures_from_pure_heap_eqs pure_heap_eqs else C.PTrue
   in
   let general_part =
-    if post_heap_atoms = [] && pure_heap_eqs = [] then pred_of_sl post_sl else C.PTrue
+    if post_heap_atoms = [] && pure_heap_eqs = [] then pred_of_sl kind post_sl else C.PTrue
   in
   p_and [ heaplet_part; pure_part; general_part ]
 
@@ -716,8 +776,13 @@ let analyze_behavior
   let pre_source =
     match kind with
     | C.FunctionContract -> req_opt
-    | C.LoopContract -> Some b.assumes
+    | C.LoopContract ->
+        (* ranges/heap context come from req if provided; otherwise fallback to assumes *)
+        (match req_opt with
+        | Some r -> Some r
+        | None -> Some b.assumes)
   in
+
 
   let pre_atoms = match pre_source with None -> [] | Some s -> collect_pt_atoms s in
   let pre_map = pre_value_to_loc_map pre_atoms in
@@ -729,7 +794,7 @@ let analyze_behavior
     | C.FunctionContract -> b.assumes
   in
   let assumes_sl = rewrite_value_vars_with_pre_map pre_map assumes_sl_raw in
-  let assumes_p = pred_of_sl assumes_sl in
+  let assumes_p = pred_of_sl kind assumes_sl in
 
   let req_sep_neqs =
     match req_opt with
@@ -742,7 +807,7 @@ let analyze_behavior
     | None -> C.PTrue
     | Some req_sl ->
         let req_sl' = rewrite_value_vars_with_pre_map pre_map req_sl in
-        pred_of_sl req_sl'
+        pred_of_sl kind req_sl'
   in
 
   let post_sl_opt =
@@ -761,7 +826,7 @@ let analyze_behavior
   let ensures_p =
     match post_sl_opt with
     | None -> C.PTrue
-    | Some post_sl -> build_ensures ~post_sl
+    | Some post_sl -> build_ensures ~kind ~post_sl
   in
 
   let ptrs = ptrs_for ptrs_choice b in
@@ -792,6 +857,7 @@ let analyze_behavior
 (***) 
 
 let mk_requires
+    ~(kind : C.spec_kind)
     ~(ptrs : StringSet.t)
     ~(ranges : range_atom list)
     ~(sep_neqs : C.predicate)
@@ -799,10 +865,23 @@ let mk_requires
   : C.clause
   =
   let p_valid = requires_from_ptrs ptrs in
-  let p_read  = requires_from_ranges ranges in
+  let p_read  = requires_from_ranges kind ranges in
   C.Requires (p_and [ sep_neqs; p_valid; p_read; pure ])
 
-(* UPDATED: add ~var_expr so loop assigns can fall back to variant vars when needed *)
+let collect_deref_bases_in_sl (s : Sl_ast.sl) : StringSet.t =
+  let f_expr acc = function
+    | EDeref (EBinop (BAdd, EVar base, _idx)) -> StringSet.add base acc
+    | EDeref (EVar base) -> StringSet.add base acc
+    | _ -> acc
+  in
+  fold_sl ~f_sl:(fun a _ -> a) ~f_expr StringSet.empty s
+
+let progress_vars_from_variant (e : Sl_ast.expr) : StringSet.t =
+  match e with
+  | EVar v -> StringSet.singleton v
+  | EBinop (BSub, _bound, EVar v) -> StringSet.singleton v
+  | _ -> collect_vars_in_expr e
+
 let mk_assigns
     ~(kind : C.spec_kind)
     ~(ptrs : StringSet.t)
@@ -814,35 +893,36 @@ let mk_assigns
   =
   match kind with
   | C.FunctionContract ->
-      let written_bases =
-        match post_sl_opt with
-        | None -> StringSet.empty
-        | Some post_sl -> collect_post_write_bases_in_sl post_sl
-      in
-      let range_assigns =
-        assigns_from_ranges_if_written ~ranges:req_ranges ~written_bases ~widen_to_full:false
-      in
-      let range_bases =
-        List.fold_left
-          (fun acc -> function
-             | C.AsRange (p, _, _) -> StringSet.add p acc
-             | _ -> acc)
-          StringSet.empty
-          range_assigns
-      in
-      let heap_assigns =
-        assigns_from_ptrs ptrs
-        |> List.filter (function
-             | C.AsHeap p -> not (StringSet.mem p range_bases)
-             | _ -> true)
-      in
-      C.Assigns (range_assigns @ heap_assigns)
+    let written_bases =
+      match post_sl_opt with
+      | None -> StringSet.empty
+      | Some post_sl -> collect_post_write_bases_in_sl post_sl
+    in
+    let range_assigns =
+      assigns_from_ranges_if_written
+        ~kind
+        ~ranges:req_ranges
+        ~written_bases
+        ~widen_to_full:false
+    in
+    let range_bases =
+      List.fold_left
+        (fun acc -> function
+           | C.AsRange (p, _, _) -> StringSet.add p acc
+           | _ -> acc)
+        StringSet.empty
+        range_assigns
+    in
+    let heap_assigns =
+      assigns_from_ptrs ptrs
+      |> List.filter (function
+           | C.AsHeap p -> not (StringSet.mem p range_bases)
+           | _ -> true)
+    in
+    C.Assigns (range_assigns @ heap_assigns)
 
-  | C.LoopContract ->
-      (* Vars assigned in a loop can be stated either via:
-         - prime notation: x'
-         - \old comparisons: x == \old(x) (still relevant loop var)
-         If neither appears (e.g. only Term[...] + ens), fall back to vars in the variant. *)
+
+    | C.LoopContract ->
       let post_vars =
         match post_sl_opt with
         | None -> StringSet.empty
@@ -852,38 +932,47 @@ let mk_assigns
               (collect_old_vars_in_sl post_sl)
       in
 
-      let var_assigns =
-        post_vars
-        |> StringSet.elements
-        |> List.map (fun v -> C.AsVar v)
-      in
+      let explicit_write_bases =
+          match post_sl_opt with
+          | None -> StringSet.empty
+          | Some post_sl -> collect_post_write_bases_in_sl post_sl
+        in
 
-      let written_bases = collect_post_write_bases_in_sl assumes_sl_for_writes in
+        (* Heuristic: treat base as written if loop invariants mention both
+          current deref and old/LoopEntry deref for that same base. *)
+        let inv_current = collect_deref_bases assumes_sl_for_writes in
+        let inv_old     = collect_old_deref_bases assumes_sl_for_writes in
+        let inv_write_bases = StringSet.inter inv_current inv_old in
+
+        let written_bases = StringSet.union explicit_write_bases inv_write_bases in
+
       let range_assigns =
         assigns_from_ranges_if_written
+          ~kind
           ~ranges:req_ranges
           ~written_bases
           ~widen_to_full:true
       in
 
-      let assigns =
-        if var_assigns = [] && range_assigns = [] then
-          match var_expr with
-          | None -> []
-          | Some e ->
-              collect_vars_in_expr e
-              |> StringSet.elements
-              |> List.map (fun v -> C.AsVar v)
-        else
-          var_assigns @ range_assigns
+      let progress_vars =
+        match var_expr with
+        | None -> StringSet.empty
+        | Some e -> progress_vars_from_variant e
       in
 
-      C.Assigns assigns
+      let all_var_assigns =
+        StringSet.union post_vars progress_vars
+        |> StringSet.elements
+        |> List.map (fun v -> C.AsVar v)
+      in
 
-let mk_variant (vopt : Sl_ast.expr option) : C.clause list =
+      C.Assigns (all_var_assigns @ range_assigns)
+
+
+let mk_variant (kind : C.spec_kind) (vopt : Sl_ast.expr option) : C.clause list =
   match vopt with
   | None -> []
-  | Some e -> [ C.Variant (term_of_expr C.Pre e) ]
+  | Some e -> [ C.Variant (term_of_expr kind C.Pre e) ]
 
 let build_core_behavior
     ~(kind : C.spec_kind)
@@ -895,7 +984,7 @@ let build_core_behavior
   let clauses =
     [
       C.Assumes a.assumes_p;
-      mk_requires ~ptrs:a.ptrs ~ranges:a.req_ranges ~sep_neqs:a.req_sep_neqs ~pure:a.req_pure;
+      mk_requires ~kind ~ptrs:a.ptrs ~ranges:a.req_ranges ~sep_neqs:a.req_sep_neqs ~pure:a.req_pure;
       C.Ensures a.ensures_p;
       mk_assigns
         ~kind
@@ -905,7 +994,7 @@ let build_core_behavior
         ~post_sl_opt:a.post_sl_opt
         ~var_expr:a.var_expr;
     ]
-    @ mk_variant a.var_expr
+    @ mk_variant kind a.var_expr
   in
   { C.b_name; clauses }
 
