@@ -17,7 +17,7 @@ int* search(int* array, size_t length, int element) {
   /*@
   loop invariant 0 <= i;
   loop invariant i <= length;
-  loop invariant \forall size_t j; (0 <= j && j <= i) ==> (array[j] != element);
+  loop invariant \forall size_t j; (0 <= j && j < i) ==> (\at(array[j], LoopEntry) != element);
   loop assigns i;
   loop variant length - i;
 */

@@ -374,7 +374,7 @@ let test_sl_to_acsl_spec_search_loop_alt_notation _ctx =
     "/*@\n" ^
     "  loop invariant 0 <= i;\n" ^
     "  loop invariant i <= length;\n" ^
-    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
+    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (\\at(array[j], LoopEntry) != element);\n" ^
     "  loop assigns i;\n" ^
     "  loop variant length - i;\n" ^
     "*/"
@@ -426,7 +426,6 @@ let test_sl_to_acsl_search_replace _ctx =
   in
   test_framework input expected
 
-
 let test_sl_to_acsl_search_replace_loop _ctx =
   let input =
     "req array->int*(0,length-1)\n" ^
@@ -452,6 +451,50 @@ let test_sl_to_acsl_search_replace_loop _ctx =
     "*/"
   in
   test_framework input expected
+
+let test_sl_to_acsl_search_replace_alt_notation _ctx =
+  let input =
+    "req array->int*(arr,0,length-1) && Term[];\n" ^
+    "ens array->int*(narr,0,length-1)\n" ^
+    " && (\\forall size_t j. (0<=j<length && \\old(arr[j])==old ==> narr[j]==new))\n" ^
+    " && (\\forall size_t j. (0<=j<length && \\old(arr[j])!=old ==> narr[j]==\\old(arr[j])));"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires \\valid(array + (0 .. length - 1));\n" ^
+    "  assigns array[0 .. length - 1];\n" ^
+    "  ensures \\forall size_t j; (0 <= j && j < length && \\old(array[j]) == old) ==> (array[j] == new) && \\forall size_t j; (0 <= j && j < length && \\old(array[j]) != old) ==> (array[j] == \\old(array[j]));\n" ^
+    "*/"
+  in
+  test_framework input expected
+
+
+let test_sl_to_acsl_search_replace_loop_alt_notation _ctx =
+  let input =
+    "req array->int*(arr,0,length-1)\n" ^
+    " && 0<=i<=length\n" ^
+    " && (\\forall size_t j. (0<=j<i && \\old(arr[j])==old ==> narr[j]==new))\n" ^
+    " && (\\forall size_t j. (0<=j<i && \\old(arr[j])!=old ==> narr[j]==\\old(arr[j])))\n" ^
+    " && (\\forall size_t j. (i<=j<length ==> narr[j]==\\old(arr[j])))\n" ^
+    " && Term[length - i];\n" ^
+    "ens (i==length ==> \n" ^
+    "      (\\forall size_t j. (0<=j<length && \\old(arr[j])==old ==> narr[j]==new))\n" ^
+    "   && (\\forall size_t j. (0<=j<length && \\old(arr[j])!=old ==> narr[j]==\\old(arr[j])))\n" ^
+    "   );"
+  in
+  let expected =
+    "/*@\n" ^
+    "  loop invariant 0 <= i;\n" ^
+    "  loop invariant i <= length;\n" ^
+    "  loop invariant \\forall size_t j; (0 <= j && j < i && \\at(array[j], LoopEntry) == old) ==> (array[j] == new);\n" ^
+    "  loop invariant \\forall size_t j; (0 <= j && j < i && \\at(array[j], LoopEntry) != old) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
+    "  loop invariant \\forall size_t j; (i <= j && j < length) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
+    "  loop assigns i, array[0 .. length - 1];\n" ^
+    "  loop variant length - i;\n" ^
+    "*/"
+  in
+  test_framework input expected
+
 
 let test_translate_incr_max _ctx =
   let input =
@@ -621,6 +664,8 @@ let suite =
     (* "mutable_arr_loop" >:: test_sl_to_acsl_mutable_arr_loop; *)
     "search_replace" >:: test_sl_to_acsl_search_replace;
     "search_replace_loop" >:: test_sl_to_acsl_search_replace_loop;
+    "search_replace_alt_notation" >:: test_sl_to_acsl_search_replace_alt_notation;
+    "search_replace_loop_alt_notation" >:: test_sl_to_acsl_search_replace_loop_alt_notation;
     "incr_max" >:: test_translate_incr_max;
     "incr_max_spatial_notation" >:: test_translate_incr_max_spatial_notation;
     "abs_diff_pure_notation" >:: test_translate_abs_diff_pure_notation;
