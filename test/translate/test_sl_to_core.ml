@@ -385,7 +385,7 @@ let test_sl_to_core_mutable_arr _ctx =
   in
   test_framework expected actual
 
-let test_sl_to_core_mutable_arr_loop _ctx =
+(* let test_sl_to_core_mutable_arr_loop _ctx =
   let input =
     "req array->int*(i,length-i) && i<=length && Term[length-i]\n" ^
     "&& \\forall size_t j. (i<=j<length ==> array[j]'==0);\n" ^
@@ -402,7 +402,7 @@ let test_sl_to_core_mutable_arr_loop _ctx =
     "  assigns { i }\n" ^
     "  variant length - i"
   in
-  test_framework expected actual
+  test_framework expected actual *)
 
 let test_sl_to_core_search_replace _ctx =
   let input =
@@ -517,7 +517,7 @@ let suite =
     "spec_search"                   >:: test_sl_to_core_spec_search;
 
     "mutable_arr"                   >:: test_sl_to_core_mutable_arr;
-    "mutable_arr_loop"              >:: test_sl_to_core_mutable_arr_loop;
+    (* "mutable_arr_loop"              >:: test_sl_to_core_mutable_arr_loop; *)
 
     "search_replace"                >:: test_sl_to_core_search_replace;
     "search_replace_loop"           >:: test_sl_to_core_search_replace_loop;

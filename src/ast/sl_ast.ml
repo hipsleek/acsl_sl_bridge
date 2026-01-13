@@ -30,7 +30,15 @@ type heap_mode = In | Default
 type heaplet =
   | HPt of { loc : expr; ty : c_type; value : expr; mode : heap_mode }
   | HPred of ident * expr list
-  | HRange of { loc : expr; ty : c_type; lo : expr; hi : expr; mode : heap_mode }                
+  | HRange of {
+      loc : expr;
+      alias : ident option;
+      ty : c_type;
+      lo : expr;
+      hi : expr;
+      mode : heap_mode;
+    }
+             
 
 type sl =
   | STrue

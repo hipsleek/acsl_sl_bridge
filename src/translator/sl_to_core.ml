@@ -6,6 +6,7 @@ module StringMap = Map.Make (String)
 
 module PairOrd = struct
   type t = string * string
+
   let compare (a1, b1) (a2, b2) =
     let c = String.compare a1 a2 in
     if c <> 0 then c else String.compare b1 b2
@@ -22,7 +23,7 @@ module Util = struct
       | x :: tl -> (
           match f x with
           | None -> go acc tl
-          | Some y -> go (y :: acc) tl )
+          | Some y -> go (y :: acc) tl)
     in
     go [] xs
 
@@ -33,7 +34,7 @@ module Util = struct
         match p with
         | C.PTrue -> flatten_and tl
         | C.PAnd qs -> flatten_and (qs @ tl)
-        | _ -> p :: flatten_and tl )
+        | _ -> p :: flatten_and tl)
 
   let rec flatten_or (ps : C.predicate list) : C.predicate list =
     match ps with
@@ -42,7 +43,7 @@ module Util = struct
         match p with
         | C.PFalse -> flatten_or tl
         | C.POr qs -> flatten_or (qs @ tl)
-        | _ -> p :: flatten_or tl )
+        | _ -> p :: flatten_or tl)
 
   let p_and (ps : C.predicate list) : C.predicate =
     let ps = flatten_and ps in
@@ -98,7 +99,7 @@ module Traverse = struct
         | HRange { loc; lo; hi; _ } ->
             let acc = fold_expr ~f:f_expr acc loc in
             let acc = fold_expr ~f:f_expr acc lo in
-            fold_expr ~f:f_expr acc hi )
+            fold_expr ~f:f_expr acc hi)
     | SPure e -> fold_expr ~f:f_expr acc e
     | SSep xs | SAnd xs | SOr xs ->
         List.fold_left (fun a x -> fold_sl ~f_sl ~f_expr a x) acc xs
@@ -106,8 +107,7 @@ module Traverse = struct
     | SImplies (a, b) ->
         let acc = fold_sl ~f_sl ~f_expr acc a in
         fold_sl ~f_sl ~f_expr acc b
-    | SExists (_, body) | SForall (_, body) ->
-        fold_sl ~f_sl ~f_expr acc body
+    | SExists (_, body) | SForall (_, body) -> fold_sl ~f_sl ~f_expr acc body
 end
 
 module Binder = struct
@@ -120,9 +120,7 @@ module Binder = struct
     | Some (SUser s) -> Some s
 
   let binders_of_sl (bs : (ident * sort option) list) : C.binder list =
-    List.map
-      (fun (nm, tyopt) -> { C.b_name = nm; b_ty = core_ty_of_sort_opt tyopt })
-      bs
+    List.map (fun (nm, tyopt) -> { C.b_name = nm; b_ty = core_ty_of_sort_opt tyopt }) bs
 end
 
 module Op = struct
@@ -143,7 +141,6 @@ module Op = struct
     | _ -> None
 end
 
-
 module Expr = struct
   let rec term_of_expr (kind : C.spec_kind) (default_phase : C.phase) (e : Sl_ast.expr) : C.term =
     match e with
@@ -151,28 +148,20 @@ module Expr = struct
     | EConstInt n -> C.TInt n
     | EConstBool b -> C.TApp ((if b then "true" else "false"), [])
     | EResult -> C.TResult
-
-    | EApp (f, args) ->
-        C.TApp (f, List.map (term_of_expr kind default_phase) args)
-
+    | EApp (f, args) -> C.TApp (f, List.map (term_of_expr kind default_phase) args)
     | EUnop (UNeg, e1) ->
         C.TArith (C.Sub, C.TInt 0, term_of_expr kind default_phase e1)
-
     | EUnop (UNot, e1) ->
         C.TApp ("not", [ term_of_expr kind default_phase e1 ])
-
     | EDeref (EBinop (BAdd, base, idx)) ->
         let sub_ph = if default_phase = C.LoopEntry then C.Post else default_phase in
         C.TIndex
-          ( default_phase
-          , term_of_expr kind sub_ph base
-          , term_of_expr kind sub_ph idx
-          )
-
+          ( default_phase,
+            term_of_expr kind sub_ph base,
+            term_of_expr kind sub_ph idx )
     | EDeref e1 ->
         let sub_ph = if default_phase = C.LoopEntry then C.Post else default_phase in
         C.TLoad (default_phase, term_of_expr kind sub_ph e1)
-
     | EOld e1 ->
         let ph =
           match kind with
@@ -180,29 +169,23 @@ module Expr = struct
           | C.FunctionContract -> C.Pre
         in
         term_of_expr kind ph e1
-
-    | EPost e1 ->
-        term_of_expr kind C.Post e1
-
+    | EPost e1 -> term_of_expr kind C.Post e1
     | EBinop (op, e1, e2) -> (
         match Op.arith_of_binop op with
         | Some aop ->
             C.TArith
-              ( aop
-              , term_of_expr kind default_phase e1
-              , term_of_expr kind default_phase e2
-              )
+              ( aop,
+                term_of_expr kind default_phase e1,
+                term_of_expr kind default_phase e2 )
         | None ->
             C.TApp
-              ( "binop"
-              , [ term_of_expr kind default_phase e1
-                ; term_of_expr kind default_phase e2
-                ]
-              ) )
+              ( "binop",
+                [ term_of_expr kind default_phase e1; term_of_expr kind default_phase e2 ] ))
 end
 
 module Pred = struct
-  let pred_of_cmp_expr (kind : C.spec_kind) (default_phase : C.phase) (e : Sl_ast.expr) : C.predicate =
+  let pred_of_cmp_expr (kind : C.spec_kind) (default_phase : C.phase) (e : Sl_ast.expr) :
+      C.predicate =
     match e with
     | EBinop (op, e1, e2) -> (
         match Op.rel_of_binop op with
@@ -211,9 +194,8 @@ module Pred = struct
               (Expr.term_of_expr kind default_phase e1)
               (Expr.term_of_expr kind default_phase e2)
         | None ->
-            Util.p_atom (C.APred ("bool", [ Expr.term_of_expr kind default_phase e ])) )
-    | _ ->
-        Util.p_atom (C.APred ("bool", [ Expr.term_of_expr kind default_phase e ]))
+            Util.p_atom (C.APred ("bool", [ Expr.term_of_expr kind default_phase e ])))
+    | _ -> Util.p_atom (C.APred ("bool", [ Expr.term_of_expr kind default_phase e ]))
 
   let rec pred_of_sl (kind : C.spec_kind) (s : Sl_ast.sl) : C.predicate =
     match s with
@@ -231,9 +213,8 @@ module Pred = struct
 end
 
 module Block = struct
-  let extract_req_ens_var (body : Sl_ast.block)
-    : Sl_ast.sl option * Sl_ast.sl option * Sl_ast.expr option
-    =
+  let extract_req_ens_var (body : Sl_ast.block) : Sl_ast.sl option * Sl_ast.sl option * Sl_ast.expr option
+      =
     let req = ref None in
     let ens = ref None in
     let var = ref None in
@@ -260,8 +241,12 @@ module Rewrite = struct
     in
     let rec map_sl = function
       | (STrue | SFalse | SEmp) as x -> x
-      | SHeap h -> SHeap h
       | SPure e -> SPure (map_expr e)
+      | SHeap (HPt { loc; ty; value; mode }) ->
+          SHeap (HPt { loc = map_expr loc; ty; value = map_expr value; mode })
+      | SHeap (HRange { loc; alias; ty; lo; hi; mode }) ->
+          SHeap (HRange { loc = map_expr loc; alias; ty; lo = map_expr lo; hi = map_expr hi; mode })
+      | SHeap (HPred (nm, args)) -> SHeap (HPred (nm, List.map map_expr args))
       | SSep xs -> SSep (List.map map_sl xs)
       | SAnd xs -> SAnd (List.map map_sl xs)
       | SOr xs -> SOr (List.map map_sl xs)
@@ -273,17 +258,14 @@ module Rewrite = struct
     map_sl s
 
   let pre_value_to_loc_map (pre_atoms : (string * string) list) : string StringMap.t =
-    List.fold_left
-      (fun acc (loc, value) -> StringMap.add value loc acc)
-      StringMap.empty
-      pre_atoms
+    List.fold_left (fun acc (loc, value) -> StringMap.add value loc acc) StringMap.empty pre_atoms
 
   let rewrite_value_vars_with_pre_map (pre_map : string StringMap.t) (s : Sl_ast.sl) : Sl_ast.sl =
     let rec map_expr = function
       | EVar x -> (
           match StringMap.find_opt x pre_map with
           | None -> EVar x
-          | Some p -> EDeref (EVar p) )
+          | Some p -> EDeref (EVar p))
       | EUnop (op, e1) -> EUnop (op, map_expr e1)
       | EBinop (op, a, b) -> EBinop (op, map_expr a, map_expr b)
       | EApp (f, es) -> EApp (f, List.map map_expr es)
@@ -297,10 +279,9 @@ module Rewrite = struct
       | SPure e -> SPure (map_expr e)
       | SHeap (HPt { loc; ty; value; mode }) ->
           SHeap (HPt { loc = map_expr loc; ty; value = map_expr value; mode })
-      | SHeap (HRange { loc; ty; lo; hi; mode }) ->
-          SHeap (HRange { loc = map_expr loc; ty; lo = map_expr lo; hi = map_expr hi; mode })
-      | SHeap (HPred (nm, args)) ->
-          SHeap (HPred (nm, List.map map_expr args))
+      | SHeap (HRange { loc; alias; ty; lo; hi; mode }) ->
+          SHeap (HRange { loc = map_expr loc; alias; ty; lo = map_expr lo; hi = map_expr hi; mode })
+      | SHeap (HPred (nm, args)) -> SHeap (HPred (nm, List.map map_expr args))
       | SSep xs -> SSep (List.map map_sl xs)
       | SAnd xs -> SAnd (List.map map_sl xs)
       | SOr xs -> SOr (List.map map_sl xs)
@@ -315,7 +296,15 @@ end
 module Heap = struct
   type pt_atom = { loc : string; value : string }
   type pt_atom_any = { loc : string; value_e : Sl_ast.expr }
+
   type range_atom = { base : string; lo : Sl_ast.expr; hi : Sl_ast.expr; mode : Sl_ast.heap_mode }
+
+  let collect_range_aliases (s : Sl_ast.sl) : string StringMap.t =
+    let f_sl acc = function
+      | SHeap (HRange { loc = EVar base; alias = Some a; _ }) -> StringMap.add a base acc
+      | _ -> acc
+    in
+    Traverse.fold_sl ~f_sl ~f_expr:(fun a _ -> a) StringMap.empty s
 
   let collect_pt_atoms (s : Sl_ast.sl) : pt_atom list =
     let f_sl acc = function
@@ -338,15 +327,61 @@ module Heap = struct
     in
     Traverse.fold_sl ~f_sl ~f_expr:(fun a _ -> a) [] s |> List.rev
 
-    let ptrs_from_pt_atoms (atoms : pt_atom list) : StringSet.t =
-      List.fold_left
-        (fun acc ({ loc; value = _ } : pt_atom) -> StringSet.add loc acc)
-        StringSet.empty
-        atoms
-
+  let ptrs_from_pt_atoms (atoms : pt_atom list) : StringSet.t =
+    List.fold_left (fun acc ({ loc; value = _ } : pt_atom) -> StringSet.add loc acc) StringSet.empty atoms
 
   let pre_pairs_for_map (atoms : pt_atom list) : (string * string) list =
     List.map (fun { loc; value } -> (loc, value)) atoms
+end
+
+module Desugar = struct
+  let desugar_expr ~(alias_map : string StringMap.t) (e : Sl_ast.expr) : Sl_ast.expr =
+    let rec alias = function
+      | EVar x -> (
+          match StringMap.find_opt x alias_map with
+          | Some base -> EVar base
+          | None -> EVar x)
+      | EUnop (op, e1) -> EUnop (op, alias e1)
+      | EBinop (op, a, b) -> EBinop (op, alias a, alias b)
+      | EApp (f, es) -> EApp (f, List.map alias es)
+      | EDeref e1 -> EDeref (alias e1)
+      | EOld e1 -> EOld (alias e1)
+      | EPost e1 -> EPost (alias e1)
+      | x -> x
+    in
+    let rec collapse = function
+      | EDeref (EBinop (BAdd, EVar base1, EBinop (BSub, p, EVar base2))) when base1 = base2 ->
+          EDeref (collapse (alias p))
+      | EUnop (op, e1) -> EUnop (op, collapse e1)
+      | EBinop (op, a, b) -> EBinop (op, collapse a, collapse b)
+      | EApp (f, es) -> EApp (f, List.map collapse es)
+      | EDeref e1 -> EDeref (collapse e1)
+      | EOld e1 -> EOld (collapse e1)
+      | EPost e1 -> EPost (collapse e1)
+      | x -> x
+    in
+    e |> alias |> collapse
+
+  let desugar_sl ~(alias_map : string StringMap.t) (s : Sl_ast.sl) : Sl_ast.sl =
+    let map_expr = desugar_expr ~alias_map in
+    let rec map_sl = function
+      | (STrue | SFalse | SEmp) as x -> x
+      | SPure e -> SPure (map_expr e)
+      | SHeap (HPt { loc; ty; value; mode }) ->
+          SHeap (HPt { loc = map_expr loc; ty; value = map_expr value; mode })
+      | SHeap (HRange { loc; alias; ty; lo; hi; mode }) ->
+          SHeap (HRange { loc = map_expr loc; alias; ty; lo = map_expr lo; hi = map_expr hi; mode })
+      | SHeap (HPred (nm, args)) ->
+          SHeap (HPred (nm, List.map map_expr args))
+      | SSep xs -> SSep (List.map map_sl xs)
+      | SAnd xs -> SAnd (List.map map_sl xs)
+      | SOr xs -> SOr (List.map map_sl xs)
+      | SNot x -> SNot (map_sl x)
+      | SImplies (a, b) -> SImplies (map_sl a, map_sl b)
+      | SExists (bs, body) -> SExists (bs, map_sl body)
+      | SForall (bs, body) -> SForall (bs, map_sl body)
+    in
+    map_sl s
 end
 
 module Sugar = struct
@@ -355,20 +390,20 @@ module Sugar = struct
       match e with
       | EBinop (BEq, lhs, rhs) -> (
           match (lhs, rhs) with
-          | (EPost (EDeref (EVar a)), EDeref (EVar b)) -> Some (a, b)
-          | (EDeref (EVar b), EPost (EDeref (EVar a))) -> Some (a, b)
-          | (EDeref (EVar a), EOld (EDeref (EVar b))) -> Some (a, b)
-          | (EOld (EDeref (EVar b)), EDeref (EVar a)) -> Some (a, b)
-          | (EPost (EDeref (EVar a)), EOld (EDeref (EVar b))) -> Some (a, b)
-          | (EOld (EDeref (EVar b)), EPost (EDeref (EVar a))) -> Some (a, b)
-          | _ -> None )
+          | EPost (EDeref (EVar a)), EDeref (EVar b) -> Some (a, b)
+          | EDeref (EVar b), EPost (EDeref (EVar a)) -> Some (a, b)
+          | EDeref (EVar a), EOld (EDeref (EVar b)) -> Some (a, b)
+          | EOld (EDeref (EVar b)), EDeref (EVar a) -> Some (a, b)
+          | EPost (EDeref (EVar a)), EOld (EDeref (EVar b)) -> Some (a, b)
+          | EOld (EDeref (EVar b)), EPost (EDeref (EVar a)) -> Some (a, b)
+          | _ -> None)
       | _ -> None
     in
     let f_sl acc = function
       | SPure e -> (
           match extract_from_expr e with
           | None -> acc
-          | Some x -> x :: acc )
+          | Some x -> x :: acc)
       | _ -> acc
     in
     Traverse.fold_sl ~f_sl ~f_expr:(fun a _ -> a) [] s |> List.rev
@@ -385,21 +420,16 @@ module LoopNorm = struct
       | _ -> None
     in
     let match_post_array_j_eq_0 = function
-      | SPure
-          (EBinop
-             ( BEq,
-               EPost (EDeref (EBinop (BAdd, EVar arr, EVar j))),
-               EConstInt 0 )) ->
+      | SPure (EBinop (BEq, EPost (EDeref (EBinop (BAdd, EVar arr, EVar j))), EConstInt 0)) ->
           Some (arr, j)
       | _ -> None
     in
     match s with
     | SForall ([(j, jty)], SImplies (ante, cons)) -> (
         match ante with
-        | SAnd [a1; a2] -> (
+        | SAnd [ a1; a2 ] -> (
             match (match_i_le_j a1, match_j_lt_len a2, match_post_array_j_eq_0 cons) with
-            | Some (i, j1), Some (j2, _len), Some (arr, j3)
-              when j1 = j && j2 = j && j3 = j ->
+            | Some (i, j1), Some (j2, _len), Some (arr, j3) when j1 = j && j2 = j && j3 = j ->
                 let new_ante =
                   SAnd
                     [
@@ -411,8 +441,8 @@ module LoopNorm = struct
                   SPure (EBinop (BEq, EDeref (EBinop (BAdd, EVar arr, EVar j)), EConstInt 0))
                 in
                 Some (SForall ([(j, jty)], SImplies (new_ante, new_cons)))
-            | _ -> None )
-        | _ -> None )
+            | _ -> None)
+        | _ -> None)
     | _ -> None
 
   let rec normalize_loop_assumes (s : Sl_ast.sl) : Sl_ast.sl =
@@ -443,10 +473,12 @@ module Collect = struct
   let expr_mentions_var (x : string) (e : Sl_ast.expr) : bool =
     let found = ref false in
     let f () = function
-      | EVar y when y = x -> found := true; ()
+      | EVar y when y = x ->
+          found := true;
+          ()
       | _ -> ()
     in
-    ignore (Traverse.fold_expr ~f (()) e);
+    ignore (Traverse.fold_expr ~f () e);
     !found
 
   let deref_bases (s : Sl_ast.sl) : StringSet.t =
@@ -481,21 +513,16 @@ module Collect = struct
 
   let post_write_bases (s : Sl_ast.sl) : StringSet.t =
     let f_expr acc = function
-      
       | EPost (EDeref (EBinop (BAdd, EVar base, _idx))) -> StringSet.add base acc
       | EPost (EDeref (EVar base)) -> StringSet.add base acc
-
-      
       | EDeref (EBinop (BAdd, EPost (EVar base), _idx)) -> StringSet.add base acc
       | EDeref (EPost (EVar base)) -> StringSet.add base acc
-
       | _ -> acc
     in
     Traverse.fold_sl ~f_sl:(fun a _ -> a) ~f_expr StringSet.empty s
 end
 
 module Build = struct
-  
   let mk_valid (x : string) : C.predicate =
     Util.p_atom (C.APred ("valid", [ C.TPtr x ]))
 
@@ -519,16 +546,14 @@ module Build = struct
            | Sl_ast.Default -> mk_valid_range base_t lo_t hi_t)
     |> Util.p_and
 
-  
   let assigns_from_ptrs (ptrs : StringSet.t) : C.assignable list =
     ptrs |> StringSet.elements |> List.map (fun p -> C.AsHeap p)
 
-    let infer_length_name_from_ranges (ranges : Heap.range_atom list) : string option =
-      let has_length (r : Heap.range_atom) =
-        Collect.expr_mentions_var "length" r.Heap.lo
-        || Collect.expr_mentions_var "length" r.Heap.hi
-      in
-      if List.exists has_length ranges then Some "length" else None
+  let infer_length_name_from_ranges (ranges : Heap.range_atom list) : string option =
+    let has_length (r : Heap.range_atom) =
+      Collect.expr_mentions_var "length" r.Heap.lo || Collect.expr_mentions_var "length" r.Heap.hi
+    in
+    if List.exists has_length ranges then Some "length" else None
 
   let assigns_from_ranges_if_written
       ~(kind : C.spec_kind)
@@ -548,9 +573,15 @@ module Build = struct
     |> List.filter (fun { Heap.base; _ } -> StringSet.mem base written_bases)
     |> List.map (fun { Heap.base; lo; hi; _ } ->
            if widen_to_full then
-             C.AsRange (base, Expr.term_of_expr kind C.Pre full_lo, Expr.term_of_expr kind C.Pre full_hi)
+             C.AsRange
+               ( base,
+                 Expr.term_of_expr kind C.Pre full_lo,
+                 Expr.term_of_expr kind C.Pre full_hi )
            else
-             C.AsRange (base, Expr.term_of_expr kind C.Pre lo, Expr.term_of_expr kind C.Pre hi))
+             C.AsRange
+               ( base,
+                 Expr.term_of_expr kind C.Pre lo,
+                 Expr.term_of_expr kind C.Pre hi ))
 
   let progress_vars_from_variant (e : Sl_ast.expr) : StringSet.t =
     match e with
@@ -564,13 +595,9 @@ module Build = struct
     | Some e -> [ C.Variant (Expr.term_of_expr kind C.Pre e) ]
 end
 
-
-
-
-
 module Ptrs = struct
   let ptrs_of_behavior (b : Sl_ast.behavior) : StringSet.t =
-    let (req_opt, ens_opt, _var_opt) = Block.extract_req_ens_var b.body in
+    let req_opt, ens_opt, _var_opt = Block.extract_req_ens_var b.body in
     let req_atoms = match req_opt with None -> [] | Some s -> Heap.collect_pt_atoms s in
     let ens_atoms = match ens_opt with None -> [] | Some s -> Heap.collect_pt_atoms s in
     let pure_eqs = match ens_opt with None -> [] | Some s -> Sugar.collect_heap_equalities_from_pure s in
@@ -592,8 +619,7 @@ module SepNeq = struct
 
   let collect_explicit_neq_pairs (s : Sl_ast.sl) : PairSet.t =
     let f_sl acc = function
-      | SPure (EBinop (BNeq, EVar a, EVar b)) ->
-          PairSet.add (canon_pair a b) acc
+      | SPure (EBinop (BNeq, EVar a, EVar b)) -> PairSet.add (canon_pair a b) acc
       | _ -> acc
     in
     Traverse.fold_sl ~f_sl ~f_expr:(fun a _ -> a) PairSet.empty s
@@ -604,9 +630,9 @@ module SepNeq = struct
         let rec flatten xs =
           List.concat_map
             (fun x ->
-               match x with
-               | SSep ys -> flatten ys
-               | _ -> [ x ])
+              match x with
+              | SSep ys -> flatten ys
+              | _ -> [ x ])
             xs
         in
         let xs = flatten xs in
@@ -619,16 +645,11 @@ module SepNeq = struct
           |> List.fold_left (fun acc p -> StringSet.add p acc) StringSet.empty
         in
         [ vars ]
-    | SAnd xs | SOr xs ->
-        List.concat_map collect_sep_loc_vars_in xs
-    | SNot x ->
-        collect_sep_loc_vars_in x
-    | SImplies (a, b) ->
-        collect_sep_loc_vars_in a @ collect_sep_loc_vars_in b
-    | SForall (_, body) | SExists (_, body) ->
-        collect_sep_loc_vars_in body
-    | _ ->
-        []
+    | SAnd xs | SOr xs -> List.concat_map collect_sep_loc_vars_in xs
+    | SNot x -> collect_sep_loc_vars_in x
+    | SImplies (a, b) -> collect_sep_loc_vars_in a @ collect_sep_loc_vars_in b
+    | SForall (_, body) | SExists (_, body) -> collect_sep_loc_vars_in body
+    | _ -> []
 
   let pairwise_neq_pairs (vars : StringSet.t) : PairSet.t =
     let vs = StringSet.elements vars in
@@ -636,10 +657,7 @@ module SepNeq = struct
       | [] -> acc
       | x :: tl ->
           let acc =
-            List.fold_left
-              (fun a y -> PairSet.add (canon_pair x y) a)
-              acc
-              tl
+            List.fold_left (fun a y -> PairSet.add (canon_pair x y) a) acc tl
           in
           all_pairs acc tl
     in
@@ -658,9 +676,7 @@ module SepNeq = struct
     let sep_groups = collect_sep_loc_vars_in req_sl in
     let inferred =
       sep_groups
-      |> List.fold_left
-           (fun acc group -> PairSet.union acc (pairwise_neq_pairs group))
-           PairSet.empty
+      |> List.fold_left (fun acc group -> PairSet.union acc (pairwise_neq_pairs group)) PairSet.empty
     in
     let inferred = PairSet.diff inferred explicit in
     neq_predicate_from_pairs inferred
@@ -693,17 +709,13 @@ module Ensures = struct
     Util.p_and [ heaplet_part; pure_part; general_part ]
 end
 
-
-
-
-
 module SpecInfo = struct
   let kind_of_spec (spec : Sl_ast.spec) : C.spec_kind =
     let has_variant =
       List.exists
         (fun (b : Sl_ast.behavior) ->
-           let (_req, _ens, v) = Block.extract_req_ens_var b.body in
-           v <> None)
+          let _req, _ens, v = Block.extract_req_ens_var b.body in
+          v <> None)
         spec.behaviors
     in
     if has_variant then C.LoopContract else C.FunctionContract
@@ -757,15 +769,28 @@ let analyze_behavior
     (b : Sl_ast.behavior)
   : beh_analysis
   =
-  let (req_opt, ens_opt, var_opt) = Block.extract_req_ens_var b.body in
+  let req_opt0, ens_opt0, var_opt = Block.extract_req_ens_var b.body in
+
+  let pre_source0 =
+    match kind with
+    | C.FunctionContract -> req_opt0
+    | C.LoopContract -> (match req_opt0 with Some r -> Some r | None -> Some b.assumes)
+  in
+
+  (* desugar alias + array[p-array] collapse based on range alias in the pre-source *)
+  let alias_map =
+    match pre_source0 with
+    | None -> StringMap.empty
+    | Some s -> Heap.collect_range_aliases s
+  in
+
+  let req_opt = Option.map (Desugar.desugar_sl ~alias_map) req_opt0 in
+  let ens_opt = Option.map (Desugar.desugar_sl ~alias_map) ens_opt0 in
 
   let pre_source =
     match kind with
     | C.FunctionContract -> req_opt
-    | C.LoopContract ->
-        (match req_opt with
-         | Some r -> Some r
-         | None -> Some b.assumes)
+    | C.LoopContract -> (match req_opt with Some r -> Some r | None -> Some (Desugar.desugar_sl ~alias_map b.assumes))
   in
 
   let pre_atoms = match pre_source with None -> [] | Some s -> Heap.collect_pt_atoms s in
@@ -775,8 +800,8 @@ let analyze_behavior
 
   let assumes_sl_raw =
     match kind with
-    | C.LoopContract -> LoopNorm.normalize_loop_assumes b.assumes
-    | C.FunctionContract -> b.assumes
+    | C.LoopContract -> LoopNorm.normalize_loop_assumes (Desugar.desugar_sl ~alias_map b.assumes)
+    | C.FunctionContract -> Desugar.desugar_sl ~alias_map b.assumes
   in
   let assumes_sl = Rewrite.rewrite_value_vars_with_pre_map pre_map assumes_sl_raw in
   let assumes_p = Pred.pred_of_sl kind assumes_sl in
@@ -804,6 +829,7 @@ let analyze_behavior
           | None -> post0
           | Some r -> Rewrite.rewrite_result r post0
         in
+        let post1 = Desugar.desugar_sl ~alias_map post1 in
         let post2 = Rewrite.rewrite_value_vars_with_pre_map pre_map post1 in
         Some post2
   in
@@ -817,8 +843,8 @@ let analyze_behavior
   let ptrs = ptrs_for ptrs_choice b in
 
   {
-    req_sl = req_opt;
-    ens_sl = ens_opt;
+    req_sl = req_opt0;
+    ens_sl = ens_opt0;
     var_expr = var_opt;
 
     assumes_sl;
@@ -846,7 +872,7 @@ let mk_requires
   : C.clause
   =
   let p_valid = Build.requires_from_ptrs ptrs in
-  let p_read  = Build.requires_from_ranges kind ranges in
+  let p_read = Build.requires_from_ranges kind ranges in
   C.Requires (Util.p_and [ sep_neqs; p_valid; p_read; pure ])
 
 let mk_assigns
@@ -892,10 +918,7 @@ let mk_assigns
       let post_vars =
         match post_sl_opt with
         | None -> StringSet.empty
-        | Some post_sl ->
-            StringSet.union
-              (Collect.post_vars post_sl)
-              (Collect.old_vars post_sl)
+        | Some post_sl -> StringSet.union (Collect.post_vars post_sl) (Collect.old_vars post_sl)
       in
 
       let explicit_write_bases =
@@ -905,7 +928,7 @@ let mk_assigns
       in
 
       let inv_current = Collect.deref_bases assumes_sl_for_writes in
-      let inv_old     = Collect.old_deref_bases assumes_sl_for_writes in
+      let inv_old = Collect.old_deref_bases assumes_sl_for_writes in
       let inv_write_bases = StringSet.inter inv_current inv_old in
       let written_bases = StringSet.union explicit_write_bases inv_write_bases in
 
@@ -963,10 +986,22 @@ let behavior_of_sl
     (b : Sl_ast.behavior)
   : C.behavior
   =
-  let assumes_sl_for_writes = b.assumes in
+  (* compute alias_map the same way as analyze_behavior, so write-inference sees array not arr *)
+  let req_opt0, _ens_opt0, _var_opt0 = Block.extract_req_ens_var b.body in
+  let pre_source0 =
+    match kind with
+    | C.FunctionContract -> req_opt0
+    | C.LoopContract -> (match req_opt0 with Some r -> Some r | None -> Some b.assumes)
+  in
+  let alias_map =
+    match pre_source0 with
+    | None -> StringMap.empty
+    | Some s -> Heap.collect_range_aliases s
+  in
+  let assumes_sl_for_writes = Desugar.desugar_sl ~alias_map b.assumes in
+
   let a = analyze_behavior ~kind ~spec_ret ~ptrs_choice b in
   build_core_behavior ~kind ~b_name ~assumes_sl_for_writes a
-
 
 let sl_to_core (spec : Sl_ast.spec) : C.spec =
   let kind = SpecInfo.kind_of_spec spec in

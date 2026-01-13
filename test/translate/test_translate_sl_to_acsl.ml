@@ -338,6 +338,49 @@ let test_sl_to_acsl_spec_search_loop _ctx =
   in
   test_framework input expected
 
+let test_sl_to_acsl_spec_search_alt_notation _ctx =
+  let input =
+    "req array->int*(arr,0,length-1)@I && Term[];\n" ^
+    "case {\n" ^
+    "  (\\exists size_t off . 0<=off<length && arr[off]==element)\n" ^
+    "    ==> ens[r] r>=array && r<array+length && arr[r-array]==element;\n" ^
+    "  (\\forall size_t off . (0<=off<length ==> arr[off]!=element))\n" ^
+    "    ==> ens[r] r==NULL;\n" ^
+    "};"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires \\valid_read(array + (0 .. length - 1));\n" ^
+    "  assigns \\nothing;\n" ^
+    "  behavior case1:\n" ^
+    "    assumes \\exists size_t off; 0 <= off && off < length && array[off] == element;\n" ^
+    "    ensures \\result >= array && \\result < array + length && \\old(*\\result) == element;\n" ^
+    "  behavior case2:\n" ^
+    "    assumes \\forall size_t off; (0 <= off && off < length) ==> (array[off] != element);\n" ^
+    "    ensures \\result == NULL;\n" ^
+    "  complete behaviors;\n" ^
+    "  disjoint behaviors;\n" ^
+    "*/"
+  in
+  test_framework input expected
+
+let test_sl_to_acsl_spec_search_loop_alt_notation _ctx =
+  let input =
+    "req array->int*(arr,0,length-1)@I && 0<=i<=length && Term[length-i]\n" ^
+    " && \\forall size_t j. (0<=j<i ==> arr[j]!=element);\n" ^
+    "ens i'==length || \\return#(array+i') && arr[i']==element /\\ 0<=i'<length;"
+  in
+  let expected =
+    "/*@\n" ^
+    "  loop invariant 0 <= i;\n" ^
+    "  loop invariant i <= length;\n" ^
+    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
+    "  loop assigns i;\n" ^
+    "  loop variant length - i;\n" ^
+    "*/"
+  in
+  test_framework input expected
+
 let test_sl_to_acsl_mutable_arr _ctx =
   let input =
     "req array->int*(0,length-1) && Term[];\n" ^
@@ -572,6 +615,8 @@ let suite =
     "translate_for_loop_search_forall_index" >:: test_translate_for_loop_search_forall_index;
     "spec_search" >:: test_sl_to_acsl_spec_search;
     "spec_search_loop" >:: test_sl_to_acsl_spec_search_loop;
+    "spec_search_alt_notation" >:: test_sl_to_acsl_spec_search_alt_notation;
+    "spec_search_loop_alt_notation" >:: test_sl_to_acsl_spec_search_loop_alt_notation;
     "mutable_arr" >:: test_sl_to_acsl_mutable_arr;
     (* "mutable_arr_loop" >:: test_sl_to_acsl_mutable_arr_loop; *)
     "search_replace" >:: test_sl_to_acsl_search_replace;

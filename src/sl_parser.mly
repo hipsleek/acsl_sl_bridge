@@ -170,7 +170,11 @@ heap_atom:
       { HPt { loc = EVar $1; ty = $3; value = $6; mode = $8 } }
 
   | ID ARROW TYPE STAR LPAREN expr COMMA expr RPAREN heap_mode_opt
-      { HRange { loc = EVar $1; ty = $3; lo = $6; hi = $8; mode = $10 } }
+    { HRange { loc = EVar $1; alias = None; ty = $3; lo = $6; hi = $8; mode = $10 } }
+
+  | ID ARROW TYPE STAR LPAREN ID COMMA expr COMMA expr RPAREN heap_mode_opt
+    { HRange { loc = EVar $1; alias = Some $6; ty = $3; lo = $8; hi = $10; mode = $12 } }
+
 
 cmp_sl:
   | expr cmp_op expr
