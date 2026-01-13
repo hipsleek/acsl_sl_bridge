@@ -10,7 +10,6 @@ let ident = ident_start ident_char*
 
 rule token = parse
   | whitespace { token lexbuf }
-
   | "req"  { REQ }
   | "ens"  { ENS }
   | "case" { CASE }
@@ -30,11 +29,11 @@ rule token = parse
   | "\\old"  { OLD }
   | "\\forall" { FORALL }
   | "\\exists" { EXISTS }
-  | "\\return" { RETURN }
+  | "\\return#" { RETURN_HASH }
+  | "\\return"  { RETURN }
   | "\\result" { ID "\\result" }
 
   | "==>"  { IMPLIES }
-  | "=>"   { IMPLIES }
   | "<==>" { IFF }
   
   | "->"   { ARROW }
@@ -60,6 +59,7 @@ rule token = parse
   | "'"  { PRIME }
   | "."  { DOT }
   | ","  { COMMA }
+  | "@I" { AT_I }
 
   | "(" { LPAREN }
   | ")" { RPAREN }

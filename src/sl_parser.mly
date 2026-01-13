@@ -14,8 +14,9 @@
 %token PRIME
 %token OLD
 %token RETURN
+%token RETURN_HASH
 %token FORALL EXISTS
-%token DOT COMMA COLON
+%token DOT COMMA COLON AT_I
 %token LPAREN RPAREN
 %token LBRACE RBRACE
 %token LBRACK RBRACK
@@ -34,7 +35,7 @@
 %right IMPLIES
 %left SEPSTAR
 %left OR
-%left AND
+%left AND SL_CONJ
 %left STAR
 %left PLUS MINUS
 %left DIV
@@ -44,8 +45,13 @@
 main:
   | spec EOF { $1 }
 
+req_head:
+  | sl
+      { $1 }
+  | sl TERM_AND LBRACK RBRACK
+      { $1 }
 spec:
-  | REQ sl SEMICOLON ens_clause
+  | REQ req_head SEMICOLON ens_clause
     {
       let (ret_opt, post) = $4 in
       {
@@ -56,23 +62,23 @@ spec:
       }
     }
 
-  | REQ sl SEMICOLON CASE LBRACE case_list RBRACE SEMICOLON
-  {
-    let cases = $6 in
-    let ret_opt =
-      cases |> List.find_map (fun (_b, r) -> r)
-    in
-    let global_req = $2 in
+  | REQ req_head SEMICOLON CASE LBRACE case_list RBRACE SEMICOLON
+    {
+      let cases = $6 in
+      let ret_opt =
+        cases |> List.find_map (fun (_b, r) -> r)
+      in
+      let global_req = $2 in
 
-    let behaviors =
-      cases
-      |> List.map (fun ((b : Sl_ast.behavior), r) ->
-           let b' = { b with body = (CReq global_req) :: b.body } in
-           (b', r))
-      |> List.map fst
-    in
-    { ret = ret_opt; behaviors }
-  }
+      let behaviors =
+        cases
+        |> List.map (fun ((b : Sl_ast.behavior), r) ->
+             let b' = { b with body = (CReq global_req) :: b.body } in
+             (b', r))
+        |> List.map fst
+      in
+      { ret = ret_opt; behaviors }
+    }
 
 
 
@@ -114,6 +120,7 @@ sl:
   | sl IFF sl { SAnd [SImplies($1,$3); SImplies($3,$1)] }
   | sl IMPLIES sl { SImplies ($1, $3) }
   | sl OR sl { SOr [$1; $3] }
+  | sl SL_CONJ sl { SAnd [$1; $3] }
   | sl AND sl { SAnd [$1; $3] }
   | sl STAR sl { SSep [$1; $3] }
   | sl SEPSTAR sl { SSep [$1; $3] }
@@ -149,14 +156,25 @@ sl_atom:
 
   | RETURN expr
       { SPure (EBinop (BEq, EResult, $2)) }
+      
+  | RETURN_HASH LPAREN expr RPAREN
+    { SPure (EBinop (BEq, EResult, $3)) }
 
+
+heap_mode_opt:
+  | AT_I { In }
+  | { Default }
 
 heap_atom:
-  | ID ARROW TYPE STAR LPAREN expr RPAREN
-      { HPt { loc = EVar $1; ty = $3; value = $6 } }
+  | ID ARROW TYPE STAR LPAREN expr RPAREN heap_mode_opt
+      { HPt { loc = EVar $1; ty = $3; value = $6; mode = $8 } }
 
-  | ID ARROW TYPE STAR LPAREN expr COMMA expr RPAREN
-      { HRange { loc = EVar $1; ty = $3; lo = $6; hi = $8 } }
+  | ID ARROW TYPE STAR LPAREN expr COMMA expr RPAREN heap_mode_opt
+    { HRange { loc = EVar $1; alias = None; ty = $3; lo = $6; hi = $8; mode = $10 } }
+
+  | ID ARROW TYPE STAR LPAREN ID COMMA expr COMMA expr RPAREN heap_mode_opt
+    { HRange { loc = EVar $1; alias = Some $6; ty = $3; lo = $8; hi = $10; mode = $12 } }
+
 
 cmp_sl:
   | expr cmp_op expr

@@ -1,5 +1,5 @@
 (library
  (name translator)
- (modules translate )
- (libraries sl_to_core core_to_ac_sl)
+ (modules translate sl_to_core core_to_acsl acsl_to_core core_to_sl)
+ (libraries ast ast_printer)
  (wrapped false))

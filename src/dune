@@ -1,6 +1,6 @@
 (library
- (name sl_to_acsl_lib)
- (modules sl_parser sl_lexer)
+ (name acsl_sl_bridge_lib)
+ (modules sl_parser sl_lexer acsl_parser acsl_lexer)
  (libraries ast ast_printer translator)
  (wrapped false))
 
@@ -10,9 +10,14 @@
 (ocamllex
  (modules sl_lexer))
 
+ (menhir
+ (modules acsl_parser))
+
+(ocamllex
+ (modules acsl_lexer))
+
 (executable
  (name main)
- ; (public_name main)
  (modules main)
- (libraries sl_to_acsl_lib))
+ (libraries acsl_sl_bridge_lib))
 

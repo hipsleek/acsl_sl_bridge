@@ -1,0 +1,11 @@
+(test
+ (name test_sl_ast)
+ (libraries ounit2 acsl_sl_bridge_lib))
+
+(test
+ (name test_core_ast)
+ (libraries ounit2 acsl_sl_bridge_lib))
+
+(test
+ (name test_acsl_ast)
+ (libraries ounit2 acsl_sl_bridge_lib))

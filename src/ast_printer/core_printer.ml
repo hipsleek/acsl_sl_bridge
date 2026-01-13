@@ -43,6 +43,7 @@ let string_of_mode = function
 let string_of_phase = function
   | Pre -> "pre"
   | Post -> "post"
+  | LoopEntry -> "loopentry"
 
 let string_of_arith_op = function
   | Add -> "+"
@@ -78,13 +79,19 @@ let rec string_of_term ?(ctx=PTop) (t : term) : string =
   let here = prec_of_term t in
   let s =
     match t with
-    | TVar (Pre, x)-> x
-    | TVar (Post, x) -> x ^ "'"              
+    | TVar (Pre, x) -> x
+    | TVar (Post, x) -> x ^ "'"
+    | TVar (LoopEntry, x) -> x ^ "@LE"
+
     | TInt n -> string_of_int n
     | TPtr p -> p
-    | THeap (Pre, p)-> "H(" ^ p ^ ")"
+
+    | THeap (Pre, p) -> "H(" ^ p ^ ")"
     | THeap (Post, p) -> "H'(" ^ p ^ ")"
+    | THeap (LoopEntry, p) -> "H@LE(" ^ p ^ ")"
+
     | TResult -> "\\result"
+
     | TArith (op, t1, t2) ->
         let (p_here, op_s) =
           match op with
@@ -94,17 +101,19 @@ let rec string_of_term ?(ctx=PTop) (t : term) : string =
         let lhs = string_of_term ~ctx:p_here t1 in
         let rhs = string_of_term ~ctx:p_here t2 in
         lhs ^ op_s ^ rhs
+
     | TApp (f, args) ->
         f ^ parens (args |> List.map (string_of_term ~ctx:PTop) |> join ", ")
+
     | TLoad (Pre, t1) ->
         "load(" ^ string_of_term ~ctx:PTop t1 ^ ")"
     | TLoad (Post, t1) ->
         "load'(" ^ string_of_term ~ctx:PTop t1 ^ ")"
+    | TLoad (LoopEntry, t1) ->
+        "load@LE(" ^ string_of_term ~ctx:PTop t1 ^ ")"
+
     | TIndex (_ph, a, idx) ->
         string_of_term ~ctx:PAtom a ^ "[" ^ string_of_term ~ctx:PTop idx ^ "]"
-
-
-
   in
   with_parens_if ctx here s
 

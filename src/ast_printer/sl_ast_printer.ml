@@ -33,13 +33,14 @@ let prec_of_binop = function
 let rec string_of_expr ?(ctx=PTop) = function
   | EVar x -> x
   | EConstInt n -> string_of_int n
-  | EConstBool true -> "true"
-  | EConstBool false -> "false"
+  | EConstBool true -> "\\true"
+  | EConstBool false -> "\\false"
   | EResult -> "\\result"
 
   | EDeref e ->
       let inner = string_of_expr ~ctx:PUnary e in
-      paren_if (ctx <> PTop && ctx <> PUnary && ctx <> PAtom) ("*" ^ inner)
+      let s = "*" ^ inner in
+      paren_if (ctx <> PTop && ctx <> PUnary && ctx <> PAtom) s
 
   | EOld e ->
       "\\old(" ^ string_of_expr e ^ ")"
@@ -53,8 +54,7 @@ let rec string_of_expr ?(ctx=PTop) = function
       inner ^ "'"
 
   | EUnop (op, e) ->
-      let s = string_of_unop op ^ string_of_expr ~ctx:PUnary e in
-      paren_if (ctx <> PTop && ctx <> PUnary && ctx <> PAtom) s
+      string_of_unop op ^ string_of_expr ~ctx:PUnary e
 
   | EBinop (op, a, b) ->
       let p = prec_of_binop op in
@@ -85,26 +85,29 @@ let rec string_of_sl ?(ctx=PTop) = function
   | SHeap h -> string_of_heaplet h
 
   | SSep xs ->
-      xs |> List.map (string_of_sl ~ctx:PAnd)
-         |> String.concat " ** "
-         |> paren_if (ctx <> PTop)
+      xs
+      |> List.map (string_of_sl ~ctx:PAnd)
+      |> String.concat " ** "
+      |> paren_if (ctx <> PTop)
 
   | SAnd xs ->
-      xs |> List.map (string_of_sl ~ctx:PAnd)
-         |> String.concat " && "
-         |> paren_if (ctx = POr || ctx = PImpl)
+      xs
+      |> List.map (string_of_sl ~ctx:PAnd)
+      |> String.concat " && "
+      |> paren_if (ctx = POr || ctx = PImpl)
 
   | SOr xs ->
-      xs |> List.map (string_of_sl ~ctx:POr)
-         |> String.concat " || "
-         |> paren_if (ctx = PImpl)
+      xs
+      |> List.map (string_of_sl ~ctx:POr)
+      |> String.concat " || "
+      |> paren_if (ctx = PImpl)
 
   | SNot p ->
       "!(" ^ string_of_sl p ^ ")"
 
   | SImplies (a, b) ->
       let s =
-        string_of_sl ~ctx:PImpl a ^ " => " ^
+        string_of_sl ~ctx:PImpl a ^ " ==> " ^
         string_of_sl ~ctx:PImpl b
       in
       paren_if (ctx <> PTop) s
@@ -120,10 +123,10 @@ let rec string_of_sl ?(ctx=PTop) = function
       ". " ^ string_of_sl p
 
 and string_of_heaplet = function
-  | HPt { loc; ty; value } ->
+  | HPt { loc; ty; value; _ } ->
       string_of_expr loc ^ "->" ^ ty ^ "*(" ^ string_of_expr value ^ ")"
 
-  | HRange { loc; ty; lo; hi } ->
+  | HRange { loc; ty; lo; hi; _ } ->
       string_of_expr loc ^ "->" ^ ty ^ "*(" ^
       string_of_expr lo ^ "," ^ string_of_expr hi ^ ")"
 
@@ -155,7 +158,7 @@ let string_of_block ~ret b =
 let string_of_behavior ~ret b =
   let body_s = string_of_block ~ret b.body in
   if b.assumes = STrue then body_s
-  else string_of_sl b.assumes ^ " => " ^ body_s
+  else string_of_sl b.assumes ^ " ==> " ^ body_s
 
 let string_of_spec (s : spec) : string =
   match s.behaviors with
@@ -177,12 +180,13 @@ let string_of_spec (s : spec) : string =
       in
       if needs_case then
         let body =
-          bs |> List.map (string_of_behavior ~ret:s.ret) |> String.concat " "
+          bs
+          |> List.map (fun b -> "  " ^ string_of_behavior ~ret:s.ret b)
+          |> String.concat "\n"
         in
-        "case {" ^ body ^ "};"
+        "case {\n" ^ body ^ "\n};"
       else
         match bs with
         | [] -> ";"
         | [b] -> string_of_block ~ret:s.ret b.body
         | _ -> assert false
-

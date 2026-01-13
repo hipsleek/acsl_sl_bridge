@@ -1,15 +1,14 @@
-open Acsl_ast
+(* src/ast_printer/acsl_ast_printer.ml *)
 
-let join sep xs = String.concat sep xs
-let parens s = "(" ^ s ^ ")"
-let comma_list xs = join ", " xs
+open Acsl_ast
 
 type prec =
   | PTop
+  | PIff
   | PImpl
   | POr
   | PAnd
-  | PRel
+  | PCmp
   | PAdd
   | PMul
   | PUnary
@@ -17,198 +16,273 @@ type prec =
 
 let prec_to_int = function
   | PTop -> 0
-  | PImpl -> 1
-  | POr -> 2
-  | PAnd -> 3
-  | PRel -> 4
-  | PAdd -> 5
-  | PMul -> 6
-  | PUnary -> 7
-  | PAtom -> 8
+  | PIff -> 1
+  | PImpl -> 2
+  | POr -> 3
+  | PAnd -> 4
+  | PCmp -> 5
+  | PAdd -> 6
+  | PMul -> 7
+  | PUnary -> 8
+  | PAtom -> 9
 
-let need_parens ctx here = prec_to_int here < prec_to_int ctx
-let with_parens_if ctx here s = if need_parens ctx here then parens s else s
+let need_parens ~(parent : prec) ~(child : prec) : bool =
+  prec_to_int child < prec_to_int parent
 
-let string_of_binop : binop -> string = function
-  | Eq -> "=="
-  | Neq -> "!="
-  | Lt -> "<"
-  | Lte -> "<="
-  | Gt -> ">"
-  | Gte -> ">="
-  | Add -> "+"
-  | Sub -> "-"
-  | Mul -> "*"
-  | Div -> "/"
+let paren_if b s = if b then "(" ^ s ^ ")" else s
 
-let string_of_rel : rel -> string = function
-  | Eq -> "=="
-  | Neq -> "!="
-  | Lt -> "<"
-  | Lte -> "<="
-  | Gt -> ">"
-  | Gte -> ">="
+let string_of_binop = function
+  | BAdd -> "+" | BSub -> "-" | BMul -> "*" | BDiv -> "/" | BMod -> "%"
+  | BEq -> "==" | BNeq -> "!=" | BLt -> "<" | BLe -> "<="
+  | BGt -> ">" | BGe -> ">="
+  | BAnd -> "&&" | BOr -> "||"
+
+let string_of_unop = function
+  | UNeg -> "-"
+  | UNot -> "!"
 
 let prec_of_binop = function
-  | Add | Sub -> PAdd
-  | Mul | Div -> PMul
-  | Eq | Neq | Lt | Lte | Gt | Gte -> PRel
+  | BOr -> POr
+  | BAnd -> PAnd
+  | BEq | BNeq | BLt | BLe | BGt | BGe -> PCmp
+  | BAdd | BSub -> PAdd
+  | BMul | BDiv | BMod -> PMul
 
-let string_of_label : label -> string = function
+let string_of_loop_label = function
   | LoopEntry -> "LoopEntry"
-  | Here -> "Here"
-  | Old -> "Old"
-  | Label s -> s
+  | LoopCurrent -> "LoopCurrent"
+  | UserLabel s -> s
 
-let rec acsl_term ?(ctx=PTop) (t : term) : string =
-  let (here, s) =
-    match t with
-    | TVar x -> (PAtom, x)
-    | TInt n -> (PAtom, string_of_int n)
-    | TResult -> (PAtom, "\\result")
-    | TIndex (arr, idx) ->
-      (PAtom, acsl_term ~ctx:PAtom arr ^ "[" ^ acsl_term ~ctx:PTop idx ^ "]")
-    | TDeref t1 ->
-        (PUnary, "*" ^ acsl_term ~ctx:PUnary t1)
-    | TOld t1 ->
-        (PAtom, "\\old(" ^ acsl_term ~ctx:PTop t1 ^ ")")
-    | TAt (t1, lab) ->
-        (PAtom, "\\at(" ^ acsl_term ~ctx:PTop t1 ^ ", " ^ string_of_label lab ^ ")")
-    | TApp (f, args) ->
-        (PAtom, f ^ parens (args |> List.map (acsl_term ~ctx:PTop) |> comma_list))
-    | TBinOp (Sub, TInt 0, t1) ->
-        let inner = acsl_term ~ctx:PUnary t1 in
-        (PUnary, "-" ^ inner)
-    | TBinOp (op, t1, t2) ->
-        let p = prec_of_binop op in
-        let lhs = acsl_term ~ctx:p t1 in
+(* ---------- Expr precedence helpers ---------- *)
 
-        let rhs_ctx =
-          match op, t2 with
-          | (Add | Sub), TBinOp ((Add | Sub), _, _) -> PUnary
-          | (Mul | Div), TBinOp ((Mul | Div), _, _) -> PUnary
-          | _ -> p
-        in
-        let rhs = acsl_term ~ctx:rhs_ctx t2 in
-        (p, lhs ^ " " ^ string_of_binop op ^ " " ^ rhs)
-    | TRange (lo, hi) ->
-        (PAtom,
-        parens (acsl_term ~ctx:PTop lo ^ " .. " ^ acsl_term ~ctx:PTop hi))
-  in
-  with_parens_if ctx here s
+let prec_of_expr = function
+  | EVar _ | EConstInt _ | EConstBool _ | EResult | ENull -> PAtom
+  | EApp _ | EIndex _ -> PAtom
+  | EOld _ | EAt _ -> PAtom
+  | ERange _ -> PAtom
+  | EDeref _ | EUnop _ -> PUnary
+  | EBinop (op, _, _) -> prec_of_binop op
+
+let binop_of_expr = function
+  | EBinop (op, _, _) -> Some op
+  | _ -> None
+
+(* Extra parentheses rules to preserve AST meaning for non-associative / right-nesting:
+   - a + (b - c) needs parens on right child if it's subtraction
+   - a - (b + c) needs parens on right child if it's add/sub
+   - similarly for *, /, % on the right child
+*)
+let need_parens_right_child (parent_op : binop) (right : expr) : bool =
+  match parent_op, binop_of_expr right with
+  | BAdd, Some BSub -> true
+  | BSub, Some (BAdd | BSub) -> true
+  | BMul, Some (BDiv | BMod) -> true
+  | BDiv, Some (BMul | BDiv | BMod) -> true
+  | BMod, Some (BMul | BDiv | BMod) -> true
+  | _ -> false
+
+(* ---------- Expr printer ---------- *)
+
+let rec string_of_expr ?(ctx = PTop) (e : expr) : string =
+  match e with
+  | EVar x -> x
+  | EConstInt n -> string_of_int n
+  | EConstBool true -> "\\true"
+  | EConstBool false -> "\\false"
+  | EResult -> "\\result"
+  | ENull -> "NULL"
+
+  | EOld e1 ->
+      "\\old(" ^ string_of_expr e1 ^ ")"
+
+  | EAt (e1, lab) ->
+      "\\at(" ^ string_of_expr e1 ^ ", " ^ string_of_loop_label lab ^ ")"
+
+  | ERange (lo, hi) ->
+      "(" ^ string_of_expr lo ^ " .. " ^ string_of_expr hi ^ ")"
+
+  | EApp (f, args) ->
+      f ^ "(" ^ (args |> List.map string_of_expr |> String.concat ", ") ^ ")"
+
+  | EIndex (a, i) ->
+      string_of_expr ~ctx:PAtom a ^ "[" ^ string_of_expr i ^ "]"
+
+  | EDeref e1 ->
+      (* IMPORTANT: do NOT re-parenthesize; child call already knows it's under unary context *)
+      let inner = string_of_expr ~ctx:PUnary e1 in
+      let s = "*" ^ inner in
+      paren_if (need_parens ~parent:ctx ~child:PUnary) s
+
+  | EUnop (op, e1) ->
+      (* IMPORTANT: do NOT re-parenthesize; child call already knows it's under unary context *)
+      let inner = string_of_expr ~ctx:PUnary e1 in
+      let s = string_of_unop op ^ inner in
+      paren_if (need_parens ~parent:ctx ~child:PUnary) s
+
+  | EBinop (op, a, b) ->
+      (* Pretty-print unary neg when encoded as (0 - e) *)
+      begin match op, a with
+      | BSub, EConstInt 0 ->
+          let inner = string_of_expr ~ctx:PUnary b in
+          let s = "-" ^ inner in
+          paren_if (need_parens ~parent:ctx ~child:PUnary) s
+      | _ ->
+          let p = prec_of_binop op in
+          let sa = string_of_expr ~ctx:p a in
+          let sb = string_of_expr ~ctx:p b in
+          let sb = paren_if (need_parens_right_child op b) sb in
+          let s = sa ^ " " ^ string_of_binop op ^ " " ^ sb in
+          paren_if (need_parens ~parent:ctx ~child:p) s
+      end
+
+(* ---------- Pred precedence helpers ---------- *)
 
 let prec_of_pred = function
-  | PTrue | PFalse | PRel _ | PApp _ -> PAtom
+  | PTrue | PFalse -> PAtom
+  | PValid _ | PValidRead _ | PApp _ -> PAtom
+  | PForall _ | PExists _ -> PAtom
   | PNot _ -> PUnary
+  | PCmp _ -> PCmp
   | PAnd _ -> PAnd
   | POr _ -> POr
   | PImplies _ -> PImpl
-  | PForall _ | PExists _ -> PAtom
+  | PIff _ -> PIff
 
-let conj xs =
-  match xs with
-  | [] -> "\\true"
-  | [x] -> x
-  | _ -> join " && " xs
+let string_of_sort = function
+  | SInt -> "integer"
+  | SBool -> "boolean"
+  | SPtr -> "ptr"
+  | SUser s -> s
 
-let rec acsl_pred ?(ctx=PTop) (p : predicate) : string =
-  let here = prec_of_pred p in
-  let s =
-    match p with
-    | PTrue -> "\\true"
-    | PFalse -> "\\false"
-    | PRel (r, t1, t2) ->
-        acsl_term ~ctx:PRel t1 ^ " " ^ string_of_rel r ^ " " ^ acsl_term ~ctx:PRel t2
-    | PApp (name, args) ->
-        name ^ parens (args |> List.map (acsl_term ~ctx:PTop) |> comma_list)
-    | PNot p1 ->
-        "!" ^ parens (acsl_pred ~ctx:PTop p1)
-    | PAnd ps ->
-        begin match ps with
-        | [] -> "\\true"
-        | [x] -> acsl_pred ~ctx:ctx x
-        | _ -> ps |> List.map (acsl_pred ~ctx:PAnd) |> conj
-        end
-    | POr ps ->
-        begin match ps with
-        | [] -> "\\false"
-        | [x] -> acsl_pred ~ctx:ctx x
-        | _ -> ps |> List.map (acsl_pred ~ctx:POr) |> join " || "
-        end
-    | PImplies (p1, p2) ->
-        parens (acsl_pred ~ctx:PImpl p1) ^ " ==> " ^ parens (acsl_pred ~ctx:PImpl p2)
-    | PForall (bs, body) ->
-        let bs_str =
-          bs
-          |> List.map (fun (x, ty) -> match ty with None -> x | Some t -> t ^ " " ^ x)
-          |> comma_list
-        in
-        "\\forall " ^ bs_str ^ "; " ^ acsl_pred ~ctx:PTop body
-    | PExists (bs, body) ->
-        let bs_str =
-          bs
-          |> List.map (fun (x, ty) -> match ty with None -> x | Some t -> t ^ " " ^ x)
-          |> comma_list
-        in
-        "\\exists " ^ bs_str ^ "; " ^ acsl_pred ~ctx:PTop body
-  in
-  with_parens_if ctx here s
+let string_of_binder (x, so) =
+  match so with
+  | None -> x
+  | Some s -> string_of_sort s ^ " " ^ x
 
-let acsl_assigns = function
+let string_of_assigns_target = function
+  | AVar x -> x
+  | ADeref e -> "*" ^ string_of_expr ~ctx:PUnary e
+  | ARange (base, lo, hi) ->
+      string_of_expr base ^ "[" ^ string_of_expr lo ^ " .. " ^ string_of_expr hi ^ "]"
+
+let string_of_assigns = function
   | ANothing -> "\\nothing"
-  | AList ts ->
-      begin match ts with
-      | [] -> "\\nothing"
-      | _ -> ts |> List.map (acsl_term ~ctx:PTop) |> comma_list
+  | AItems xs -> xs |> List.map string_of_assigns_target |> String.concat ", "
+
+(* ---------- Pred printer ---------- *)
+
+let rec string_of_pred ?(ctx = PTop) (p : pred) : string =
+  match p with
+  | PTrue -> "\\true"
+  | PFalse -> "\\false"
+
+  | PValid e ->
+      "\\valid(" ^ string_of_expr e ^ ")"
+
+  | PValidRead e ->
+      "\\valid_read(" ^ string_of_expr e ^ ")"
+
+  | PApp (f, args) ->
+      f ^ "(" ^ (args |> List.map string_of_expr |> String.concat ", ") ^ ")"
+
+  | PCmp (op, a, b) ->
+      let sa = string_of_expr ~ctx:PCmp a in
+      let sb = string_of_expr ~ctx:PCmp b in
+      let s = sa ^ " " ^ string_of_binop op ^ " " ^ sb in
+      paren_if (need_parens ~parent:ctx ~child:PCmp) s
+
+  | PNot p1 ->
+      (* exactly one set of parens, always *)
+      "!(" ^ string_of_pred ~ctx:PTop p1 ^ ")"
+
+  | PAnd xs ->
+      let s = xs |> List.map (string_of_pred ~ctx:PAnd) |> String.concat " && " in
+      paren_if (need_parens ~parent:ctx ~child:PAnd) s
+
+  | POr xs ->
+      let s = xs |> List.map (string_of_pred ~ctx:POr) |> String.concat " || " in
+      paren_if (need_parens ~parent:ctx ~child:POr) s
+
+  | PImplies (a, b) ->
+      (* Tests expect parentheses around both sides *)
+      let sa = "(" ^ string_of_pred ~ctx:PTop a ^ ")" in
+      let sb = "(" ^ string_of_pred ~ctx:PTop b ^ ")" in
+      let s = sa ^ " ==> " ^ sb in
+      paren_if (need_parens ~parent:ctx ~child:PImpl) s
+
+  | PIff (a, b) ->
+      (* Tests expect parentheses around both sides *)
+      let sa = "(" ^ string_of_pred ~ctx:PTop a ^ ")" in
+      let sb = "(" ^ string_of_pred ~ctx:PTop b ^ ")" in
+      let s = sa ^ " <==> " ^ sb in
+      paren_if (need_parens ~parent:ctx ~child:PIff) s
+
+  | PForall (bs, body) ->
+      "\\forall "
+      ^ (bs |> List.map string_of_binder |> String.concat ", ")
+      ^ "; " ^ string_of_pred ~ctx:PTop body
+
+  | PExists (bs, body) ->
+      "\\exists "
+      ^ (bs |> List.map string_of_binder |> String.concat ", ")
+      ^ "; " ^ string_of_pred ~ctx:PTop body
+
+(* ---------- Spec pretty-print ---------- *)
+
+let pp_line buf s =
+  Buffer.add_string buf "  ";
+  Buffer.add_string buf s;
+  Buffer.add_string buf "\n"
+
+let pp_behavior buf (b : behavior) =
+  match b.name with
+  | None -> ()
+  | Some n ->
+      pp_line buf ("behavior " ^ n ^ ":");
+      pp_line buf ("  assumes " ^ string_of_pred b.assumes ^ ";");
+      pp_line buf ("  ensures " ^ string_of_pred b.ensures ^ ";")
+
+let string_of_fun_spec (fs : fun_spec) : string =
+  let buf = Buffer.create 256 in
+  Buffer.add_string buf "/*@\n";
+
+  (* Your tests expect requires even when absent *)
+  begin match fs.requires with
+  | None -> pp_line buf "requires \\true;"
+  | Some p -> pp_line buf ("requires " ^ string_of_pred p ^ ";")
+  end;
+
+  pp_line buf ("assigns " ^ string_of_assigns fs.assigns ^ ";");
+
+  begin match fs.behaviors with
+  | [] ->
+      begin match fs.ensures with
+      | None -> ()
+      | Some p -> pp_line buf ("ensures " ^ string_of_pred p ^ ";")
       end
+  | bs ->
+      List.iter (pp_behavior buf) bs;
+      if fs.complete_behaviors then pp_line buf "complete behaviors;";
+      if fs.disjoint_behaviors then pp_line buf "disjoint behaviors;"
+  end;
 
-let acsl_behavior (b : behavior) : string list =
-  match b.b_name with
-  | None ->
-      let ensures = b.b_ensures |> List.map acsl_pred |> conj in
-      [ "  ensures " ^ ensures ^ ";" ]
-  | Some name ->
-      let assumes = b.b_assumes |> List.map acsl_pred |> conj in
-      let ensures = b.b_ensures |> List.map acsl_pred |> conj in
-      [ "  behavior " ^ name ^ ":"
-      ; "    assumes " ^ assumes ^ ";"
-      ; "    ensures " ^ ensures ^ ";"
-      ]
+  Buffer.add_string buf "*/";
+  Buffer.contents buf
 
-let acsl_contract (c : contract) : string =
-  let requires = c.requires |> List.map acsl_pred |> conj in
-  let assigns = acsl_assigns c.assigns in
-  let body = c.behaviors |> List.concat_map acsl_behavior in
+let string_of_loop_spec (ls : loop_spec) : string =
+  let buf = Buffer.create 256 in
+  Buffer.add_string buf "/*@\n";
+  ls.invariants
+  |> List.iter (fun p -> pp_line buf ("loop invariant " ^ string_of_pred p ^ ";"));
+  pp_line buf ("loop assigns " ^ string_of_assigns ls.assigns ^ ";");
+  begin match ls.variant with
+  | None -> ()
+  | Some e -> pp_line buf ("loop variant " ^ string_of_expr e ^ ";")
+  end;
+  Buffer.add_string buf "*/";
+  Buffer.contents buf
 
-  let behavior_clauses =
-    if List.length c.behaviors > 1 then
-      [ "  complete behaviors;"
-      ; "  disjoint behaviors;"
-      ]
-    else
-      []
-  in
-
-  join "\n"
-    (["/*@"
-     ; "  requires " ^ requires ^ ";"
-     ; "  assigns " ^ assigns ^ ";"
-     ]
-     @ body
-     @ behavior_clauses
-     @ ["*/"])
-
-
-let acsl_loop_contract (lc : loop_contract) : string =
-  let invs =
-    match lc.l_invariants with
-    | [] -> [ "  loop invariant \\true;" ]
-    | ps -> ps |> List.map (fun p -> "  loop invariant " ^ acsl_pred p ^ ";")
-  in
-  let assigns = "  loop assigns " ^ acsl_assigns lc.l_assigns ^ ";" in
-  let variant =
-    match lc.l_variant with
-    | None -> []
-    | Some t -> [ "  loop variant " ^ acsl_term t ^ ";" ]
-  in
-  join "\n" (["/*@"] @ invs @ [assigns] @ variant @ ["*/"])
+let string_of_spec (s : spec) : string =
+  match s with
+  | FunSpec fs -> string_of_fun_spec fs
+  | LoopSpec ls -> string_of_loop_spec ls

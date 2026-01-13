@@ -1,5 +1,0 @@
-(library
- (name sl_to_core)
- (modules spec_to_core)
- (libraries ast ast_printer)
- (wrapped false))

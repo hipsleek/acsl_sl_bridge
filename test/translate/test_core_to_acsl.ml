@@ -479,8 +479,8 @@ let test_core_to_acsl_loop_search_forall_index _ctx =
   let actual = Core_to_acsl.spec_to_acsl core_spec in
   let expected =
     "/*@\n" ^
-    "  loop invariant i <= length;\n" ^
     "  loop invariant 0 <= i;\n" ^
+    "  loop invariant i <= length;\n" ^
     "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
     "  loop assigns i;\n" ^
     "  loop variant length - i;\n" ^

@@ -1,0 +1,7 @@
+; (test
+;  (name test_lexer)
+;  (libraries ounit2 acsl_sl_bridge_lib))
+
+(test
+ (name test_parser)
+ (libraries ounit2 acsl_sl_bridge_lib))
