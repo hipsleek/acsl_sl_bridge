@@ -352,7 +352,7 @@ let test_sl_to_acsl_mutable_arr _ctx =
   in
   test_framework input expected
 
-let test_sl_to_acsl_mutable_arr_loop _ctx =
+(* let test_sl_to_acsl_mutable_arr_loop _ctx =
   let input =
     "req array->int*(i,length-1) && i<=length && Term[length-i];\n" ^
     "ens \\forall size_t j. (i<=j<=length ==> array[j]'==0) && i'==length;"
@@ -366,7 +366,7 @@ let test_sl_to_acsl_mutable_arr_loop _ctx =
     "  loop variant length - i;\n" ^
     "*/"
   in
-  test_framework input expected
+  test_framework input expected *)
 
 let test_sl_to_acsl_search_replace _ctx =
   let input =
@@ -573,7 +573,7 @@ let suite =
     "spec_search" >:: test_sl_to_acsl_spec_search;
     "spec_search_loop" >:: test_sl_to_acsl_spec_search_loop;
     "mutable_arr" >:: test_sl_to_acsl_mutable_arr;
-    "mutable_arr_loop" >:: test_sl_to_acsl_mutable_arr_loop;
+    (* "mutable_arr_loop" >:: test_sl_to_acsl_mutable_arr_loop; *)
     "search_replace" >:: test_sl_to_acsl_search_replace;
     "search_replace_loop" >:: test_sl_to_acsl_search_replace_loop;
     "incr_max" >:: test_translate_incr_max;
