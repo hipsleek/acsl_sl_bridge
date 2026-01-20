@@ -1,4 +1,8 @@
 (test
+ (name test_sl_desugar)
+ (libraries ounit2 acsl_sl_bridge_lib))
+
+(test
  (name test_sl_to_core)
  (libraries ounit2 acsl_sl_bridge_lib))
 
