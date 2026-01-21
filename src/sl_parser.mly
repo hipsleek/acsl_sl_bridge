@@ -169,11 +169,33 @@ heap_atom:
   | ID ARROW TYPE STAR LPAREN expr RPAREN heap_mode_opt
       { HPt { loc = EVar $1; ty = $3; value = $6; mode = $8 } }
 
-  | ID ARROW TYPE STAR LPAREN expr COMMA expr RPAREN heap_mode_opt
-    { HRange { loc = EVar $1; alias = None; ty = $3; lo = $6; hi = $8; mode = $10 } }
+  | ID ARROW TYPE STAR LPAREN expr COMMA expr range_tail RPAREN heap_mode_opt
+      {
+        match $9 with
+        | None ->
+            (* (lo, hi) *)
+            HRange { loc = EVar $1; alias = None; ty = $3; lo = $6; hi = $8; mode = $11 }
+        | Some hi ->
+            (* (x, lo, hi) where x must be a bare variable to count as alias *)
+            match $6 with
+            | EVar a ->
+                HRange { loc = EVar $1; alias = Some a; ty = $3; lo = $8; hi; mode = $11 }
+            | _ ->
+                failwith "3-argument range requires first argument to be an alias identifier"
+      }
 
-  | ID ARROW TYPE STAR LPAREN ID COMMA expr COMMA expr RPAREN heap_mode_opt
-    { HRange { loc = EVar $1; alias = Some $6; ty = $3; lo = $8; hi = $10; mode = $12 } }
+range_tail:
+  |                    { None }
+  | COMMA expr         { Some $2 }
+
+heap_payload:
+  | expr
+      { `Pt $1 }
+  | expr COMMA expr
+      { `Range2 ($1, $3) }
+  | ID COMMA expr COMMA expr
+      { `Range3 ($1, $3, $5) }
+
 
 
 cmp_sl:

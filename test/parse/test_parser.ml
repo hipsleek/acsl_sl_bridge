@@ -1,6 +1,11 @@
 (* test/parse/test_parser.ml
-   Drop-in replacement: updates ONLY the expected outputs to match the NEW
-   pretty-printer format (multi-line `case { ... }` blocks with indentation).
+   Drop-in replacement: includes the new requirement that the parser must accept
+   loop-range heaps like `array->int*(i,length-1)` and Term[length - i] in a loop-style
+   clause (REQ ... && Term[...] ; ENS ...), without regressing existing tests.
+
+   New test added:
+   - parse_heap_range_with_var_lo: exercises `array->int*(i,length-1) && Term[length-i]`
+     which previously failed because the parser couldn't parse `i` in the heap range.
 *)
 
 open OUnit2
@@ -161,6 +166,22 @@ let test_parse_heap_range _ctx =
   in
   test_framework input expected
 
+let test_parse_heap_range_with_var_lo _ctx =
+  let input =
+    "req array->int*(i,length-1) && Term[length - i];\n" ^
+    "ens i' == length \n" ^
+    " && (\\forall size_t j. (i<=j<length && \\old(array[j])==old ==> array[j]==new))" ^
+    " && (\\forall size_t j. (i<=j<length && \\old(array[j])!=old ==> array[j]==\\old(array[j])));"
+  in
+  let expected =
+    "case {\n" ^
+    "  array->int*(i,length - 1) ==> req Term[length - i]; ens i' == length && " ^
+    "\\forall j:size_t. (i <= j && j < length && \\old(*(array + j)) == old) ==> (*(array + j)) == new && " ^
+    "\\forall j:size_t. (i <= j && j < length && \\old(*(array + j)) != old) ==> (*(array + j)) == \\old(*(array + j));\n" ^
+    "};"
+  in
+  test_framework input expected
+
 let test_parse_forall_basic _ctx =
   let input =
     "req \\forall size_t j. (0<=j ==> j<10) && Term[1];\n" ^
@@ -234,8 +255,6 @@ let test_parse_target_full _ctx =
     "};"
   in
   test_framework input expected
-
-(* ---------- Incremental parser tests for the new (search) specification ---------- *)
 
 let test_parse_req_heap_range_minimal _ctx =
   let input =
@@ -331,6 +350,7 @@ let suite =
          "parse_loop_minimal" >:: test_parse_loop_minimal;
          "parse_loop_term_only" >:: test_parse_loop_term_only;
          "parse_heap_range" >:: test_parse_heap_range;
+         "parse_heap_range_with_var_lo" >:: test_parse_heap_range_with_var_lo; (* NEW *)
          "parse_forall_basic" >:: test_parse_forall_basic;
          "parse_index_basic" >:: test_parse_index_basic;
          "parse_forall_with_index" >:: test_parse_forall_with_index;
