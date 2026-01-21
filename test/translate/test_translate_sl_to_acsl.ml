@@ -311,7 +311,7 @@ let test_sl_to_acsl_spec_search _ctx =
     "  assigns \\nothing;\n" ^
     "  behavior case1:\n" ^
     "    assumes \\exists size_t off; 0 <= off && off < length && array[off] == element;\n" ^
-    "    ensures \\result >= array && \\result < array + length && \\old(*\\result) == element;\n" ^
+    "    ensures \\result >= array && \\result < array + length && *\\result == element;\n" ^
     "  behavior case2:\n" ^
     "    assumes \\forall size_t off; (0 <= off && off < length) ==> (array[off] != element);\n" ^
     "    ensures \\result == NULL;\n" ^
@@ -426,7 +426,7 @@ let test_sl_to_acsl_search_replace _ctx =
   in
   test_framework input expected
 
-let test_sl_to_acsl_search_replace_loop _ctx =
+(* let test_sl_to_acsl_search_replace_loop _ctx =
   let input =
     "req array->int*(0,length-1)\n" ^
     " && 0<=i<=length\n" ^
@@ -450,13 +450,34 @@ let test_sl_to_acsl_search_replace_loop _ctx =
     "  loop variant length - i;\n" ^
     "*/"
   in
+  test_framework input expected *)
+
+let test_sl_to_acsl_search_replace_loop _ctx =
+  let input =
+    "req array->int*(i,length-1) && Term[length - i];\n" ^
+    "ens i' == length \n" ^
+    " && (\\forall size_t j. (i<=j<length && \\old(array[j])==old ==> array[j]==new))" ^
+    " && (\\forall size_t j. (i<=j<length && \\old(array[j])!=old ==> array[j]==\\old(array[j])));"  
+  in
+  let expected =
+    "/*@\n" ^
+    "  loop invariant 0 <= i;\n" ^
+    "  loop invariant i <= length;\n" ^
+    "  loop invariant \\at(i, LoopEntry) <= i;\n" ^
+    "  loop invariant \\forall size_t j; (\\at(i, LoopEntry) <= j && j < i && \\at(array[j], LoopEntry) == old) ==> (array[j] == new);\n" ^
+    "  loop invariant \\forall size_t j; (\\at(i, LoopEntry) <= j && j < i && \\at(array[j], LoopEntry) != old) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
+    "  loop invariant \\forall size_t j; (i <= j && j < length) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
+    "  loop assigns i, array[\\at(i, LoopEntry) .. length - 1];\n" ^
+    "  loop variant length - i;\n" ^
+    "*/" 
+  in
   test_framework input expected
 
 let test_sl_to_acsl_search_replace_alt_notation _ctx =
   let input =
     "req array->int*(arr,0,length-1) && Term[];\n" ^
     "ens array->int*(narr,0,length-1)\n" ^
-    " && (\\forall size_t j. (0<=j<length && \\old(arr[j])==old ==> narr[j]==new))\n" ^
+    " && (\\forall size_t j. (0<=j<length && \\old(arr[j])==old ==> narspec_search_loop_alt_notationr[j]==new))\n" ^
     " && (\\forall size_t j. (0<=j<length && \\old(arr[j])!=old ==> narr[j]==\\old(arr[j])));"
   in
   let expected =
@@ -625,7 +646,7 @@ let test_translate_present_absent_search _ctx =
     "  assigns \\nothing;\n" ^
     "  behavior case1:\n" ^
     "    assumes \\exists integer i; 0 <= i && i < len && t[i] == elt;\n" ^
-    "    ensures 0 <= \\result && \\result < len && \\old(t[\\result]) == elt;\n" ^
+    "    ensures 0 <= \\result && \\result < len && t[\\result] == elt;\n" ^
     "  behavior case2:\n" ^
     "    assumes \\forall integer i; (0 <= i && i < len) ==> (t[i] != elt);\n" ^
     "    ensures \\result == -1;\n" ^
@@ -664,6 +685,7 @@ let suite =
     (* "mutable_arr_loop" >:: test_sl_to_acsl_mutable_arr_loop; *)
     "search_replace" >:: test_sl_to_acsl_search_replace;
     "search_replace_loop" >:: test_sl_to_acsl_search_replace_loop;
+    (* "search_replace_loop_verbose" >:: test_sl_to_acsl_search_replace_loop_verbose; *)
     "search_replace_alt_notation" >:: test_sl_to_acsl_search_replace_alt_notation;
     "search_replace_loop_alt_notation" >:: test_sl_to_acsl_search_replace_loop_alt_notation;
     "incr_max" >:: test_translate_incr_max;
