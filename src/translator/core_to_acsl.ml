@@ -23,52 +23,145 @@ let binop_of_arith : Core.arith_op -> A.binop = function
   | Mul -> A.BMul
   | Div -> A.BDiv
 
+let rec simplify_term (t : Core.term) : Core.term =
+  let s = simplify_term in
+  match t with
+  | Core.TInt _ | Core.TResult | Core.TPtr _ | Core.TVar _ | Core.THeap _ -> t
+
+  | Core.TApp (f, args) ->
+      Core.TApp (f, List.map s args)
+
+  | Core.TIndex (ph, a, idx) ->
+      Core.TIndex (ph, s a, s idx)
+
+  | Core.TLoad (ph, addr) ->
+      Core.TLoad (ph, s addr)
+
+  | Core.TArith (op, a, b) ->
+      let a = s a in
+      let b = s b in
+
+
+      let rec strip_sub_const (t : Core.term) : Core.term * int =
+        match t with
+        | Core.TArith (Core.Sub, x, Core.TInt k) ->
+            let (x', c) = strip_sub_const x in
+            (x', c + k)
+        | _ -> (t, 0)
+      in
+
+      (* small constant folding helper *)
+      let fold_int (f : int -> int -> int) =
+        match (a, b) with
+        | Core.TInt x, Core.TInt y -> Core.TInt (f x y)
+        | _ -> Core.TArith (op, a, b)
+      in
+
+      begin
+        match (op : Core.arith_op) with
+        | Core.Add -> (
+            match (a, b) with
+            | _, Core.TInt 0 -> a
+            | Core.TInt 0, _ -> b
+
+            (* (x - k) + k ==> x  (direct) *)
+            | Core.TArith (Core.Sub, x, Core.TInt k1), Core.TInt k2 when k1 = k2 ->
+                x
+
+            (* k + (x - k) ==> x  (commuted) *)
+            | Core.TInt k2, Core.TArith (Core.Sub, x, Core.TInt k1) when k1 = k2 ->
+                x
+
+            (* (x - k1 - k2 - ...) + k ==> x - (k1+k2+...-k)  and if equal, cancel *)
+            | _ ->
+                let (x1, k1) = strip_sub_const a in
+                (match b with
+                | Core.TInt k2 when k1 = k2 -> x1
+                | _ ->
+                    (* keep your existing fallback(s) here if you want,
+                        but don’t use strip_add_const on a plain TInt *)
+                    Core.TArith (Core.Add, a, b))
+          )
+
+        | Core.Sub -> (
+            match b with
+            | Core.TInt 0 -> a
+            | _ ->
+              (match (a, b) with
+               | Core.TInt _, Core.TInt _ -> fold_int (fun x y -> x - y)
+               | _ ->
+                 (* (x + k) - k ==> x *)
+                 (match a with
+                  | Core.TArith (Core.Add, x, Core.TInt k2) ->
+                      (match b with
+                       | Core.TInt k when k = k2 -> x
+                       | _ -> Core.TArith (Core.Sub, a, b))
+                  | _ -> Core.TArith (Core.Sub, a, b)))
+          )
+
+        | Core.Mul -> (
+            match (a, b) with
+            | _, Core.TInt 0 | Core.TInt 0, _ -> Core.TInt 0
+            | _, Core.TInt 1 -> a
+            | Core.TInt 1, _ -> b
+            | Core.TInt x, Core.TInt y -> Core.TInt (x * y)
+            | _ -> Core.TArith (Core.Mul, a, b)
+          )
+
+        | Core.Div -> (
+            match (a, b) with
+            | Core.TInt x, Core.TInt y when y <> 0 -> Core.TInt (x / y)
+            | _ -> Core.TArith (Core.Div, a, b)
+          )
+      end
+
+
 let rec expr_of_core (c : ctx) (t : Core.term) : A.expr =
+  let t = simplify_term t in
   match t with
   | TInt n -> A.EConstInt n
   | TResult -> A.EResult
-
   | TPtr p -> A.EVar p
 
   | TVar (ph, x) -> (
-    match c with
-    | CLoop ->
-        (* invariants from assumes describe current loop state *)
-        (match ph with
-         | LoopEntry -> A.EAt (A.EVar x, A.LoopEntry)
-         | Pre | Post -> A.EVar x)
-    | CLoopRel ->
-        (* relational invariants: Pre/LoopEntry = LoopEntry, Post = current *)
-        (match ph with
-         | Post -> A.EVar x
-         | Pre | LoopEntry -> A.EAt (A.EVar x, A.LoopEntry))
-    | CRequires -> A.EVar x
-    | CEnsures -> A.EVar x)
-
-
+      match c with
+      | CLoop ->
+          (match ph with
+           | LoopEntry -> A.EAt (A.EVar x, A.LoopEntry)
+           | Pre | Post -> A.EVar x)
+      | CLoopRel ->
+          (match ph with
+           | Post -> A.EVar x
+           | Pre | LoopEntry -> A.EAt (A.EVar x, A.LoopEntry))
+      | CRequires ->
+          A.EVar x
+      | CEnsures ->
+          (match ph with
+           | Post -> A.EVar x
+           | Pre -> A.EOld (A.EVar x)
+           | LoopEntry -> A.EAt (A.EVar x, A.LoopEntry)) )
 
   | THeap (ph, p) -> (
-    let deref = A.EDeref (A.EVar p) in
-    match c with
-    | CLoop ->
-        (match ph with
-         | LoopEntry -> A.EAt (deref, A.LoopEntry)
-         | Pre | Post -> deref)
-    | CLoopRel ->
-        (match ph with
-         | Post -> deref
-         | Pre | LoopEntry -> A.EAt (deref, A.LoopEntry))
-    | CRequires -> deref
-    | CEnsures ->
-        (match ph with
-         | Post -> deref
-         | Pre -> A.EOld deref
-         | LoopEntry -> A.EAt (deref, A.LoopEntry)) )
-
-
+      let deref = A.EDeref (A.EVar p) in
+      match c with
+      | CLoop ->
+          (match ph with
+           | LoopEntry -> A.EAt (deref, A.LoopEntry)
+           | Pre | Post -> deref)
+      | CLoopRel ->
+          (match ph with
+           | Post -> deref
+           | Pre | LoopEntry -> A.EAt (deref, A.LoopEntry))
+      | CRequires ->
+          deref
+      | CEnsures ->
+          (match ph with
+           | Post -> deref
+           | Pre -> A.EOld deref
+           | LoopEntry -> A.EAt (deref, A.LoopEntry)) )
 
   | TArith (Core.Sub, Core.TInt 0, t2) ->
-    A.EUnop (A.UNeg, expr_of_core c t2)
+      A.EUnop (A.UNeg, expr_of_core c t2)
 
   | TArith (op, t1, t2) ->
       A.EBinop (binop_of_arith op, expr_of_core c t1, expr_of_core c t2)
@@ -77,38 +170,50 @@ let rec expr_of_core (c : ctx) (t : Core.term) : A.expr =
       A.EApp (f, List.map (expr_of_core c) args)
 
   | TIndex (ph, a, idx) ->
-    let e = A.EIndex (expr_of_core c a, expr_of_core c idx) in
-    (match c with
-     | CEnsures ->
-         (match ph with
-          | Pre -> A.EOld e
-          | Post | LoopEntry -> e)
-     | CLoopRel ->
-         (match ph with
-          | Post -> e
-          | Pre | LoopEntry -> A.EAt (e, A.LoopEntry))
-     | CRequires | CLoop ->
-         (match ph with
-          | LoopEntry -> A.EAt (e, A.LoopEntry)
-          | Pre | Post -> e))
+      (match c with
+      | CEnsures ->
+          (match ph with
+            | Pre ->
+                let a' = expr_of_core CEnsures (match a with
+                  | TVar (_, x) -> TVar (Post, x)
+                  | _ -> a)
+                in
+                let idx' = expr_of_core CEnsures (match idx with
+                  | TVar (_, x) -> TVar (Post, x)
+                  | _ -> idx)
+                in
+                A.EOld (A.EIndex (a', idx'))
+            | Post | LoopEntry ->
+                A.EIndex (expr_of_core c a, expr_of_core c idx))
 
+      | CLoopRel ->
+          let e = A.EIndex (expr_of_core c a, expr_of_core c idx) in
+          (match ph with
+            | Post -> e
+            | Pre | LoopEntry -> A.EAt (e, A.LoopEntry))
 
-  | TLoad (ph, addr) -> (
-    let a = expr_of_core c addr in
-    let deref = A.EDeref a in
-    match c with
-    | CEnsures ->
-        (match ph with
-         | Pre -> A.EOld deref
-         | Post | LoopEntry -> deref)
-    | CLoopRel ->
-        (match ph with
-         | Post -> deref
-         | Pre | LoopEntry -> A.EAt (deref, A.LoopEntry))
-    | CLoop | CRequires ->
-        (match ph with
-         | LoopEntry -> A.EAt (deref, A.LoopEntry)
-         | Pre | Post -> deref))
+      | CRequires | CLoop ->
+          let e = A.EIndex (expr_of_core c a, expr_of_core c idx) in
+          (match ph with
+            | LoopEntry -> A.EAt (e, A.LoopEntry)
+            | Pre | Post -> e))
+
+  | TLoad (ph, addr) ->
+      let a = expr_of_core c addr in
+      let deref = A.EDeref a in
+      (match c with
+       | CEnsures ->
+           (match ph with
+            | Pre -> A.EOld deref
+            | Post | LoopEntry -> deref)
+       | CLoopRel ->
+           (match ph with
+            | Post -> deref
+            | Pre | LoopEntry -> A.EAt (deref, A.LoopEntry))
+       | CLoop | CRequires ->
+           (match ph with
+            | LoopEntry -> A.EAt (deref, A.LoopEntry)
+            | Pre | Post -> deref))
 
 
 let sort_of_core_ty_opt (ty : string option) : A.sort option =
@@ -120,7 +225,7 @@ let sort_of_core_ty_opt (ty : string option) : A.sort option =
   | Some "boolean" -> Some A.SBool
   | Some "ptr" -> Some A.SPtr
   | Some s -> Some (A.SUser s)
-  
+
 let rec pred_of_core (c : ctx) (p : Core.predicate) : A.pred =
   match p with
   | PTrue -> A.PTrue
@@ -147,15 +252,14 @@ let rec pred_of_core (c : ctx) (p : Core.predicate) : A.pred =
              A.PApp ("\\valid_read", List.map (expr_of_core c) args))
       else if name = "valid_range" then
         (match args with
-        | [ base; lo; hi ] ->
-            let base' = expr_of_core c base in
-            let lo' = expr_of_core c lo in
-            let hi' = expr_of_core c hi in
-            let ptr = A.EBinop (A.BAdd, base', A.ERange (lo', hi')) in
-            A.PValid ptr
-        | _ ->
-            A.PApp ("\\valid", List.map (expr_of_core c) args))
-
+         | [ base; lo; hi ] ->
+             let base' = expr_of_core c base in
+             let lo' = expr_of_core c lo in
+             let hi' = expr_of_core c hi in
+             let ptr = A.EBinop (A.BAdd, base', A.ERange (lo', hi')) in
+             A.PValid ptr
+         | _ ->
+             A.PApp ("\\valid", List.map (expr_of_core c) args))
       else
         A.PApp (name, List.map (expr_of_core c) args)
 
@@ -163,13 +267,15 @@ let rec pred_of_core (c : ctx) (p : Core.predicate) : A.pred =
   | PAnd ps -> A.PAnd (List.map (pred_of_core c) ps)
   | POr ps -> A.POr (List.map (pred_of_core c) ps)
   | PImplies (p1, p2) -> A.PImplies (pred_of_core c p1, pred_of_core c p2)
+
   | PForall (bs, body) ->
-    let bs' =
-      List.map
-        (fun (b : Core.binder) -> (b.b_name, sort_of_core_ty_opt b.b_ty))
-        bs
-    in
-    A.PForall (bs', pred_of_core c body)
+      let bs' =
+        List.map
+          (fun (b : Core.binder) -> (b.b_name, sort_of_core_ty_opt b.b_ty))
+          bs
+      in
+      A.PForall (bs', pred_of_core c body)
+
   | PExists (bs, body) ->
       let bs' =
         List.map
@@ -177,6 +283,8 @@ let rec pred_of_core (c : ctx) (p : Core.predicate) : A.pred =
           bs
       in
       A.PExists (bs', pred_of_core c body)
+
+(* ---------------- helpers ---------------- *)
 
 let find_first (f : 'a -> 'b option) (xs : 'a list) : 'b option =
   let rec go = function
@@ -223,9 +331,7 @@ let uniq_preserve (xs : 'a list) : 'a list =
   go [] [] xs
 
 let normalize_pred_list (ps : A.pred list) : A.pred list =
-  ps
-  |> List.filter (fun p -> p <> A.PTrue)
-  |> uniq_preserve
+  ps |> List.filter (fun p -> p <> A.PTrue) |> uniq_preserve
 
 let pred_and_acsl (ps : A.pred list) : A.pred =
   let atoms =
@@ -238,7 +344,6 @@ let pred_and_acsl (ps : A.pred list) : A.pred =
   | [] -> A.PTrue
   | [ p ] -> p
   | _ -> A.PAnd atoms
-
 
 let uniq_assignables (xs : Core.assignable list) : Core.assignable list =
   let key_of = function
@@ -257,6 +362,8 @@ let uniq_assignables (xs : Core.assignable list) : Core.assignable list =
   in
   go S.empty [] xs
 
+(* ---------------- assigns ---------------- *)
+
 let assigns_target_of_core (a : Core.assignable) : A.assigns_target option =
   match a with
   | AsVar v -> Some (A.AVar v)
@@ -266,7 +373,6 @@ let assigns_target_of_core (a : Core.assignable) : A.assigns_target option =
       let hi' = expr_of_core CLoop hi in
       Some (A.ARange (A.EVar p, lo', hi'))
   | AsTerm t ->
-      (* best-effort: print as "*t" if caller used an address-like term; otherwise include the term directly *)
       let e = expr_of_core CEnsures t in
       Some (A.ADeref e)
 
@@ -275,6 +381,10 @@ let assigns_of_core (xs : Core.assignable list) : A.assigns =
   match ts with
   | [] -> A.ANothing
   | _ -> A.AItems ts
+
+(* ========================================================= *)
+(* Function contract printing (unchanged policy) *)
+(* ========================================================= *)
 
 let is_global_req_only_behavior (b : Core.behavior) : bool =
   let assumes_ps = b.clauses |> all_of clause_assumes in
@@ -323,15 +433,12 @@ let fun_spec_of_core (s : Core.spec) : A.fun_spec =
   in
   let assigns = assigns_of_core assigns_list in
 
-  (* Filter out the special “global requires only” behavior if it exists *)
+  (* Filter out special “global requires only” behavior *)
   let candidate_behaviors =
     s.behaviors |> List.filter (fun b -> not (is_global_req_only_behavior b))
   in
 
-  (* Policy for backwards-compatibility with tests:
-     - If there is at least one NAMED behavior, emit behaviors.
-     - Otherwise (all b_name=None), emit NO behaviors, and lift ensures to top-level ensures.
-  *)
+  (* policy: only emit behaviors if at least one is named *)
   let has_named_behavior =
     candidate_behaviors |> List.exists (fun b -> b.b_name <> None)
   in
@@ -371,7 +478,6 @@ let fun_spec_of_core (s : Core.spec) : A.fun_spec =
       None
   in
 
-  (* Emit complete/disjoint only when we emitted multiple behaviors *)
   let complete_behaviors = has_named_behavior && List.length behaviors > 1 in
   let disjoint_behaviors = has_named_behavior && List.length behaviors > 1 in
 
@@ -384,11 +490,9 @@ let fun_spec_of_core (s : Core.spec) : A.fun_spec =
     disjoint_behaviors;
   }
 
-
-let rec split_top_and (p : Core.predicate) : Core.predicate list =
-  match p with
-  | Core.PAnd ps -> List.concat_map split_top_and ps
-  | _ -> [ p ]
+(* ========================================================= *)
+(* Relational lifting: helpers to detect Pre/Post mentions *)
+(* ========================================================= *)
 
 let rec term_mentions_result (t : Core.term) : bool =
   match t with
@@ -427,26 +531,45 @@ let rec term_has_phase (want : Core.phase) (t : Core.term) : bool =
 let rec pred_has_phase (want : Core.phase) (p : Core.predicate) : bool =
   match p with
   | Core.PTrue | Core.PFalse -> false
-  | Core.PAtom (Core.ARel (_, t1, t2)) -> term_has_phase want t1 || term_has_phase want t2
-  | Core.PAtom (Core.APred (_, args)) -> List.exists (term_has_phase want) args
-  | Core.PNot p1 -> pred_has_phase want p1
+  | Core.PAtom (Core.ARel (_, t1, t2)) ->
+      term_has_phase want t1 || term_has_phase want t2
+  | Core.PAtom (Core.APred (_, args)) ->
+      List.exists (term_has_phase want) args
+  | Core.PNot q -> pred_has_phase want q
   | Core.PAnd ps | Core.POr ps -> List.exists (pred_has_phase want) ps
-  | Core.PImplies (p1, p2) -> pred_has_phase want p1 || pred_has_phase want p2
+  | Core.PImplies (a, b) -> pred_has_phase want a || pred_has_phase want b
   | Core.PForall (_, body) | Core.PExists (_, body) -> pred_has_phase want body
 
 let pred_is_relational_pre_post (p : Core.predicate) : bool =
   pred_has_phase Core.Pre p && pred_has_phase Core.Post p
 
-let is_liftable_relational (p : Core.predicate) : bool =
+let rec is_liftable_relational (p : Core.predicate) : bool =
+  (* allow Eq, and Forall/Implies wrapping an Eq *)
   match p with
   | Core.PAtom (Core.ARel (Core.Eq, _t1, _t2)) ->
       pred_is_relational_pre_post p && not (pred_mentions_result p)
+
+  | Core.PForall (_bs, body) ->
+      is_liftable_relational body
+
+  | Core.PImplies (_g, conseq) ->
+      is_liftable_relational conseq
+
+  | Core.PAnd ps ->
+      List.for_all is_liftable_relational ps
+
   | _ ->
       false
 
-let ctx_for_loop_inv (_p : Core.predicate) : ctx = CLoop
+
+(* ========================================================= *)
+(* Loop spec printing *)
+(* ========================================================= *)
 
 let loop_spec_of_core (s : Core.spec) : A.loop_spec =
+  (* Choose a behavior deterministically:
+     - Prefer one that has a Variant clause (typical for loops).
+     - Else take the first behavior. *)
   let chosen =
     match
       s.behaviors
@@ -459,18 +582,20 @@ let loop_spec_of_core (s : Core.spec) : A.loop_spec =
          | [] -> failwith "empty loop spec")
   in
 
+  (* 1) Assumes → loop invariants (current state) *)
   let assumes_invs =
     chosen.clauses
     |> all_of clause_assumes
-    |> List.concat_map split_top_and
+    |> List.concat_map split_top_and_core
     |> List.map (pred_of_core CLoop)
     |> normalize_pred_list
   in
 
+  (* 2) Liftable relational ensures → loop invariants (relational printing) *)
   let relational_ensures_invs =
     chosen.clauses
     |> all_of clause_ensures
-    |> List.concat_map (fun p -> match p with Core.PAnd ps -> ps | _ -> [])
+    |> List.concat_map (fun p -> match p with Core.PAnd ps -> ps | _ -> [ p ])
     |> List.filter is_liftable_relational
     |> List.map (pred_of_core CLoopRel)
     |> normalize_pred_list
@@ -493,10 +618,14 @@ let loop_spec_of_core (s : Core.spec) : A.loop_spec =
 
   { A.invariants; assigns; variant }
 
+(* ========================================================= *)
+(* Entry point *)
+(* ========================================================= *)
+
 let spec_to_acsl (s : Core.spec) : string =
   let acsl_spec : A.spec =
     match s.kind with
     | FunctionContract -> A.FunSpec (fun_spec_of_core s)
     | LoopContract -> A.LoopSpec (loop_spec_of_core s)
-  in Acsl_ast_printer.string_of_spec acsl_spec
-
+  in
+  Acsl_ast_printer.string_of_spec acsl_spec

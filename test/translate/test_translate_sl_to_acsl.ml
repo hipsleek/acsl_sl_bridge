@@ -464,9 +464,9 @@ let test_sl_to_acsl_search_replace_loop _ctx =
     "  loop invariant 0 <= i;\n" ^
     "  loop invariant i <= length;\n" ^
     "  loop invariant \\at(i, LoopEntry) <= i;\n" ^
+    "  loop invariant \\forall size_t j; (i <= j && j < length) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
     "  loop invariant \\forall size_t j; (\\at(i, LoopEntry) <= j && j < i && \\at(array[j], LoopEntry) == old) ==> (array[j] == new);\n" ^
     "  loop invariant \\forall size_t j; (\\at(i, LoopEntry) <= j && j < i && \\at(array[j], LoopEntry) != old) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
-    "  loop invariant \\forall size_t j; (i <= j && j < length) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
     "  loop assigns i, array[\\at(i, LoopEntry) .. length - 1];\n" ^
     "  loop variant length - i;\n" ^
     "*/" 
