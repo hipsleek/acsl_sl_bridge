@@ -544,6 +544,14 @@ module Sugar = struct
 end
 
 module Collect = struct
+  let primed_scalar_vars (s : Sl_ast.sl) : StringSet.t =
+    let f_expr (acc : StringSet.t) (e : Sl_ast.expr) : StringSet.t =
+      match e with
+      | EPost (EVar x) -> StringSet.add x acc
+      | _ -> acc
+    in
+    Traverse.fold_sl ~f_sl:(fun a _ -> a) ~f_expr StringSet.empty s
+
   let vars_in_expr (e : Sl_ast.expr) : StringSet.t =
     let f acc = function
       | EVar x -> StringSet.add x acc
@@ -815,7 +823,6 @@ let analyze_behavior
     match req_opt with
     | Some s when Heap.collect_range_atoms s <> [] || Heap.collect_pt_atoms s <> [] -> Some s
     | _ ->
-        (* fallback: use assumes if it carries heap/range info *)
         let has_heap =
           (Heap.collect_range_atoms assumes_desugared <> []) || (Heap.collect_pt_atoms assumes_desugared <> [])
         in
@@ -837,17 +844,29 @@ let analyze_behavior
     | Some req_sl -> SepNeq.infer_sep_neqs req_sl
   in
 
+  (* FIX: req_pure source for loop invariants
+     If the parser placed the "req ..." content into b.assumes (and body has no CReq),
+     then req_opt=None and we'd otherwise lose all the pure invariants (like forall).
+     For LoopContract, fall back to assumes_desugared as the "req/pure" source. *)
   let req_pure =
-    match req_opt with
+    let pure_src_opt : Sl_ast.sl option =
+      match req_opt with
+      | Some s -> Some s
+      | None ->
+          (match kind with
+          | C.LoopContract -> Some assumes_desugared
+          | C.FunctionContract -> None)
+    in
+    match pure_src_opt with
     | None -> C.PTrue
-    | Some req_sl ->
-        let req_sl' = Rewrite.rewrite_value_vars_with_pre_map pre_map req_sl in
+    | Some pure_src ->
+        let pure_src' = Rewrite.rewrite_value_vars_with_pre_map pre_map pure_src in
         let phase =
           match kind with
           | C.FunctionContract -> C.Pre
           | C.LoopContract -> C.Post
         in
-        Pred.pred_of_sl_with_phase kind phase req_sl'
+        Pred.pred_of_sl_with_phase kind phase pure_src'
   in
 
   let post_sl_opt =
@@ -901,25 +920,70 @@ let analyze_behavior
   }
 
 
+
 module Loop_contract = struct
   let cur_phase : C.phase = C.Post
+
+  let scalar_accumulator_invariants
+      ~(post_sl_opt : Sl_ast.sl option)
+      ~(var_expr : Sl_ast.expr option)
+    : C.predicate list
+    =
+    let pvars =
+      match var_expr with
+      | None -> StringSet.empty
+      | Some v -> Build.progress_vars_from_variant v
+    in
+    match StringSet.elements pvars with
+    | [ i ] -> (
+        let rec collect_eqs (s : Sl_ast.sl) : (Sl_ast.expr * Sl_ast.expr) list =
+          match s with
+          | SPure (EBinop (BEq, lhs, rhs)) -> [ (lhs, rhs) ]
+          | SAnd xs | SSep xs -> List.concat_map collect_eqs xs
+          | SOr xs -> List.concat_map collect_eqs xs
+          | SNot x -> collect_eqs x
+          | SImplies (a, b) -> collect_eqs a @ collect_eqs b
+          | SForall (_, body) | SExists (_, body) -> collect_eqs body
+          | _ -> []
+        in
+
+        let is_evar x = function EVar y when y = x -> true | _ -> false in
+        let is_epost_evar x = function EPost (EVar y) when y = x -> true | _ -> false in
+
+        let mk_inv (x : string) : C.predicate =
+          let x_cur = C.TVar (C.Post, x) in
+          let x_le  = C.TVar (C.LoopEntry, x) in
+          let i_cur = C.TVar (C.Post, i) in
+          let i_le  = C.TVar (C.LoopEntry, i) in
+          Util.mk_eq x_cur (C.TArith (C.Add, x_le, C.TArith (C.Sub, i_cur, i_le)))
+        in
+
+        match post_sl_opt with
+        | None -> []
+        | Some post_sl ->
+            collect_eqs post_sl
+            |> List.filter_map (fun (lhs, rhs) ->
+                 match lhs with
+                 | EPost (EVar x) -> (
+                     (* rhs must be: x + (i' - i) *)
+                     match rhs with
+                     | EBinop (BAdd, e_x, EBinop (BSub, e_ip, e_i)) ->
+                         if is_evar x e_x && is_epost_evar i e_ip && is_evar i e_i
+                         then Some (mk_inv x)
+                         else None
+                     | _ -> None)
+                 | _ -> None))
+    | _ -> []
+
 
   let base_invariants
       ~(req_sep_neqs : C.predicate)
       ~(ptrs : StringSet.t)
       ~(req_ranges : Heap.range_atom list)
-      ~(req_sl_opt : Sl_ast.sl option)
+      ~(req_pure : C.predicate)
     : C.predicate list
     =
-    ignore ptrs; (* do not emit \valid invariants in loop mode, to match expected output *)
-
-    let pure =
-      match req_sl_opt with
-      | None -> C.PTrue
-      | Some s -> Pred.pred_of_sl_with_phase C.LoopContract C.Post s
-    in
-
-    (* Emit bounds as separate invariants: 0<=i and i<=hi+1 (e.g., length). *)
+    ignore ptrs;
     let range_bounds : C.predicate list =
       req_ranges
       |> List.filter_map (fun (r : Heap.range_atom) ->
@@ -929,49 +993,97 @@ module Loop_contract = struct
                 let zero = C.TInt 0 in
                 let hi_t = Expr.term_of_expr C.LoopContract C.Post r.hi in
                 let hi_plus_1 = C.TArith (C.Add, hi_t, C.TInt 1) in
-                Some [ Util.mk_rel C.Lte zero i_cur; Util.mk_rel C.Lte i_cur hi_plus_1 ]
+                Some
+                  [
+                    Util.mk_rel C.Lte zero i_cur;
+                    Util.mk_rel C.Lte i_cur hi_plus_1;
+                  ]
             | _ -> None)
       |> List.concat
     in
-
-    (* Keep any pure part + sep neq part as a single invariant *)
-    let global = Util.p_and [ req_sep_neqs; pure ] in
+    let global = Util.p_and [ req_sep_neqs; req_pure ] in
     global :: range_bounds
-
 
   let variant_clause (vopt : Sl_ast.expr option) : C.clause list =
     match vopt with
     | None -> []
     | Some e -> [ C.Variant (Expr.term_of_expr C.LoopContract cur_phase e) ]
+  
+  let writes_base_in_post (base : string) (p : C.predicate) : bool =
+    let rec term_mentions_base = function
+      | C.TIndex (_, C.TVar (_, b), _) when b = base -> true
+      | C.THeap (_, b) when b = base -> true
+      | C.TArith (_, a, b) -> term_mentions_base a || term_mentions_base b
+      | C.TApp (_, ts) -> List.exists term_mentions_base ts
+      | _ -> false
+    in
+    let rec pred = function
+      | C.PAtom (C.ARel (_, t1, t2)) ->
+          term_mentions_base t1 || term_mentions_base t2
+      | C.PImplies (_, q) -> pred q
+      | C.PForall (_, q) -> pred q
+      | C.PAnd ps | C.POr ps -> List.exists pred ps
+      | _ -> false
+    in
+    pred p
 
-  (* IMPORTANT FIX: this must NOT be nested inside variant_clause. *)
+
   let assigns_clause
       ~(req_ranges : Heap.range_atom list)
       ~(post_sl_opt : Sl_ast.sl option)
       ~(var_expr : Sl_ast.expr option)
     : C.clause
     =
-    ignore post_sl_opt;
     let progress_vars =
       match var_expr with
       | None -> StringSet.empty
       | Some v -> Build.progress_vars_from_variant v
     in
-    let progress = progress_vars |> StringSet.elements |> List.map (fun x -> C.AsVar x) in
 
-    (* In loop mode: always track range(s), starting from LoopEntry(i) if lo == i. *)
+    (* NEW: also assign any primed scalar vars appearing in the postcondition *)
+    let primed_scalars =
+      match post_sl_opt with
+      | None -> StringSet.empty
+      | Some post_sl -> Collect.primed_scalar_vars post_sl
+    in
+
+    let all_scalar_writes = StringSet.union progress_vars primed_scalars in
+    let scalar_assigns =
+      all_scalar_writes
+      |> StringSet.elements
+      |> List.map (fun x -> C.AsVar x)
+    in
+
+    let written_bases =
+      match post_sl_opt with
+      | None -> StringSet.empty
+      | Some post_sl -> Collect.post_write_bases post_sl
+    in
+
     let range_assigns =
       req_ranges
+      |> List.filter (fun (r : Heap.range_atom) ->
+          match r.mode with
+          | Sl_ast.In -> false
+          | Sl_ast.Default ->
+              StringSet.mem r.base written_bases
+              ||
+              writes_base_in_post r.base
+                (match post_sl_opt with
+                | None -> C.PTrue
+                | Some post_sl -> Ensures.build_ensures ~kind:C.LoopContract ~post_sl))
       |> List.map (fun (r : Heap.range_atom) ->
-             let lo_term =
-               match (StringSet.elements progress_vars, r.lo) with
-               | [ i ], EVar x when x = i -> C.TVar (C.LoopEntry, i)
-               | _ -> Expr.term_of_expr C.LoopContract C.Post r.lo
-             in
-             let hi_term = Expr.term_of_expr C.LoopContract C.Post r.hi in
-             C.AsRange (r.base, lo_term, hi_term))
+          let lo_term =
+            match (StringSet.elements progress_vars, r.lo) with
+            | [ i ], EVar x when x = i -> C.TVar (C.LoopEntry, i)
+            | _ -> Expr.term_of_expr C.LoopContract C.Post r.lo
+          in
+          let hi_term = Expr.term_of_expr C.LoopContract C.Post r.hi in
+          C.AsRange (r.base, lo_term, hi_term))
     in
-    C.Assigns (progress @ range_assigns)
+
+    C.Assigns (scalar_assigns @ range_assigns)
+
 
   let unchanged_suffix_invariants
       ~(req_ranges : Heap.range_atom list)
@@ -1093,32 +1205,51 @@ module Loop_contract = struct
         collect ensures_p
     | _ -> []
 
-  let progress_invariants ~(var_expr : Sl_ast.expr option) : C.predicate list =
+  let progress_invariants
+      ~(req_ranges : Heap.range_atom list)
+      ~(var_expr : Sl_ast.expr option)
+    : C.predicate list
+    =
     match var_expr with
     | None -> []
     | Some v ->
-        let pvars = Build.progress_vars_from_variant v in
-        (match StringSet.elements pvars with
-        | [ i ] ->
-            let i_le = C.TVar (C.LoopEntry, i) in
-            let i_cur = C.TVar (C.Post, i) in
-            [ Util.mk_rel C.Lte i_le i_cur ]
-        | _ -> [])
+        if req_ranges = [] then []
+        else
+          let pvars = Build.progress_vars_from_variant v in
+          match StringSet.elements pvars with
+          | [ i ] ->
+              let i_le = C.TVar (C.LoopEntry, i) in
+              let i_cur = C.TVar (C.Post, i) in
+              [ Util.mk_rel C.Lte i_le i_cur ]
+          | _ -> []
+
+
+
 
   let build_invariants
       ~(req_sep_neqs : C.predicate)
+      ~(req_pure : C.predicate)
       ~(ptrs : StringSet.t)
       ~(req_ranges : Heap.range_atom list)
       ~(req_sl_opt : Sl_ast.sl option)
       ~(ensures_p : C.predicate)
+      ~(post_sl_opt : Sl_ast.sl option)
       ~(var_expr : Sl_ast.expr option)
     : C.predicate list
     =
-    let base = base_invariants ~req_sep_neqs ~ptrs ~req_ranges ~req_sl_opt in
-    let prog = progress_invariants ~var_expr in
+    ignore req_sl_opt;
+
+    let base = base_invariants ~req_sep_neqs ~req_pure ~ptrs ~req_ranges in
+    let prog = progress_invariants ~req_ranges ~var_expr in
     let suffix = unchanged_suffix_invariants ~req_ranges ~var_expr in
     let prefix = processed_prefix_invariants ~ensures_p ~var_expr in
-    base @ prog @ suffix @ prefix
+
+    (* NEW: scalar accumulator invariants like b == at(b,LE) + (i - at(i,LE)) *)
+    let scalar = scalar_accumulator_invariants ~post_sl_opt ~var_expr in
+
+    base @ prog @ suffix @ prefix @ scalar
+
+
 end
 
 let mk_requires
@@ -1183,12 +1314,15 @@ let build_core_behavior ~(kind : C.spec_kind) ~(b_name : string option) (a : beh
       let invs =
         Loop_contract.build_invariants
           ~req_sep_neqs:a.req_sep_neqs
+          ~req_pure:a.req_pure
           ~ptrs:a.ptrs
           ~req_ranges:a.req_ranges
           ~req_sl_opt:a.req_sl
           ~ensures_p:a.ensures_p
+          ~post_sl_opt:a.post_sl_opt
           ~var_expr:a.var_expr
       in
+
       let inv_clauses = List.map (fun p -> C.Assumes p) invs in
       let ensures_clause = C.Ensures a.ensures_p in
       let assigns =
@@ -1199,6 +1333,7 @@ let build_core_behavior ~(kind : C.spec_kind) ~(b_name : string option) (a : beh
       in
       let variant = Loop_contract.variant_clause a.var_expr in
       { C.b_name; clauses = inv_clauses @ [ ensures_clause; assigns ] @ variant }
+
 
 let behavior_of_sl
     ~(kind : C.spec_kind)

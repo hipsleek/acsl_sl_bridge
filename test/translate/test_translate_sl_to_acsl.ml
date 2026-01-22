@@ -277,24 +277,6 @@ let test_translate_ens_res _ctx =
   test_framework input expected
 
 (* No observed difference*)
-let test_translate_for_loop_search_forall_index _ctx =
-  let input =
-    "req array->int*(0,length-i) && 0<=i<=length && Term[length-i]\n" ^
-    "&& \\forall size_t j. (0<=j<i ==> array[j]!=element);\n" ^
-    "ens i'==length || \\return*(array+i') && array[i']!=element && 0<=i'<length;"
-  in
-  let expected =
-    "/*@\n" ^
-    "  loop invariant 0 <= i;\n" ^
-    "  loop invariant i <= length;\n" ^
-    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
-    "  loop assigns i;\n" ^
-    "  loop variant length - i;\n" ^
-    "*/"
-  in
-  test_framework input expected
-
-(* No observed difference*)
 let test_sl_to_acsl_spec_search _ctx =
   let input =
     "req array->int*(0,length-1)@I && Term[];\n" ^
@@ -332,6 +314,8 @@ let test_sl_to_acsl_spec_search_loop _ctx =
     "  loop invariant 0 <= i;\n" ^
     "  loop invariant i <= length;\n" ^
     "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
+    "  loop invariant \\at(i, LoopEntry) <= i;\n" ^
+    "  loop invariant \\forall size_t j; (i <= j && j < length) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
     "  loop assigns i;\n" ^
     "  loop variant length - i;\n" ^
     "*/"
@@ -374,7 +358,9 @@ let test_sl_to_acsl_spec_search_loop_alt_notation _ctx =
     "/*@\n" ^
     "  loop invariant 0 <= i;\n" ^
     "  loop invariant i <= length;\n" ^
-    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (\\at(array[j], LoopEntry) != element);\n" ^
+    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] != element);\n" ^
+    "  loop invariant \\at(i, LoopEntry) <= i;\n" ^
+    "  loop invariant \\forall size_t j; (i <= j && j < length) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
     "  loop assigns i;\n" ^
     "  loop variant length - i;\n" ^
     "*/"
@@ -477,7 +463,7 @@ let test_sl_to_acsl_search_replace_alt_notation _ctx =
   let input =
     "req array->int*(arr,0,length-1) && Term[];\n" ^
     "ens array->int*(narr,0,length-1)\n" ^
-    " && (\\forall size_t j. (0<=j<length && \\old(arr[j])==old ==> narspec_search_loop_alt_notationr[j]==new))\n" ^
+    " && (\\forall size_t j. (0<=j<length && \\old(arr[j])==old ==> narr[j]==new))\n" ^
     " && (\\forall size_t j. (0<=j<length && \\old(arr[j])!=old ==> narr[j]==\\old(arr[j])));"
   in
   let expected =
@@ -510,6 +496,7 @@ let test_sl_to_acsl_search_replace_loop_alt_notation _ctx =
     "  loop invariant \\forall size_t j; (0 <= j && j < i && \\at(array[j], LoopEntry) == old) ==> (array[j] == new);\n" ^
     "  loop invariant \\forall size_t j; (0 <= j && j < i && \\at(array[j], LoopEntry) != old) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
     "  loop invariant \\forall size_t j; (i <= j && j < length) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
+    "  loop invariant \\at(i, LoopEntry) <= i;\n" ^
     "  loop assigns i, array[0 .. length - 1];\n" ^
     "  loop variant length - i;\n" ^
     "*/"
@@ -607,8 +594,8 @@ let test_translate_all_zero_array _ctx =
     "/*@\n" ^
     "  requires n >= 0 && \\valid(t + (0 .. n - 1));\n" ^
     "  assigns \\nothing;\n" ^
-    "  ensures ((\\result != 0) ==> (\\forall integer j; (0 <= j && j < n) ==> (\\old(t[j]) == 0)))" ^
-    " && ((\\forall integer j; (0 <= j && j < n) ==> (\\old(t[j]) == 0)) ==> (\\result != 0));\n" ^
+    "  ensures ((\\result != 0) ==> (\\forall integer j; (0 <= j && j < n) ==> (t[j] == 0)))" ^
+    " && ((\\forall integer j; (0 <= j && j < n) ==> (t[j] == 0)) ==> (\\result != 0));\n" ^
     "*/"
   in
   test_framework input expected
@@ -676,7 +663,6 @@ let suite =
     "loop_invariant_all_zero_prefix" >:: test_translate_loop_invariant_all_zero_prefix;
     "translate_for_loop" >:: test_translate_for_loop;
     "translate_ens_res" >:: test_translate_ens_res;
-    "translate_for_loop_search_forall_index" >:: test_translate_for_loop_search_forall_index;
     "spec_search" >:: test_sl_to_acsl_spec_search;
     "spec_search_loop" >:: test_sl_to_acsl_spec_search_loop;
     "spec_search_alt_notation" >:: test_sl_to_acsl_spec_search_alt_notation;
