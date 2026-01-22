@@ -1112,98 +1112,109 @@ module Loop_contract = struct
         [ C.PForall ([ j_b ], C.PImplies (guard, body)) ]
     | _ -> []
 
-  let processed_prefix_invariants ~(ensures_p : C.predicate) ~(var_expr : Sl_ast.expr option) : C.predicate list =
-    let pvars =
-      match var_expr with
-      | None -> StringSet.empty
-      | Some v -> Build.progress_vars_from_variant v
-    in
-    match StringSet.elements pvars with
-    | [ i ] ->
-        let rec split_and = function
-          | C.PAnd ps -> List.concat_map split_and ps
-          | p -> [ p ]
-        in
-        let and_of ps = Util.p_and ps in
-
-        let rewrite_guard_for_prefix ~(jname : string) (g : C.predicate) : C.predicate option =
-          let cs = split_and g in
-          let has_lower = ref false in
-          let has_upper = ref false in
-
-          let is_j_var (t : C.term) : bool =
-            match t with
-            | C.TVar (_, x) when x = jname -> true
-            | _ -> false
+    let processed_prefix_invariants ~(ensures_p : C.predicate) ~(var_expr : Sl_ast.expr option) : C.predicate list =
+      let pvars =
+        match var_expr with
+        | None -> StringSet.empty
+        | Some v -> Build.progress_vars_from_variant v
+      in
+      match StringSet.elements pvars with
+      | [ i ] ->
+          let rec split_and = function
+            | C.PAnd ps -> List.concat_map split_and ps
+            | p -> [ p ]
           in
-          let is_i_cur (t : C.term) : bool =
-            match t with
-            | C.TVar (C.Post, x) when x = i -> true
-            | _ -> false
-          in
+          let and_of ps = Util.p_and ps in
 
-          let term_mentions_j (t : C.term) : bool =
-            let rec go = function
-              | C.TVar (_, x) -> x = jname
-              | C.TArith (_, a, b) -> go a || go b
-              | C.TApp (_, args) -> List.exists go args
-              | C.TIndex (_, a, b) -> go a || go b
-              | C.TLoad (_, a) -> go a
-              | C.THeap _ | C.TPtr _ | C.TInt _ | C.TResult -> false
+          let rewrite_guard_for_prefix ~(jname : string) (g : C.predicate) : C.predicate option =
+            let cs = split_and g in
+            let has_lower = ref false in
+            let has_upper = ref false in
+
+            let is_j_var (t : C.term) : bool =
+              match t with
+              | C.TVar (_, x) when x = jname -> true
+              | _ -> false
             in
-            go t
+            let is_i_cur (t : C.term) : bool =
+              match t with
+              | C.TVar (C.Post, x) when x = i -> true
+              | _ -> false
+            in
+
+            let term_mentions_j (t : C.term) : bool =
+              let rec go = function
+                | C.TVar (_, x) -> x = jname
+                | C.TArith (_, a, b) -> go a || go b
+                | C.TApp (_, args) -> List.exists go args
+                | C.TIndex (_, a, b) -> go a || go b
+                | C.TLoad (_, a) -> go a
+                | C.THeap _ | C.TPtr _ | C.TInt _ | C.TResult -> false
+              in
+              go t
+            in
+
+            let is_lower_conj (p : C.predicate) : bool =
+              match p with
+              | C.PAtom (C.ARel (C.Lte, t1, t2))
+              | C.PAtom (C.ARel (C.Lt,  t1, t2)) ->
+                  is_i_cur t1 && is_j_var t2
+              | _ -> false
+            in
+
+            let is_upper_conj (p : C.predicate) : bool =
+              match p with
+              | C.PAtom (C.ARel (C.Lt,  t1, t2))
+              | C.PAtom (C.ARel (C.Lte, t1, t2)) ->
+                  is_j_var t1 && not (term_mentions_j t2)
+              | _ -> false
+            in
+
+            let kept =
+              List.filter
+                (fun c ->
+                  if is_lower_conj c then (has_lower := true; false)
+                  else if is_upper_conj c then (has_upper := true; false)
+                  else true)
+                cs
+            in
+
+            if (not !has_lower) || not !has_upper then None
+            else
+              let j = C.TVar (C.Post, jname) in
+              let lower' = Util.mk_rel C.Lte (C.TVar (C.LoopEntry, i)) j in
+              let upper' = Util.mk_rel C.Lt  j (C.TVar (C.Post, i)) in
+              Some (and_of (lower' :: upper' :: kept))
           in
 
-          let is_lower_conj (p : C.predicate) : bool =
+          (* NEW: allow the forall-body to be either a single implies OR an AND containing implies(s) *)
+          let extract_implies (body : C.predicate) : (C.predicate * C.predicate) list =
+            body
+            |> split_and
+            |> List.filter_map (function
+                | C.PImplies (g, concl) -> Some (g, concl)
+                | _ -> None)
+          in
+
+          let rec collect (p : C.predicate) : C.predicate list =
             match p with
-            | C.PAtom (C.ARel (C.Lte, t1, t2))
-            | C.PAtom (C.ARel (C.Lt, t1, t2)) ->
-                is_i_cur t1 && is_j_var t2
-            | _ -> false
+            | C.PAnd ps -> List.concat_map collect ps
+
+            | C.PForall (bs, body) -> (
+                match bs with
+                | [ ({ C.b_name = jname; _ } as jb) ] ->
+                    extract_implies body
+                    |> List.filter_map (fun (g, concl) ->
+                        match rewrite_guard_for_prefix ~jname g with
+                        | None -> None
+                        | Some g' -> Some (C.PForall ([ jb ], C.PImplies (g', concl))))
+                | _ -> [])
+
+            | _ -> []
           in
+          collect ensures_p
+      | _ -> []
 
-          let is_upper_conj (p : C.predicate) : bool =
-            match p with
-            | C.PAtom (C.ARel (C.Lt, t1, t2))
-            | C.PAtom (C.ARel (C.Lte, t1, t2)) ->
-                is_j_var t1 && not (term_mentions_j t2)
-            | _ -> false
-          in
-
-          let kept =
-            List.filter
-              (fun c ->
-                if is_lower_conj c then (has_lower := true; false)
-                else if is_upper_conj c then (has_upper := true; false)
-                else true)
-              cs
-          in
-
-          if (not !has_lower) || not !has_upper then None
-          else
-            let j = C.TVar (C.Post, jname) in
-            let lower' = Util.mk_rel C.Lte (C.TVar (C.LoopEntry, i)) j in
-            let upper' = Util.mk_rel C.Lt j (C.TVar (C.Post, i)) in
-            Some (and_of (lower' :: upper' :: kept))
-        in
-
-        let rec collect (p : C.predicate) : C.predicate list =
-          match p with
-          | C.PAnd ps -> List.concat_map collect ps
-          | C.PForall (bs, body) -> (
-              match bs with
-              | [ ({ C.b_name = jname; _ } as jb) ] -> (
-                  match body with
-                  | C.PImplies (g, concl) -> (
-                      match rewrite_guard_for_prefix ~jname g with
-                      | None -> []
-                      | Some g' -> [ C.PForall ([ jb ], C.PImplies (g', concl)) ])
-                  | _ -> [])
-              | _ -> [])
-          | _ -> []
-        in
-        collect ensures_p
-    | _ -> []
 
   let progress_invariants
       ~(req_ranges : Heap.range_atom list)

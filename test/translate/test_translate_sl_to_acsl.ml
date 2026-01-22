@@ -381,21 +381,23 @@ let test_sl_to_acsl_mutable_arr _ctx =
   in
   test_framework input expected
 
-(* let test_sl_to_acsl_mutable_arr_loop _ctx =
+let test_sl_to_acsl_mutable_arr_loop _ctx =
   let input =
     "req array->int*(i,length-1) && i<=length && Term[length-i];\n" ^
     "ens \\forall size_t j. (i<=j<=length ==> array[j]'==0) && i'==length;"
   in
   let expected =
     "/*@\n" ^
-    "  loop invariant 0 <= i;\n" ^
     "  loop invariant i <= length;\n" ^
-    "  loop invariant \\forall size_t j; (0 <= j && j < i) ==> (array[j] == 0);\n" ^
-    "  loop assigns i, array[0 .. length - 1];\n" ^
+    "  loop invariant 0 <= i;\n" ^
+    "  loop invariant \\at(i, LoopEntry) <= i;\n" ^
+    "  loop invariant \\forall size_t j; (i <= j && j < length) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
+    "  loop invariant \\forall size_t j; (\\at(i, LoopEntry) <= j && j < i) ==> (array[j] == 0);\n" ^
+    "  loop assigns i, array[\\at(i, LoopEntry) .. length - 1];\n" ^
     "  loop variant length - i;\n" ^
     "*/"
   in
-  test_framework input expected *)
+  test_framework input expected
 
 let test_sl_to_acsl_search_replace _ctx =
   let input =
@@ -668,7 +670,7 @@ let suite =
     "spec_search_alt_notation" >:: test_sl_to_acsl_spec_search_alt_notation;
     "spec_search_loop_alt_notation" >:: test_sl_to_acsl_spec_search_loop_alt_notation;
     "mutable_arr" >:: test_sl_to_acsl_mutable_arr;
-    (* "mutable_arr_loop" >:: test_sl_to_acsl_mutable_arr_loop; *)
+    "mutable_arr_loop" >:: test_sl_to_acsl_mutable_arr_loop;
     "search_replace" >:: test_sl_to_acsl_search_replace;
     "search_replace_loop" >:: test_sl_to_acsl_search_replace_loop;
     (* "search_replace_loop_verbose" >:: test_sl_to_acsl_search_replace_loop_verbose; *)
