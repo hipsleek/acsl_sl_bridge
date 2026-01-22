@@ -1,5 +1,3 @@
-(* sl_to_core.ml *)
-
 open Sl_ast
 module C = Core
 
@@ -145,12 +143,6 @@ end
 
 module Expr = struct
   let rec term_of_expr (kind : C.spec_kind) (default_phase : C.phase) (e : Sl_ast.expr) : C.term =
-    (* Prevent nested LoopEntry printing like:
-         \at(\at(array,LoopEntry)[\at(j,LoopEntry)],LoopEntry)
-       Desired for old reads:
-         \at(array[j],LoopEntry)
-       So: for mem-ops whose OUTER phase is LoopEntry, translate operands in Post.
-    *)
     let inner_phase_for_mem_op (ph : C.phase) : C.phase =
       match ph with
       | C.LoopEntry -> C.Post
@@ -168,7 +160,6 @@ module Expr = struct
         let inner = inner_phase_for_mem_op default_phase in
         C.TIndex (default_phase, term_of_expr kind inner base, term_of_expr kind inner idx)
 
-    (* IMPORTANT: plain pointer deref becomes heap-read, not a load of an address term *)
     | EDeref (EVar p) ->
         C.THeap (default_phase, p)
 
@@ -271,8 +262,6 @@ module Rewrite = struct
             | None -> EVar x
             | Some p ->
                 let deref = EDeref (EVar p) in
-                (* value-vars (u,v,...) denote PRE-state values.
-                  If we are already under an EOld, don’t wrap again. *)
                 if under_old then deref else EOld deref)
 
         | EUnop (op, e1) -> EUnop (op, map_expr ~under_old e1)
@@ -280,14 +269,9 @@ module Rewrite = struct
         | EApp (f, es) -> EApp (f, List.map (map_expr ~under_old) es)
         | EDeref e1 -> EDeref (map_expr ~under_old e1)
 
-        | EOld e1 ->
-            (* entering an old-context *)
-            EOld (map_expr ~under_old:true e1)
+        | EOld e1 -> EOld (map_expr ~under_old:true e1)
 
-        | EPost e1 ->
-            (* post-context doesn’t change whether something is “already old” *)
-            EPost (map_expr ~under_old e1)
-
+        | EPost e1 -> EPost (map_expr ~under_old e1)
         | (EConstInt _ | EConstBool _ | EResult) as x -> x
       in
 
@@ -441,10 +425,6 @@ module Heap = struct
           | Some p -> { base = p; lo; hi; mode } :: acc)
 
       | SHeap (HPred (_nm, args)) -> (
-          (* Robustly recognize array->int*(lo,hi) encodings:
-            - [loc; lo; hi]
-            - [loc; ...; lo; hi] (e.g. type in the middle)
-          *)
           match args with
           | loc :: rest -> (
               match (base_of_loc loc, take_last_two rest) with
@@ -814,11 +794,6 @@ let analyze_behavior
     |> Desugar.desugar_sl ~pre_alias:pre_alias_map ~post_alias:post_alias_map
     |> norm_sl
   in
-
-  (* ------------------------------------------------------------ *)
-  (* IMPORTANT: choose a “heap/range source” robustly.             *)
-  (* In some ASTs, the heap-range predicate ends up in `assumes`.  *)
-  (* ------------------------------------------------------------ *)
   let heap_src_sl : Sl_ast.sl option =
     match req_opt with
     | Some s when Heap.collect_range_atoms s <> [] || Heap.collect_pt_atoms s <> [] -> Some s
@@ -843,11 +818,6 @@ let analyze_behavior
     | None -> C.PTrue
     | Some req_sl -> SepNeq.infer_sep_neqs req_sl
   in
-
-  (* FIX: req_pure source for loop invariants
-     If the parser placed the "req ..." content into b.assumes (and body has no CReq),
-     then req_opt=None and we'd otherwise lose all the pure invariants (like forall).
-     For LoopContract, fall back to assumes_desugared as the "req/pure" source. *)
   let req_pure =
     let pure_src_opt : Sl_ast.sl option =
       match req_opt with
@@ -919,8 +889,6 @@ let analyze_behavior
     ptrs;
   }
 
-
-
 module Loop_contract = struct
   let cur_phase : C.phase = C.Post
 
@@ -965,7 +933,6 @@ module Loop_contract = struct
             |> List.filter_map (fun (lhs, rhs) ->
                  match lhs with
                  | EPost (EVar x) -> (
-                     (* rhs must be: x + (i' - i) *)
                      match rhs with
                      | EBinop (BAdd, e_x, EBinop (BSub, e_ip, e_i)) ->
                          if is_evar x e_x && is_epost_evar i e_ip && is_evar i e_i
@@ -1040,7 +1007,6 @@ module Loop_contract = struct
       | Some v -> Build.progress_vars_from_variant v
     in
 
-    (* NEW: also assign any primed scalar vars appearing in the postcondition *)
     let primed_scalars =
       match post_sl_opt with
       | None -> StringSet.empty
@@ -1187,7 +1153,6 @@ module Loop_contract = struct
               Some (and_of (lower' :: upper' :: kept))
           in
 
-          (* NEW: allow the forall-body to be either a single implies OR an AND containing implies(s) *)
           let extract_implies (body : C.predicate) : (C.predicate * C.predicate) list =
             body
             |> split_and
@@ -1254,13 +1219,8 @@ module Loop_contract = struct
     let prog = progress_invariants ~req_ranges ~var_expr in
     let suffix = unchanged_suffix_invariants ~req_ranges ~var_expr in
     let prefix = processed_prefix_invariants ~ensures_p ~var_expr in
-
-    (* NEW: scalar accumulator invariants like b == at(b,LE) + (i - at(i,LE)) *)
     let scalar = scalar_accumulator_invariants ~post_sl_opt ~var_expr in
-
     base @ prog @ suffix @ prefix @ scalar
-
-
 end
 
 let mk_requires

@@ -1,5 +1,3 @@
-(* core_to_acsl.ml *)
-
 open Core
 module A = Acsl_ast
 
@@ -50,7 +48,6 @@ let rec simplify_term (t : Core.term) : Core.term =
         | _ -> (t, 0)
       in
 
-      (* small constant folding helper *)
       let fold_int (f : int -> int -> int) =
         match (a, b) with
         | Core.TInt x, Core.TInt y -> Core.TInt (f x y)
@@ -64,23 +61,17 @@ let rec simplify_term (t : Core.term) : Core.term =
             | _, Core.TInt 0 -> a
             | Core.TInt 0, _ -> b
 
-            (* (x - k) + k ==> x  (direct) *)
             | Core.TArith (Core.Sub, x, Core.TInt k1), Core.TInt k2 when k1 = k2 ->
                 x
 
-            (* k + (x - k) ==> x  (commuted) *)
             | Core.TInt k2, Core.TArith (Core.Sub, x, Core.TInt k1) when k1 = k2 ->
                 x
 
-            (* (x - k1 - k2 - ...) + k ==> x - (k1+k2+...-k)  and if equal, cancel *)
             | _ ->
                 let (x1, k1) = strip_sub_const a in
                 (match b with
                 | Core.TInt k2 when k1 = k2 -> x1
-                | _ ->
-                    (* keep your existing fallback(s) here if you want,
-                        but don’t use strip_add_const on a plain TInt *)
-                    Core.TArith (Core.Add, a, b))
+                | _ -> Core.TArith (Core.Add, a, b))
           )
 
         | Core.Sub -> (
@@ -90,7 +81,6 @@ let rec simplify_term (t : Core.term) : Core.term =
               (match (a, b) with
                | Core.TInt _, Core.TInt _ -> fold_int (fun x y -> x - y)
                | _ ->
-                 (* (x + k) - k ==> x *)
                  (match a with
                   | Core.TArith (Core.Add, x, Core.TInt k2) ->
                       (match b with
@@ -382,10 +372,6 @@ let assigns_of_core (xs : Core.assignable list) : A.assigns =
   | [] -> A.ANothing
   | _ -> A.AItems ts
 
-(* ========================================================= *)
-(* Function contract printing (unchanged policy) *)
-(* ========================================================= *)
-
 let is_global_req_only_behavior (b : Core.behavior) : bool =
   let assumes_ps = b.clauses |> all_of clause_assumes in
   let ensures_ps = b.clauses |> all_of clause_ensures in
@@ -433,12 +419,10 @@ let fun_spec_of_core (s : Core.spec) : A.fun_spec =
   in
   let assigns = assigns_of_core assigns_list in
 
-  (* Filter out special “global requires only” behavior *)
   let candidate_behaviors =
     s.behaviors |> List.filter (fun b -> not (is_global_req_only_behavior b))
   in
 
-  (* policy: only emit behaviors if at least one is named *)
   let has_named_behavior =
     candidate_behaviors |> List.exists (fun b -> b.b_name <> None)
   in
@@ -466,7 +450,6 @@ let fun_spec_of_core (s : Core.spec) : A.fun_spec =
       []
   in
 
-  (* Top-level ensures only when we did NOT emit behaviors *)
   let ensures =
     if behaviors = [] then
       let es =
@@ -490,9 +473,6 @@ let fun_spec_of_core (s : Core.spec) : A.fun_spec =
     disjoint_behaviors;
   }
 
-(* ========================================================= *)
-(* Relational lifting: helpers to detect Pre/Post mentions *)
-(* ========================================================= *)
 
 let rec term_mentions_result (t : Core.term) : bool =
   match t with
@@ -544,7 +524,6 @@ let pred_is_relational_pre_post (p : Core.predicate) : bool =
   pred_has_phase Core.Pre p && pred_has_phase Core.Post p
 
 let rec is_liftable_relational (p : Core.predicate) : bool =
-  (* allow Eq, and Forall/Implies wrapping an Eq *)
   match p with
   | Core.PAtom (Core.ARel (Core.Eq, _t1, _t2)) ->
       pred_is_relational_pre_post p && not (pred_mentions_result p)
@@ -562,14 +541,7 @@ let rec is_liftable_relational (p : Core.predicate) : bool =
       false
 
 
-(* ========================================================= *)
-(* Loop spec printing *)
-(* ========================================================= *)
-
 let loop_spec_of_core (s : Core.spec) : A.loop_spec =
-  (* Choose a behavior deterministically:
-     - Prefer one that has a Variant clause (typical for loops).
-     - Else take the first behavior. *)
   let chosen =
     match
       s.behaviors
@@ -582,7 +554,6 @@ let loop_spec_of_core (s : Core.spec) : A.loop_spec =
          | [] -> failwith "empty loop spec")
   in
 
-  (* 1) Assumes → loop invariants (current state) *)
   let assumes_invs =
     chosen.clauses
     |> all_of clause_assumes
@@ -591,7 +562,6 @@ let loop_spec_of_core (s : Core.spec) : A.loop_spec =
     |> normalize_pred_list
   in
 
-  (* 2) Liftable relational ensures → loop invariants (relational printing) *)
   let relational_ensures_invs =
     chosen.clauses
     |> all_of clause_ensures
@@ -618,9 +588,6 @@ let loop_spec_of_core (s : Core.spec) : A.loop_spec =
 
   { A.invariants; assigns; variant }
 
-(* ========================================================= *)
-(* Entry point *)
-(* ========================================================= *)
 
 let spec_to_acsl (s : Core.spec) : string =
   let acsl_spec : A.spec =

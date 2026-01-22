@@ -1,5 +1,3 @@
-(* src/ast_printer/acsl_ast_printer.ml *)
-
 open Acsl_ast
 
 type prec =
@@ -67,11 +65,6 @@ let binop_of_expr = function
   | EBinop (op, _, _) -> Some op
   | _ -> None
 
-(* Extra parentheses rules to preserve AST meaning for non-associative / right-nesting:
-   - a + (b - c) needs parens on right child if it's subtraction
-   - a - (b + c) needs parens on right child if it's add/sub
-   - similarly for *, /, % on the right child
-*)
 let need_parens_right_child (parent_op : binop) (right : expr) : bool =
   match parent_op, binop_of_expr right with
   | BAdd, Some BSub -> true
@@ -108,19 +101,16 @@ let rec string_of_expr ?(ctx = PTop) (e : expr) : string =
       string_of_expr ~ctx:PAtom a ^ "[" ^ string_of_expr i ^ "]"
 
   | EDeref e1 ->
-      (* IMPORTANT: do NOT re-parenthesize; child call already knows it's under unary context *)
       let inner = string_of_expr ~ctx:PUnary e1 in
       let s = "*" ^ inner in
       paren_if (need_parens ~parent:ctx ~child:PUnary) s
 
   | EUnop (op, e1) ->
-      (* IMPORTANT: do NOT re-parenthesize; child call already knows it's under unary context *)
       let inner = string_of_expr ~ctx:PUnary e1 in
       let s = string_of_unop op ^ inner in
       paren_if (need_parens ~parent:ctx ~child:PUnary) s
 
   | EBinop (op, a, b) ->
-      (* Pretty-print unary neg when encoded as (0 - e) *)
       begin match op, a with
       | BSub, EConstInt 0 ->
           let inner = string_of_expr ~ctx:PUnary b in
@@ -134,8 +124,6 @@ let rec string_of_expr ?(ctx = PTop) (e : expr) : string =
           let s = sa ^ " " ^ string_of_binop op ^ " " ^ sb in
           paren_if (need_parens ~parent:ctx ~child:p) s
       end
-
-(* ---------- Pred precedence helpers ---------- *)
 
 let prec_of_pred = function
   | PTrue | PFalse -> PAtom
@@ -169,8 +157,6 @@ let string_of_assigns = function
   | ANothing -> "\\nothing"
   | AItems xs -> xs |> List.map string_of_assigns_target |> String.concat ", "
 
-(* ---------- Pred printer ---------- *)
-
 let rec string_of_pred ?(ctx = PTop) (p : pred) : string =
   match p with
   | PTrue -> "\\true"
@@ -192,7 +178,6 @@ let rec string_of_pred ?(ctx = PTop) (p : pred) : string =
       paren_if (need_parens ~parent:ctx ~child:PCmp) s
 
   | PNot p1 ->
-      (* exactly one set of parens, always *)
       "!(" ^ string_of_pred ~ctx:PTop p1 ^ ")"
 
   | PAnd xs ->
@@ -204,14 +189,12 @@ let rec string_of_pred ?(ctx = PTop) (p : pred) : string =
       paren_if (need_parens ~parent:ctx ~child:POr) s
 
   | PImplies (a, b) ->
-      (* Tests expect parentheses around both sides *)
       let sa = "(" ^ string_of_pred ~ctx:PTop a ^ ")" in
       let sb = "(" ^ string_of_pred ~ctx:PTop b ^ ")" in
       let s = sa ^ " ==> " ^ sb in
       paren_if (need_parens ~parent:ctx ~child:PImpl) s
 
   | PIff (a, b) ->
-      (* Tests expect parentheses around both sides *)
       let sa = "(" ^ string_of_pred ~ctx:PTop a ^ ")" in
       let sb = "(" ^ string_of_pred ~ctx:PTop b ^ ")" in
       let s = sa ^ " <==> " ^ sb in
@@ -226,8 +209,6 @@ let rec string_of_pred ?(ctx = PTop) (p : pred) : string =
       "\\exists "
       ^ (bs |> List.map string_of_binder |> String.concat ", ")
       ^ "; " ^ string_of_pred ~ctx:PTop body
-
-(* ---------- Spec pretty-print ---------- *)
 
 let pp_line buf s =
   Buffer.add_string buf "  ";
@@ -246,7 +227,6 @@ let string_of_fun_spec (fs : fun_spec) : string =
   let buf = Buffer.create 256 in
   Buffer.add_string buf "/*@\n";
 
-  (* Your tests expect requires even when absent *)
   begin match fs.requires with
   | None -> pp_line buf "requires \\true;"
   | Some p -> pp_line buf ("requires " ^ string_of_pred p ^ ";")
