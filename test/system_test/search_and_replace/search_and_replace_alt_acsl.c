@@ -11,8 +11,8 @@ void search_replace(int array[], size_t length, int old, int new) {
   loop invariant i <= length;
   loop invariant \at(i, LoopEntry) <= i;
   loop invariant \forall size_t j; (i <= j && j < length) ==> (array[j] == \at(array[j], LoopEntry));
-  loop invariant \forall size_t j; (\at(i, LoopEntry) <= j && j < i && array[j] == old) ==> (array[j] == new);
-  loop invariant \forall size_t j; (\at(i, LoopEntry) <= j && j < i && array[j] != old) ==> (array[j] == array[j]);
+  loop invariant \forall size_t j; (\at(i, LoopEntry) <= j && j < i && \at(array[j], LoopEntry) == old) ==> (array[j] == new);
+  loop invariant \forall size_t j; (\at(i, LoopEntry) <= j && j < i && \at(array[j], LoopEntry) != old) ==> (array[j] == \at(array[j], LoopEntry));
   loop assigns i, array[\at(i, LoopEntry) .. length - 1];
   loop variant length - i;
 */
