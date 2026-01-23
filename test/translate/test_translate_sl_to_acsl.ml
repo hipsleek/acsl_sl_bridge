@@ -415,11 +415,11 @@ let test_sl_to_acsl_search_replace _ctx =
   test_framework input expected
 
 let test_sl_to_acsl_search_replace_loop _ctx =
-  let input =
+let input =
     "req array->int*(i,length-1) && Term[length - i];\n" ^
     "ens i' == length \n" ^
-    " && (\\forall size_t j. (i<=j<length && \\old(array[j])==old ==> array[j]==new))" ^
-    " && (\\forall size_t j. (i<=j<length && \\old(array[j])!=old ==> array[j]==\\old(array[j])));"  
+    " && (\\forall size_t j. (i<=j<length && array[j]==old ==> array[j]'==new))" ^
+    " && (\\forall size_t j. (i<=j<length && array[j]!=old ==> array[j]'==array[j]));"  
   in
   let expected =
     "/*@\n" ^

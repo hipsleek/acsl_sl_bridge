@@ -912,10 +912,7 @@ let analyze_behavior
     | Some post0 ->
         let post1 = match spec_ret with None -> post0 | Some r -> Rewrite.rewrite_result r post0 in
         let post1 = post1 |> Desugar.desugar_sl ~pre_alias:pre_alias_map ~post_alias:post_alias_map |> norm_sl in
-        let post1 = match kind with
-          | C.FunctionContract -> Rewrite.force_old_unprimed_heap_reads_if_post_exists post1
-          | C.LoopContract -> post1
-        in
+        let post1 = Rewrite.force_old_unprimed_heap_reads_if_post_exists post1 in
         let post2 = Rewrite.rewrite_value_vars_with_pre_map pre_map post1 in
         Some post2
   in
