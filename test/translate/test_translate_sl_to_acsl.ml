@@ -454,28 +454,22 @@ let test_sl_to_acsl_search_replace_alt_notation _ctx =
 
 let test_sl_to_acsl_search_replace_loop_alt_notation _ctx =
   let input =
-    "req array->int*(arr,0,length-1)\n" ^
-    " && 0<=i<=length\n" ^
-    " && (\\forall size_t j. (0<=j<i && \\old(arr[j])==old ==> narr[j]==new))\n" ^
-    " && (\\forall size_t j. (0<=j<i && \\old(arr[j])!=old ==> narr[j]==\\old(arr[j])))\n" ^
-    " && (\\forall size_t j. (i<=j<length ==> narr[j]==\\old(arr[j])))\n" ^
-    " && Term[length - i];\n" ^
-    "ens (i==length ==> \n" ^
-    "      (\\forall size_t j. (0<=j<length && \\old(arr[j])==old ==> narr[j]==new))\n" ^
-    "   && (\\forall size_t j. (0<=j<length && \\old(arr[j])!=old ==> narr[j]==\\old(arr[j])))\n" ^
-    "   );"
+    "req array->int*(arr,i,length-1) && Term[length-i];\n" ^
+    "ens array->int*(narr,i,length-1) && i'==length\n" ^
+    "    && (\\forall size_t j. i<=j<length && arr[j]==old ==> narr[j]==new)\n" ^
+    "    && (\\forall size_t j. i<=j<length && arr[j]!=old ==> narr[j]==arr[j]);"
   in
   let expected =
     "/*@\n" ^
     "  loop invariant 0 <= i;\n" ^
     "  loop invariant i <= length;\n" ^
-    "  loop invariant \\forall size_t j; (0 <= j && j < i && \\at(array[j], LoopEntry) == old) ==> (array[j] == new);\n" ^
-    "  loop invariant \\forall size_t j; (0 <= j && j < i && \\at(array[j], LoopEntry) != old) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
-    "  loop invariant \\forall size_t j; (i <= j && j < length) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
     "  loop invariant \\at(i, LoopEntry) <= i;\n" ^
-    "  loop assigns i, array[0 .. length - 1];\n" ^
+    "  loop invariant \\forall size_t j; (i <= j && j < length) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
+    "  loop invariant \\forall size_t j; (\\at(i, LoopEntry) <= j && j < i && \\at(array[j], LoopEntry) == old) ==> (array[j] == new);\n" ^
+    "  loop invariant \\forall size_t j; (\\at(i, LoopEntry) <= j && j < i && \\at(array[j], LoopEntry) != old) ==> (array[j] == \\at(array[j], LoopEntry));\n" ^
+    "  loop assigns i, array[\\at(i, LoopEntry) .. length - 1];\n" ^
     "  loop variant length - i;\n" ^
-    "*/"
+    "*/" 
   in
   test_framework input expected
 
