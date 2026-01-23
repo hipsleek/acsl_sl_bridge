@@ -402,8 +402,8 @@ let test_sl_to_acsl_mutable_arr_loop _ctx =
 let test_sl_to_acsl_search_replace _ctx =
   let input =
     "req array->int*(0,length-1) && Term[];\n" ^
-    "ens (\\forall size_t j. (0<=j<length && \\old(array[j])==old ==> array[j]'==new))\n" ^
-    " && (\\forall size_t j. (0<=j<length && \\old(array[j])!=old ==> array[j]'==\\old(array[j])));"
+    "ens (\\forall size_t j. (0<=j<length && array[j]==old ==> array[j]'==new))\n" ^
+    " && (\\forall size_t j. (0<=j<length && array[j]!=old ==> array[j]'==array[j]));"
   in
   let expected =
     "/*@\n" ^
@@ -569,7 +569,7 @@ let test_translate_all_zero_array _ctx =
   let expected =
     "/*@\n" ^
     "  requires n >= 0 && \\valid(t + (0 .. n - 1));\n" ^
-    "  assigns \\nothing;\n" ^
+    "  assigns t[0 .. n - 1];\n" ^
     "  ensures ((\\result != 0) ==> (\\forall integer j; (0 <= j && j < n) ==> (t[j] == 0)))" ^
     " && ((\\forall integer j; (0 <= j && j < n) ==> (t[j] == 0)) ==> (\\result != 0));\n" ^
     "*/"
@@ -606,7 +606,7 @@ let test_translate_present_absent_search _ctx =
   let expected =
     "/*@\n" ^
     "  requires len >= 0 && \\valid(t + (0 .. len - 1));\n" ^
-    "  assigns \\nothing;\n" ^
+    "  assigns t[0 .. len - 1];\n" ^
     "  behavior case1:\n" ^
     "    assumes \\exists integer i; 0 <= i && i < len && t[i] == elt;\n" ^
     "    ensures 0 <= \\result && \\result < len && t[\\result] == elt;\n" ^

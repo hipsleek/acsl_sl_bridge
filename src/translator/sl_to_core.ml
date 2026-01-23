@@ -223,6 +223,74 @@ module Block = struct
 end
 
 module Rewrite = struct
+  let force_old_unprimed_heap_reads_if_post_exists (s : Sl_ast.sl) : Sl_ast.sl =
+    (* detect whether there exists any EPost anywhere *)
+    let has_post =
+      Traverse.fold_sl
+        ~f_sl:(fun acc _ -> acc)
+        ~f_expr:(fun acc e -> acc || match e with EPost _ -> true | _ -> false)
+        false
+        s
+    in
+    if not has_post then s
+    else
+      let rec map_expr ~(under_old:bool) ~(under_post:bool) (e : Sl_ast.expr) : Sl_ast.expr =
+        match e with
+        | EOld e1 ->
+            EOld (map_expr ~under_old:true ~under_post:false e1)
+
+        | EPost e1 ->
+            EPost (map_expr ~under_old:false ~under_post:true e1)
+
+        | EDeref e1 ->
+            let e1' = map_expr ~under_old ~under_post e1 in
+            if under_old || under_post then EDeref e1'
+            else EOld (EDeref e1')
+
+        | EUnop (op, e1) ->
+            EUnop (op, map_expr ~under_old ~under_post e1)
+
+        | EBinop (op, a, b) ->
+            EBinop (op, map_expr ~under_old ~under_post a, map_expr ~under_old ~under_post b)
+
+        | EApp (f, es) ->
+            EApp (f, List.map (map_expr ~under_old ~under_post) es)
+
+        | (EVar _ | EConstInt _ | EConstBool _ | EResult) as x -> x
+      in
+
+      let rec map_sl (t : Sl_ast.sl) : Sl_ast.sl =
+        match t with
+        | (STrue | SFalse | SEmp) as x -> x
+        | SPure e -> SPure (map_expr ~under_old:false ~under_post:false e)
+        | SHeap (HPt { loc; ty; value; mode }) ->
+            SHeap (HPt {
+              loc = map_expr ~under_old:false ~under_post:false loc;
+              ty;
+              value = map_expr ~under_old:false ~under_post:false value;
+              mode
+            })
+        | SHeap (HRange { loc; alias; ty; lo; hi; mode }) ->
+            SHeap (HRange {
+              loc = map_expr ~under_old:false ~under_post:false loc;
+              alias; ty;
+              lo = map_expr ~under_old:false ~under_post:false lo;
+              hi = map_expr ~under_old:false ~under_post:false hi;
+              mode
+            })
+        | SHeap (HPred (nm, args)) ->
+            SHeap (HPred (nm, List.map (map_expr ~under_old:false ~under_post:false) args))
+        | SSep xs -> SSep (List.map map_sl xs)
+        | SAnd xs -> SAnd (List.map map_sl xs)
+        | SOr xs -> SOr (List.map map_sl xs)
+        | SNot x -> SNot (map_sl x)
+        | SImplies (a, b) -> SImplies (map_sl a, map_sl b)
+        | SExists (bs, body) -> SExists (bs, map_sl body)
+        | SForall (bs, body) -> SForall (bs, map_sl body)
+      in
+      map_sl s
+
+
   let rewrite_result (ret : string) (s : Sl_ast.sl) : Sl_ast.sl =
     let rec map_expr = function
       | EVar x when x = ret -> EResult
@@ -838,17 +906,19 @@ let analyze_behavior
         in
         Pred.pred_of_sl_with_phase kind phase pure_src'
   in
-
   let post_sl_opt =
     match ens_opt with
     | None -> None
     | Some post0 ->
         let post1 = match spec_ret with None -> post0 | Some r -> Rewrite.rewrite_result r post0 in
         let post1 = post1 |> Desugar.desugar_sl ~pre_alias:pre_alias_map ~post_alias:post_alias_map |> norm_sl in
+        let post1 = match kind with
+          | C.FunctionContract -> Rewrite.force_old_unprimed_heap_reads_if_post_exists post1
+          | C.LoopContract -> post1
+        in
         let post2 = Rewrite.rewrite_value_vars_with_pre_map pre_map post1 in
         Some post2
   in
-
   let ensures_p =
     match post_sl_opt with
     | None -> C.PTrue
@@ -1245,12 +1315,21 @@ let mk_assigns
   let written_bases =
     match post_sl_opt with
     | None -> StringSet.empty
-    | Some post_sl -> Collect.post_write_bases post_sl
+    | Some post_sl ->
+        (* OLD behavior: only notices explicit EPost heap writes *)
+        let explicit = Collect.post_write_bases post_sl in
+        (* NEW behavior: also treat unprotected derefs in ensures as post-state heap mentions *)
+        let implicit = Collect.written_bases_from_ens_default_post post_sl in
+        StringSet.union explicit implicit
   in
   let range_assigns =
     req_ranges
     |> List.filter (fun r -> StringSet.mem r.Heap.base written_bases)
-    |> List.map (fun r -> C.AsRange (r.Heap.base, Expr.term_of_expr kind C.Pre r.Heap.lo, Expr.term_of_expr kind C.Pre r.Heap.hi))
+    |> List.map (fun r ->
+         C.AsRange
+           ( r.Heap.base,
+             Expr.term_of_expr kind C.Pre r.Heap.lo,
+             Expr.term_of_expr kind C.Pre r.Heap.hi ))
   in
   let range_bases =
     List.fold_left
