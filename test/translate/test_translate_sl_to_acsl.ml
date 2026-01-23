@@ -641,7 +641,6 @@ let suite =
     "mutable_arr_loop" >:: test_sl_to_acsl_mutable_arr_loop;
     "search_replace" >:: test_sl_to_acsl_search_replace;
     "search_replace_loop" >:: test_sl_to_acsl_search_replace_loop;
-    (* "search_replace_loop_verbose" >:: test_sl_to_acsl_search_replace_loop_verbose; *)
     "search_replace_alt_notation" >:: test_sl_to_acsl_search_replace_alt_notation;
     "search_replace_loop_alt_notation" >:: test_sl_to_acsl_search_replace_loop_alt_notation;
     "incr_max" >:: test_translate_incr_max;
