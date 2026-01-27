@@ -13,7 +13,7 @@
 %token NOT
 %token PRIME
 %token OLD
-// %token AT_OLD
+%token AT_OLD
 %token RETURN
 %token RETURN_HASH
 %token FORALL EXISTS
@@ -40,7 +40,7 @@
 %left STAR
 %left PLUS MINUS
 %left DIV
-// %left AT_OLD PRIME
+%left AT_OLD PRIME
 
 %%
 
@@ -227,8 +227,8 @@ expr:
   | expr PRIME
       { EPost $1 }
   
-  // | expr AT_OLD
-  //     { EOld $1 }
+  | expr AT_OLD
+      { EOld $1 }
 
   | OLD LPAREN expr RPAREN
       { EOld $3 }
