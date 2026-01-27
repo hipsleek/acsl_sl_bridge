@@ -224,15 +224,19 @@ end
 
 module Rewrite = struct
   let force_old_unprimed_heap_reads_if_post_exists (s : Sl_ast.sl) : Sl_ast.sl =
-    (* detect whether there exists any EPost anywhere *)
-    let has_post =
+    let has_post_heap =
       Traverse.fold_sl
         ~f_sl:(fun acc _ -> acc)
-        ~f_expr:(fun acc e -> acc || match e with EPost _ -> true | _ -> false)
+        ~f_expr:(fun acc e ->
+          acc ||
+          match e with
+          | EPost (EDeref _) -> true      (* ( *p )' / array[j]' form *)
+          | EDeref (EPost _) -> true      (* *p' form, if you allow it *)
+          | _ -> false)
         false
         s
     in
-    if not has_post then s
+    if not has_post_heap then s
     else
       let rec map_expr ~(under_old:bool) ~(under_post:bool) (e : Sl_ast.expr) : Sl_ast.expr =
         match e with
