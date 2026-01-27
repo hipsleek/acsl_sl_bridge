@@ -90,6 +90,17 @@ let test_translate_swap_old_notation_sugar _ctx =
   in
   test_framework input expected
 
+let test_translate_swap_old_at_notation_sugar _ctx =
+  let input = "ens (*a)==(*b)@ && (*b)==(*a)@;" in
+  let expected =
+    "/*@\n" ^
+    "  requires \\valid(a) && \\valid(b);\n" ^
+    "  assigns *a, *b;\n" ^
+    "  ensures *a == \\old(*b) && *b == \\old(*a);\n" ^
+    "*/"
+  in
+  test_framework input expected
+
 let test_translate_unary_not _ctx =
   let input =
     "ens !(a == b);"
@@ -451,6 +462,22 @@ let test_sl_to_acsl_search_replace_alt_notation _ctx =
   in
   test_framework input expected
 
+let test_sl_to_acsl_search_replace_alt_notation_old_at _ctx =
+  let input =
+    "req array->int*(arr,0,length-1) && Term[];\n" ^
+    "ens array->int*(narr,0,length-1)\n" ^
+    " && (\\forall size_t j. (0<=j<length && arr[j]@==old ==> narr[j]==new))\n" ^
+    " && (\\forall size_t j. (0<=j<length && arr[j]@!=old ==> narr[j]==arr[j]@));"
+  in
+  let expected =
+    "/*@\n" ^
+    "  requires \\valid(array + (0 .. length - 1));\n" ^
+    "  assigns array[0 .. length - 1];\n" ^
+    "  ensures \\forall size_t j; (0 <= j && j < length && \\old(array[j]) == old) ==> (array[j] == new) && \\forall size_t j; (0 <= j && j < length && \\old(array[j]) != old) ==> (array[j] == \\old(array[j]));\n" ^
+    "*/"
+  in
+  test_framework input expected
+
 
 let test_sl_to_acsl_search_replace_loop_alt_notation _ctx =
   let input =
@@ -621,6 +648,7 @@ let suite =
     "swap_type_mismatch" >:: test_translate_swap_type_mismatch;
     "swap_prime_notation_sugar"  >:: test_translate_swap_prime_notation_sugar;
     "swap_old_notation_sugar" >:: test_translate_swap_old_notation_sugar;
+    "swap_old_at_notation_sugar" >:: test_translate_swap_old_at_notation_sugar;
     "unary_not" >:: test_translate_unary_not;
     "unary_negate" >:: test_translate_unary_negate;
     "case_single" >:: test_translate_case_single;
@@ -642,6 +670,7 @@ let suite =
     "search_replace" >:: test_sl_to_acsl_search_replace;
     "search_replace_loop" >:: test_sl_to_acsl_search_replace_loop;
     "search_replace_alt_notation" >:: test_sl_to_acsl_search_replace_alt_notation;
+    "search_replace_alt_notation_old_at" >:: test_sl_to_acsl_search_replace_alt_notation_old_at;
     "search_replace_loop_alt_notation" >:: test_sl_to_acsl_search_replace_loop_alt_notation;
     "incr_max" >:: test_translate_incr_max;
     "incr_max_spatial_notation" >:: test_translate_incr_max_spatial_notation;

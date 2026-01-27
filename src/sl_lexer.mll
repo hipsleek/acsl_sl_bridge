@@ -60,6 +60,7 @@ rule token = parse
   | "."  { DOT }
   | ","  { COMMA }
   | "@I" { AT_I }
+  | "@"  { AT_OLD }
 
   | "(" { LPAREN }
   | ")" { RPAREN }
