@@ -1,5 +1,6 @@
 (library
  (name ast_printer)
+ (public_name frama-c-sl.ast_printer)
  (modules sl_ast_printer core_printer acsl_ast_printer)
  (libraries ast)
  (wrapped false))

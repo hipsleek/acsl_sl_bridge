@@ -1,0 +1,9 @@
+opam-version: "2.0"
+name: "frama-c-sl"
+synopsis: "Separation-logic (SL) front-end plug-in for Frama-C"
+maintainer: "kylezcc@gmail.com"
+authors: "kylezcc@gmail.com"
+homepage: "https://example.invalid/frama-c-sl"
+bug-reports: "https://example.invalid/frama-c-sl/issues"
+build: [ ["dune" "build" "-p" name "-j" jobs] ]
+depends: [ "dune" "frama-c" ]

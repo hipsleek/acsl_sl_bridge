@@ -1,0 +1,12 @@
+(library
+ (name frama_sl)
+ (public_name frama-c-sl.plugin)
+ (flags -open Frama_c_kernel :standard)
+ (libraries frama-c.kernel frontend translator acsl_sl_bridge_lib))
+
+(plugin
+ (optional)
+ (name sl)
+ (libraries frama_sl)
+ (site (frama-c plugins))
+ (package frama-c-sl))

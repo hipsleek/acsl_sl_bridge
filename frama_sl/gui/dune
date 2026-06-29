@@ -1,0 +1,13 @@
+(library
+ (name frama_sl_gui)
+ (public_name frama-c-sl.gui)
+ (optional)
+ (flags -open Frama_c_kernel -open Frama_c_gui :standard -w -9)
+ (libraries str frama-c-sl.plugin frama-c.kernel frama-c.gui))
+
+(plugin
+ (optional)
+ (name sl-gui)
+ (libraries frama-c-sl.gui)
+ (site (frama-c plugins_gui))
+ (package frama-c-sl))

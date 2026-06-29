@@ -1,5 +1,6 @@
 (library
  (name acsl_sl_bridge_lib)
+ (public_name frama-c-sl.bridge)
  (modules sl_parser sl_lexer acsl_parser acsl_lexer)
  (libraries ast ast_printer translator)
  (wrapped false))
@@ -10,7 +11,7 @@
 (ocamllex
  (modules sl_lexer))
 
- (menhir
+(menhir
  (modules acsl_parser))
 
 (ocamllex
@@ -19,5 +20,4 @@
 (executable
  (name main)
  (modules main)
- (libraries acsl_sl_bridge_lib))
-
+ (libraries acsl_sl_bridge_lib frontend))
